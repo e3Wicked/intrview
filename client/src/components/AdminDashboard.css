@@ -1,0 +1,258 @@
+.admin-dashboard {
+  padding: 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+  color: #e5e5e5;
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+.admin-header h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.admin-refresh-btn {
+  padding: 10px 20px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  color: #b0b0b0;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.admin-refresh-btn:hover {
+  background: #222222;
+  border-color: #3a3a3a;
+  color: #ffffff;
+}
+
+.admin-loading,
+.admin-error {
+  text-align: center;
+  padding: 80px 32px;
+  color: #888;
+  font-size: 16px;
+}
+
+.admin-error button {
+  margin-top: 16px;
+  padding: 10px 20px;
+  background: #f59e0b;
+  border: none;
+  border-radius: 6px;
+  color: #0a0a0a;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 48px;
+}
+
+.stat-card {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 36px;
+  font-weight: 700;
+  color: #f59e0b;
+  margin-bottom: 8px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.admin-analyses h2 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 24px;
+}
+
+.admin-empty {
+  text-align: center;
+  padding: 48px;
+  color: #888;
+  font-size: 16px;
+}
+
+.analyses-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 16px;
+}
+
+.analyses-list-grouped {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.company-group {
+  margin-bottom: 32px;
+}
+
+.company-group-header {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #f59e0b;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.dashboard-progress {
+  margin-top: 24px;
+}
+
+.progress-list {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  margin-top: 24px;
+}
+
+.progress-item {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.progress-item-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 8px 0;
+}
+
+.progress-item-url {
+  margin-bottom: 16px;
+}
+
+.progress-item-url a {
+  color: #888;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.progress-item-url a:hover {
+  color: #f59e0b;
+  text-decoration: underline;
+}
+
+.analysis-card {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 20px;
+  transition: all 0.2s;
+}
+
+.analysis-card:hover {
+  border-color: #3a3a3a;
+  background: #222222;
+}
+
+.analysis-header {
+  margin-bottom: 12px;
+}
+
+.analysis-company {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.analysis-role {
+  font-size: 14px;
+  color: #b0b0b0;
+}
+
+.analysis-url {
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.analysis-url a {
+  color: #f59e0b;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.analysis-url a:hover {
+  text-decoration: underline;
+}
+
+.analysis-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: #666;
+}
+
+.analysis-load-btn {
+  width: 100%;
+  padding: 10px 16px;
+  background: #f59e0b;
+  border: none;
+  border-radius: 6px;
+  color: #0a0a0a;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.analysis-load-btn:hover:not(:disabled) {
+  background: #fb923c;
+}
+
+.analysis-load-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .admin-dashboard {
+    padding: 16px;
+  }
+
+  .admin-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .analyses-list {
+    grid-template-columns: 1fr;
+  }
+}
+

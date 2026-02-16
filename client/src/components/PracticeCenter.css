@@ -1,0 +1,99 @@
+.practice-center {
+  width: 100%;
+}
+
+.practice-center-empty {
+  text-align: center;
+  padding: 64px;
+  color: #888;
+}
+
+.practice-progress-summary {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.progress-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.progress-summary-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.progress-overall {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.progress-value {
+  font-size: 32px;
+  font-weight: 600;
+  color: #f59e0b;
+  line-height: 1;
+}
+
+.progress-label {
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  margin-top: 4px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.progress-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.progress-category-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.category-name {
+  min-width: 120px;
+  font-size: 13px;
+  color: #b0b0b0;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.category-progress-bar {
+  flex: 1;
+  height: 8px;
+  background: #0a0a0a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.category-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b 0%, #fb923c 100%);
+  transition: width 0.3s;
+}
+
+.category-progress-value {
+  min-width: 40px;
+  text-align: right;
+  font-size: 13px;
+  color: #f59e0b;
+  font-weight: 500;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.practice-section {
+  width: 100%;
+}

@@ -1,0 +1,388 @@
+.voice-container {
+  background: #111111;
+  border-radius: 12px;
+  padding: 32px;
+  border: 1px solid #1a1a1a;
+  margin-bottom: 32px;
+}
+
+.voice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.voice-header h2 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.voice-average {
+  font-size: 14px;
+  color: #b0b0b0;
+}
+
+.voice-question-card {
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 24px;
+  border: 1px solid #2a2a2a;
+  margin-bottom: 24px;
+}
+
+.voice-question-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.voice-number {
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.voice-category {
+  background: #2a2a2a;
+  color: #b0b0b0;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.voice-question-text {
+  font-size: 18px;
+  color: #ffffff;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.voice-recording-section {
+  margin-bottom: 24px;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.voice-record-btn {
+  padding: 16px 32px;
+  background: #3a1a1a;
+  color: #ff6b6b;
+  border: 2px solid #5a2a2a;
+  border-radius: 12px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.voice-record-btn:hover {
+  background: #5a2a2a;
+  border-color: #7a3a3a;
+}
+
+.voice-recording-active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  color: #ff6b6b;
+  font-weight: 600;
+}
+
+.recording-dot {
+  width: 12px;
+  height: 12px;
+  background: #ff6b6b;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.voice-stop-btn {
+  padding: 12px 24px;
+  background: #1a1a1a;
+  color: #ffffff;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.voice-stop-btn:hover {
+  background: #2a2a2a;
+}
+
+.voice-audio-player {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.audio-element {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.voice-audio-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.voice-retry-btn,
+.voice-submit-btn {
+  padding: 12px 24px;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.voice-retry-btn {
+  background: #1a1a1a;
+  color: #ffffff;
+}
+
+.voice-retry-btn:hover {
+  background: #2a2a2a;
+}
+
+.voice-submit-btn {
+  background: #ffffff;
+  color: #0a0a0a;
+  font-weight: 600;
+}
+
+.voice-submit-btn:hover:not(:disabled) {
+  background: #e5e5e5;
+}
+
+.voice-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.transcript-preview {
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 24px;
+  border: 1px solid #2a2a2a;
+  margin-bottom: 24px;
+  margin-top: 24px;
+}
+
+.transcript-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 12px;
+}
+
+.transcript-text {
+  color: #b0b0b0;
+  line-height: 1.7;
+  font-size: 14px;
+  margin: 0;
+  padding: 16px;
+  background: #0a0a0a;
+  border-radius: 6px;
+  border: 1px solid #2a2a2a;
+}
+
+.voice-evaluation {
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 24px;
+  border: 1px solid #2a2a2a;
+  margin-bottom: 24px;
+}
+
+.evaluation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.evaluation-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.score-badge {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.score-high {
+  background: #1a3a1a;
+  border: 1px solid #2a5a2a;
+}
+
+.score-medium {
+  background: #3a3a1a;
+  border: 1px solid #5a5a2a;
+}
+
+.score-low {
+  background: #3a1a1a;
+  border: 1px solid #5a2a2a;
+}
+
+.transcription-section {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #0a0a0a;
+  border-radius: 8px;
+  border: 1px solid #2a2a2a;
+}
+
+.transcription-text {
+  color: #b0b0b0;
+  line-height: 1.6;
+  font-size: 14px;
+  margin: 0;
+  margin-top: 8px;
+}
+
+.evaluation-section {
+  margin-bottom: 20px;
+}
+
+.evaluation-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 12px;
+}
+
+.delivery-text {
+  color: #b0b0b0;
+  line-height: 1.6;
+  font-size: 14px;
+  margin: 0;
+}
+
+.evaluation-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.evaluation-list li {
+  padding: 8px 0;
+  padding-left: 24px;
+  position: relative;
+  color: #b0b0b0;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.evaluation-list.strengths li:before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.evaluation-list.improvements li:before {
+  content: "⚠";
+  position: absolute;
+  left: 0;
+  color: #f59e0b;
+}
+
+.evaluation-list.tips li:before {
+  content: "💡";
+  position: absolute;
+  left: 0;
+}
+
+.evaluation-feedback {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #2a2a2a;
+}
+
+.evaluation-feedback p {
+  color: #b0b0b0;
+  line-height: 1.6;
+  font-size: 14px;
+  margin: 0;
+}
+
+.voice-controls {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.voice-nav-btn {
+  padding: 10px 20px;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  background: #1a1a1a;
+  color: #ffffff;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.voice-nav-btn:hover:not(:disabled) {
+  background: #2a2a2a;
+  border-color: #3a3a3a;
+}
+
+.voice-nav-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.voice-empty {
+  text-align: center;
+  padding: 48px;
+  color: #888;
+  font-size: 16px;
+}
+

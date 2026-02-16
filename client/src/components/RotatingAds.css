@@ -1,0 +1,450 @@
+.rotating-ads {
+  position: fixed;
+  top: 80px;
+  width: 280px;
+  padding: 24px;
+  background: #111111;
+  border-right: 1px solid #1a1a1a;
+  height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  z-index: 10; /* Lower than header (200) and sidebars (100) but above content */
+  overflow: hidden; /* Prevent any overflow */
+}
+
+.rotating-ads-left {
+  left: 0;
+}
+
+.rotating-ads-right {
+  right: 0;
+  border-right: none;
+  border-left: 1px solid #1a1a1a;
+}
+
+.rotating-ads-header {
+  margin-bottom: 20px;
+}
+
+.rotating-ads-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.rotating-ads-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  justify-content: space-between;
+  overflow: hidden; /* Prevent cards from overflowing */
+}
+
+.rotating-ads-list.rotating .rotating-ad-card {
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  pointer-events: none; /* Disable interaction during rotation */
+}
+
+.rotating-ads-list:not(.rotating) .rotating-ad-card {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  pointer-events: auto; /* Re-enable interaction after rotation */
+}
+
+/* Stagger animation for cards (5 cards per sidebar) */
+.rotating-ads-list:not(.rotating) .rotating-ad-card:nth-child(1) {
+  transition-delay: 0.05s;
+}
+
+.rotating-ads-list:not(.rotating) .rotating-ad-card:nth-child(2) {
+  transition-delay: 0.1s;
+}
+
+.rotating-ads-list:not(.rotating) .rotating-ad-card:nth-child(3) {
+  transition-delay: 0.15s;
+}
+
+.rotating-ads-list:not(.rotating) .rotating-ad-card:nth-child(4) {
+  transition-delay: 0.2s;
+}
+
+.rotating-ads-list:not(.rotating) .rotating-ad-card:nth-child(5) {
+  transition-delay: 0.25s;
+}
+
+.rotating-ad-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  padding: 16px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  transition: all 0.2s;
+  overflow: hidden;
+}
+
+.rotating-ad-card:hover {
+  background: #222222;
+  border-color: #f59e0b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+}
+
+.rotating-ad-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.rotating-ad-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+.rotating-ad-logo-wrapper {
+  flex-shrink: 0;
+}
+
+.rotating-ad-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  flex-shrink: 0;
+  background: transparent;
+  border-radius: 6px;
+  padding: 0;
+  border: none;
+  display: block;
+}
+
+.logo-placeholder {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  background: #f59e0b;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 20px;
+  flex-shrink: 0;
+  border: none;
+}
+
+/* Mobile logo styles */
+@media (max-width: 768px) {
+  .rotating-ad-mobile-logo img,
+  .rotating-ad-mobile-logo .rotating-ad-logo {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 4px;
+  }
+
+  .rotating-ad-mobile-logo .logo-placeholder {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+}
+
+
+.rotating-ad-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rotating-ad-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.rotating-ad-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.3;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.hiring-badge {
+  background: #f59e0b;
+  color: #0a0a0a;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.rotating-ad-description {
+  font-size: 13px;
+  color: #b0b0b0;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 10px;
+  flex: 1;
+  word-break: break-word;
+  width: 100%;
+}
+
+.rotating-ad-jobs-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.job-count-display {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.job-count-number {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f59e0b;
+  line-height: 1;
+}
+
+.job-count-label {
+  font-size: 11px;
+  color: #888;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.rotating-ad-jobs {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid #2a2a2a;
+  flex-shrink: 0;
+  width: 100%;
+}
+
+.view-jobs-link {
+  font-size: 13px;
+  color: #f59e0b;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rotating-ad-card:hover .view-jobs-link {
+  color: #fb923c;
+  text-decoration: underline;
+  transform: translateX(2px);
+}
+
+.rotating-ads-footer {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #1a1a1a;
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.sponsor-link {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 12px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.2s;
+  padding: 0;
+}
+
+.sponsor-link:hover {
+  color: #ffffff;
+}
+
+/* Mobile: horizontal ads at top and bottom */
+@media (max-width: 768px) {
+  /* Hide sidebars on mobile */
+  .sidebar,
+  .right-sidebar {
+    display: none !important;
+  }
+
+  /* Mobile ad bars - fixed at top and bottom */
+  .mobile-ad-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    z-index: 150;
+    background: #0a0a0a;
+    border-bottom: 1px solid #1a1a1a;
+    padding: 12px 16px;
+  }
+
+  .mobile-ad-bar-top {
+    top: 80px; /* Below header */
+    border-bottom: 1px solid #1a1a1a;
+    border-top: 1px solid #1a1a1a;
+  }
+
+  .mobile-ad-bar-bottom {
+    bottom: 0;
+    border-top: 1px solid #1a1a1a;
+    border-bottom: none;
+  }
+
+  /* Mobile rotating ads container */
+  .rotating-ads.mobile {
+    position: relative;
+    width: 100%;
+    height: auto;
+    padding: 0;
+    border: none;
+    top: auto;
+    left: auto;
+    right: auto;
+    background: transparent;
+  }
+
+  .rotating-ads.mobile .rotating-ads-list.mobile-horizontal {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: hidden; /* No scrolling, just show 5 cards */
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    justify-content: space-between; /* Distribute evenly */
+    width: 100%;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  /* Mobile ad card - compact, only logo and name */
+  .rotating-ad-card.mobile-card {
+    flex: 1 1 0; /* Equal width for all 5 cards */
+    min-width: 0; /* Allow shrinking */
+    max-width: none;
+    height: auto;
+    min-height: 70px;
+    padding: 8px 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    box-sizing: border-box;
+  }
+
+  .rotating-ad-mobile-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .rotating-ad-mobile-logo {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .rotating-ad-mobile-logo .rotating-ad-logo,
+  .rotating-ad-mobile-logo .logo-placeholder {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+  }
+
+  .rotating-ad-mobile-name {
+    font-size: 9px;
+    font-weight: 500;
+    color: #fff;
+    text-align: center;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+    font-family: 'Inconsolata', 'Courier New', monospace;
+    padding: 0 2px;
+  }
+
+  /* Hide desktop content on mobile */
+  .rotating-ads.mobile .rotating-ad-content,
+  .rotating-ads.mobile .rotating-ads-header,
+  .rotating-ads.mobile .rotating-ads-footer {
+    display: none;
+  }
+
+  /* Adjust main content padding for mobile ad bars */
+  .main-content {
+    padding-top: 140px; /* Header (80px) + Top ad bar (~60px) */
+    padding-bottom: 80px; /* Bottom ad bar (~60px) + margin */
+  }
+}
+
+/* Tablet: hide sidebars, show mobile ads */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .sidebar,
+  .right-sidebar {
+    display: none !important;
+  }
+
+  .mobile-ad-bar {
+    display: none;
+  }
+}
+

@@ -1,0 +1,19 @@
+{
+  "name": "interview-prepper",
+  "version": "1.0.0",
+  "description": "Generate study plans and interview questions from job descriptions",
+  "main": "server/index.js",
+  "scripts": {
+    "build": "cd client && npm run build",
+    "start": "npm run build && npm run server",
+    "server": "cd server && node index.js",
+    "install-all": "npm install && cd server && npm install && cd ../client && npm install"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
+

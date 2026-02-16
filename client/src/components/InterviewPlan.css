@@ -1,0 +1,271 @@
+.interview-plan {
+  width: 100%;
+}
+
+.interview-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 800px;
+}
+
+.timeline-stage {
+  display: flex;
+  gap: 20px;
+}
+
+.stage-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  min-width: 20px;
+}
+
+.connector-line {
+  width: 2px;
+  flex: 1;
+  background: #2a2a2a;
+  min-height: 20px;
+}
+
+.stage-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f59e0b;
+  border: 3px solid #1a1a1a;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.stage-content {
+  flex: 1;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.stage-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: #f59e0b;
+  margin: 0 0 8px 0;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.stage-description {
+  color: #b0b0b0;
+  margin: 0 0 16px 0;
+  font-size: 14px;
+}
+
+.stage-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-item {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.detail-label {
+  color: #888;
+  font-weight: 500;
+}
+
+.detail-value {
+  color: #fff;
+}
+
+.stage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.stage-toggle {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f59e0b;
+  font-size: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.stage-toggle:hover {
+  background: #3a3a3a;
+  border-color: #f59e0b;
+}
+
+.stage-questions-count {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 12px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.stage-questions {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.question-item {
+  background: #0a0a0a;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.question-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.question-number {
+  background: #f59e0b;
+  color: #0a0a0a;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.question-category {
+  padding: 4px 8px;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #b0b0b0;
+  text-transform: uppercase;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.question-text {
+  color: #fff;
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.question-answer {
+  margin-top: 12px;
+}
+
+.question-answer summary {
+  color: #f59e0b;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  user-select: none;
+}
+
+.question-answer summary:hover {
+  color: #fb923c;
+}
+
+.answer-content {
+  color: #b0b0b0;
+  line-height: 1.7;
+  margin-top: 12px;
+  padding: 12px;
+  background: #1a1a1a;
+  border-left: 3px solid #f59e0b;
+  border-radius: 4px;
+}
+
+.answer-tips {
+  margin-top: 12px;
+  padding: 12px;
+  background: #1a1a1a;
+  border-left: 3px solid #3a3a3a;
+  border-radius: 4px;
+  color: #b0b0b0;
+  font-size: 13px;
+}
+
+.answer-tips strong {
+  color: #f59e0b;
+}
+
+.answer-references {
+  margin-top: 12px;
+  padding: 12px;
+  background: #1a1a1a;
+  border-left: 3px solid #3a3a3a;
+  border-radius: 4px;
+  color: #b0b0b0;
+  font-size: 13px;
+}
+
+.answer-references strong {
+  color: #f59e0b;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.answer-references ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.answer-references li {
+  margin-bottom: 6px;
+}
+
+.answer-references a {
+  color: #f59e0b;
+  text-decoration: none;
+}
+
+.answer-references a:hover {
+  text-decoration: underline;
+}
+
+.ref-desc {
+  color: #888;
+  font-size: 12px;
+}
+
+.stage-no-questions {
+  color: #888;
+  font-size: 13px;
+  font-style: italic;
+  padding: 12px;
+  background: #0a0a0a;
+  border-radius: 4px;
+  border: 1px dashed #2a2a2a;
+}
+
+.interview-plan-empty {
+  text-align: center;
+  padding: 64px;
+  color: #888;
+}
+

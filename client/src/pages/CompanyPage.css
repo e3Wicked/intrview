@@ -1,0 +1,263 @@
+.company-page {
+  width: 100%;
+}
+
+
+.company-page-loading,
+.company-page-empty {
+  text-align: center;
+  padding: 64px;
+  color: #888;
+}
+
+.company-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0 32px 24px;
+  margin-bottom: 32px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.company-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.company-back-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  color: #b0b0b0;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.company-back-button:hover {
+  background: #2a2a2a;
+  border-color: #3a3a3a;
+  color: #f59e0b;
+}
+
+.company-logo-large-container {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #2a2a2a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.company-logo-large {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f59e0b 0%, #fb923c 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0a0a0a;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.company-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.company-page-title {
+  font-size: 32px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.company-role-badge {
+  padding: 4px 12px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  color: #f59e0b;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  white-space: nowrap;
+}
+
+.company-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: #888;
+  flex-wrap: wrap;
+}
+
+.target-role {
+  color: #f59e0b;
+}
+
+.company-header-right {
+  display: flex;
+  align-items: center;
+}
+
+.company-progress-ring {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.progress-ring-svg {
+  transform: rotate(-90deg);
+}
+
+.progress-ring-circle {
+  transition: stroke-dashoffset 0.3s;
+}
+
+.progress-ring-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.progress-ring-value {
+  display: block;
+  font-size: 18px;
+  font-weight: 600;
+  color: #f59e0b;
+}
+
+.progress-ring-label {
+  display: block;
+  font-size: 10px;
+  color: #888;
+  text-transform: uppercase;
+}
+
+.company-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 32px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.company-tab {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 14px;
+}
+
+.company-tab:hover {
+  color: #fff;
+}
+
+.company-tab.active {
+  color: #f59e0b;
+  border-bottom-color: #f59e0b;
+}
+
+.company-tab-content {
+  min-height: 400px;
+}
+
+/* Inline Role Switcher */
+.role-switcher-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.role-switcher-btn-inline {
+  padding: 4px 10px;
+  background: #0a0a0a;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 12px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.role-switcher-btn-inline:hover {
+  border-color: #3a3a3a;
+  color: #fff;
+}
+
+.role-switcher-btn-inline.active {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  color: #0a0a0a;
+  font-weight: 600;
+}
+
+.role-count-badge-inline {
+  padding: 1px 4px;
+  background: rgba(10, 10, 10, 0.3);
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+.role-switcher-btn-inline.active .role-count-badge-inline {
+  background: rgba(10, 10, 10, 0.5);
+}
+
+.job-post-link {
+  padding: 8px 16px;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  color: #f59e0b;
+  text-decoration: none;
+  font-size: 13px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  transition: all 0.2s;
+}
+
+.job-post-link:hover {
+  background: #3a3a3a;
+  border-color: #f59e0b;
+}
+
+.roles-badge {
+  padding: 4px 12px;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  color: #f59e0b;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+

@@ -1,0 +1,108 @@
+.progress-dashboard {
+  width: 100%;
+}
+
+.progress-overview {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 48px;
+}
+
+.progress-ring-large {
+  position: relative;
+  width: 200px;
+  height: 200px;
+}
+
+.progress-ring-svg-large {
+  transform: rotate(-90deg);
+}
+
+.progress-ring-circle-large {
+  transition: stroke-dashoffset 0.5s;
+}
+
+.progress-ring-text-large {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.progress-ring-value-large {
+  display: block;
+  font-size: 36px;
+  font-weight: 600;
+  color: #f59e0b;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.progress-ring-label-large {
+  display: block;
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.progress-categories {
+  max-width: 600px;
+}
+
+.categories-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 24px 0;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.categories-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.category-progress-item {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.category-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.category-percent {
+  font-size: 16px;
+  font-weight: 600;
+  color: #f59e0b;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.category-bar {
+  width: 100%;
+  height: 8px;
+  background: #2a2a2a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.category-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b 0%, #fb923c 100%);
+  transition: width 0.3s;
+}
+
+

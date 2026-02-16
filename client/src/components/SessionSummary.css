@@ -1,0 +1,203 @@
+.session-summary-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9000;
+  backdrop-filter: blur(4px);
+}
+
+.session-summary-modal {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 440px;
+  width: 90%;
+  text-align: center;
+  animation: summarySlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.session-summary-title {
+  font-size: 24px;
+  color: #fff;
+  margin-bottom: 24px;
+}
+
+.session-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.session-stat {
+  padding: 12px;
+  background: #0a0a0a;
+  border-radius: 10px;
+  border: 1px solid #1a1a1a;
+}
+
+.session-stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #f59e0b;
+}
+
+.session-stat-label {
+  font-size: 11px;
+  color: #666;
+  margin-top: 4px;
+}
+
+.session-xp-section {
+  margin-bottom: 20px;
+}
+
+.session-xp-earned {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.session-xp-icon {
+  font-size: 24px;
+}
+
+.session-xp-amount {
+  font-size: 28px;
+  font-weight: 700;
+  color: #f59e0b;
+  text-shadow: 0 0 12px rgba(245, 158, 11, 0.3);
+}
+
+.session-level-bar {
+  padding: 0 8px;
+}
+
+.session-level-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.session-level-track {
+  height: 6px;
+  background: #1a1a1a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.session-level-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  border-radius: 3px;
+  transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.session-achievements {
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.session-achievements h3 {
+  font-size: 14px;
+  color: #e5e5e5;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.session-achievement-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: #1a1510;
+  border: 1px solid #f59e0b22;
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+
+.session-ach-icon {
+  font-size: 24px;
+}
+
+.session-ach-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e5e5e5;
+}
+
+.session-ach-desc {
+  font-size: 11px;
+  color: #666;
+}
+
+.session-ach-xp {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f59e0b;
+  margin-left: auto;
+}
+
+.session-streak {
+  font-size: 16px;
+  color: #f59e0b;
+  margin-bottom: 20px;
+}
+
+.session-streak-mult {
+  font-size: 13px;
+  color: #888;
+}
+
+.session-summary-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.session-btn-continue {
+  flex: 1;
+  padding: 12px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border: none;
+  border-radius: 8px;
+  color: #000;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.session-btn-continue:hover {
+  filter: brightness(1.1);
+}
+
+.session-btn-end {
+  flex: 1;
+  padding: 12px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  color: #888;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.session-btn-end:hover {
+  background: #222;
+  color: #e5e5e5;
+}
+
+@keyframes summarySlideUp {
+  from { transform: translateY(40px) scale(0.95); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}

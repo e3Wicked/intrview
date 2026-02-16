@@ -1,0 +1,31 @@
+.dashboard-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #2a2a2a;
+  margin-bottom: 24px;
+  padding-bottom: 0;
+}
+
+.dashboard-tab {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.dashboard-tab:hover {
+  color: #fff;
+}
+
+.dashboard-tab.active {
+  color: #f59e0b;
+  border-bottom-color: #f59e0b;
+}
+
+

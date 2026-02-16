@@ -1,0 +1,105 @@
+.study-plan-schedule {
+  width: 100%;
+}
+
+.study-plan-empty {
+  text-align: center;
+  padding: 48px;
+  color: #888;
+}
+
+.schedule-header {
+  margin-bottom: 32px;
+}
+
+.schedule-header h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 8px 0;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.schedule-subtitle {
+  color: #888;
+  font-size: 14px;
+  margin: 0;
+}
+
+.weekly-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.week-card {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.week-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.week-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #f59e0b;
+  margin: 0;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.week-topics {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.topic-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #0a0a0a;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.topic-item:hover {
+  border-color: #3a3a3a;
+}
+
+.topic-item.completed {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 146, 60, 0.1) 100%);
+  border-color: #f59e0b;
+}
+
+.topic-check {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #f59e0b;
+  color: #0a0a0a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.topic-name {
+  color: #fff;
+  font-size: 14px;
+}
+
+.topic-item.completed .topic-name {
+  color: #f59e0b;
+}
+
+

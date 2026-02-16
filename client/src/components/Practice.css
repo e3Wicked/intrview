@@ -1,0 +1,156 @@
+.practice-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+.practice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.practice-question-count {
+  font-size: 14px;
+  color: #888;
+  margin: 4px 0 0 0;
+}
+
+.practice-header h2 {
+  font-size: 28px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.practice-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #888;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #f59e0b;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.practice-mode-toggle {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 32px;
+  border-bottom: 1px solid #1a1a1a;
+  padding-bottom: 16px;
+}
+
+.mode-btn {
+  padding: 12px 24px;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  background: #1a1a1a;
+  color: #b0b0b0;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mode-btn:hover {
+  background: #2a2a2a;
+  border-color: #3a3a3a;
+  color: #ffffff;
+}
+
+.mode-btn.active {
+  background: #ffffff;
+  color: #0a0a0a;
+  border-color: #ffffff;
+  font-weight: 600;
+}
+
+.practice-content {
+  width: 100%;
+}
+
+.practice-empty {
+  text-align: center;
+  padding: 64px 32px;
+  color: #888;
+  font-size: 16px;
+}
+
+.quiz-with-voice {
+  width: 100%;
+}
+
+.voice-toggle-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+.voice-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  background: #1a1a1a;
+  color: #b0b0b0;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.voice-toggle-btn:hover {
+  background: #2a2a2a;
+  border-color: #3a3a3a;
+  color: #ffffff;
+}
+
+.voice-toggle-btn.active {
+  background: #f59e0b;
+  color: #0a0a0a;
+  border-color: #f59e0b;
+}
+
+.voice-toggle-btn svg {
+  flex-shrink: 0;
+}
+
+.generate-more-btn {
+  padding: 10px 20px;
+  background: #1a1a1a;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  color: #f59e0b;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.generate-more-btn:hover:not(:disabled) {
+  background: #f59e0b;
+  color: #0a0a0b;
+}
+
+.generate-more-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
