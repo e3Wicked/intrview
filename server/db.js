@@ -74,13 +74,24 @@ async function getOrCreateCompany(companyData) {
 // Get company with all related data
 async function getCompanyFullData(companyName) {
   const normalizedName = normalizeCompanyName(companyName);
-  
+
   try {
-    const company = await pool.query(
+    let company = await pool.query(
       'SELECT * FROM companies WHERE normalized_name = $1',
       [normalizedName]
     );
-    
+
+    // Fuzzy fallback: try LIKE match if exact match fails (handles "Datadog, Inc." vs "Datadog")
+    if (company.rows.length === 0) {
+      const baseName = normalizedName.replace(/-+(inc|llc|ltd|corp|co)-*$/i, '').replace(/-+$/, '');
+      if (baseName !== normalizedName) {
+        company = await pool.query(
+          'SELECT * FROM companies WHERE normalized_name = $1',
+          [baseName]
+        );
+      }
+    }
+
     if (company.rows.length === 0) {
       return null;
     }

@@ -13,7 +13,7 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
 SMTP_PASSWORD=your-app-password
-SMTP_FROM=Interview Prepper <noreply@interviewprepper.com>
+SMTP_FROM=intrview.io <noreply@intrview.io>
 ```
 
 **For Gmail:**

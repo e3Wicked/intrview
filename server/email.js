@@ -48,20 +48,20 @@ function getTransporter() {
 export async function sendVerificationCode(email, code) {
   try {
     const mailOptions = {
-      from: process.env.SMTP_FROM || 'Interview Prepper <noreply@interviewprepper.com>',
+      from: process.env.SMTP_FROM || 'intrview.io <noreply@intrview.io>',
       to: email,
-      subject: 'Your Interview Prepper Verification Code',
+      subject: 'Your intrview.io Verification Code',
       html: `
         <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e5e5e5; padding: 32px; border-radius: 8px;">
           <h2 style="color: #fff; margin-bottom: 16px;">Your verification code</h2>
-          <p style="color: #b0b0b0; margin-bottom: 24px;">Use this code to sign in to Interview Prepper:</p>
+          <p style="color: #b0b0b0; margin-bottom: 24px;">Use this code to sign in to intrview.io:</p>
           <div style="font-size: 36px; font-weight: bold; letter-spacing: 12px; text-align: center; margin: 32px 0; color: #f59e0b; font-family: 'Courier New', monospace;">
             ${code}
           </div>
           <p style="color: #666; font-size: 12px; text-align: center; margin-top: 24px;">This code expires in 10 minutes.</p>
         </div>
       `,
-      text: `Your Interview Prepper verification code is: ${code}\n\nThis code expires in 10 minutes.`,
+      text: `Your intrview.io verification code is: ${code}\n\nThis code expires in 10 minutes.`,
     };
 
     const transporter = getTransporter();

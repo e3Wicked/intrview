@@ -37,7 +37,7 @@ function Layout({ children, user, setUser, showLoginModal, setShowLoginModal, lo
                 <path d="M16 8L20 14H22L18 20H14L10 14H12L16 8Z" fill="#0a0a0a"/>
                 <path d="M16 24L12 18H10L14 12H18L22 18H20L16 24Z" fill="#0a0a0a"/>
               </svg>
-              <span className="header-logo-text">Interview Prepper</span>
+              <span className="header-logo-text">intrview.io</span>
             </button>
           </div>
           

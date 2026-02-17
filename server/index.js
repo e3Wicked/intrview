@@ -2470,7 +2470,7 @@ app.post('/api/stripe/create-advertiser-checkout', async (req, res) => {
         price_data: {
           currency: 'usd',
           product_data: {
-            name: 'Interview Prepper Advertiser Spot',
+            name: 'intrview.io Advertiser Spot',
             description: 'Monthly advertising spot - Next month reservation' + (companyName ? ` (${companyName})` : '')
           },
           recurring: {

@@ -19,7 +19,7 @@ async function resetAdmin() {
     console.log('✅ Deleted all users');
     
     // Create new admin user
-    const adminEmail = 'admin@interviewprepper.com';
+    const adminEmail = 'admin@intrview.io';
     const adminPassword = 'admin123';
     const adminName = 'Admin User';
     

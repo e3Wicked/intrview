@@ -45,7 +45,7 @@ function SponsorModal({ onClose }) {
         </button>
         
         <div className="sponsor-modal-header">
-          <h2 className="sponsor-modal-title">Advertise on Interview Prepper</h2>
+          <h2 className="sponsor-modal-title">Advertise on intrview.io</h2>
           <p className="sponsor-modal-subtitle">Reach 120K+ job seekers and engineers every month</p>
         </div>
 
@@ -70,7 +70,7 @@ function SponsorModal({ onClose }) {
         <div className="sponsor-modal-section">
           <h3 className="sponsor-section-title">How it works</h3>
           <p className="sponsor-section-text">
-            Your company appears in rotating sponsor slots on desktop sidebars and mobile banners across all Interview Prepper pages. 
+            Your company appears in rotating sponsor slots on desktop sidebars and mobile banners across all intrview.io pages. 
             Sponsors rotate every 10 seconds to ensure fair visibility among all advertisers.
           </p>
         </div>

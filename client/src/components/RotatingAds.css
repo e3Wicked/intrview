@@ -86,7 +86,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 0;
-  padding: 16px;
+  padding: 12px;
   background: #1a1a1a;
   border: 1px solid #2a2a2a;
   border-radius: 8px;
@@ -122,8 +122,8 @@
 .rotating-ad-top {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 10px;
+  margin-bottom: 8px;
   min-width: 0;
   width: 100%;
 }
@@ -133,8 +133,8 @@
 }
 
 .rotating-ad-logo {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   object-fit: contain;
   flex-shrink: 0;
   background: transparent;
@@ -145,8 +145,8 @@
 }
 
 .logo-placeholder {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border-radius: 6px;
   background: #f59e0b;
   color: white;
@@ -154,7 +154,7 @@
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 20px;
+  font-size: 18px;
   flex-shrink: 0;
   border: none;
 }
@@ -217,14 +217,11 @@
 }
 
 .rotating-ad-description {
-  font-size: 13px;
+  font-size: 12px;
   color: #b0b0b0;
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
+  line-height: 1.4;
   overflow: hidden;
-  margin-bottom: 10px;
+  margin-bottom: 0;
   flex: 1;
   word-break: break-word;
   width: 100%;

@@ -16,7 +16,7 @@ export async function createStripeProducts() {
     if (plan.price) {
       const product = await stripe.products.create({
         name: `${plan.name} Plan`,
-        description: `Interview Prepper ${plan.name} subscription`
+        description: `intrview.io ${plan.name} subscription`
       });
       
       const price = await stripe.prices.create({
@@ -84,7 +84,7 @@ export async function createCheckoutSession(userId, planKey, successUrl, cancelU
     try {
       const product = await stripe.products.create({
         name: `${plan.name} Plan`,
-        description: `Interview Prepper ${plan.name} subscription`
+        description: `intrview.io ${plan.name} subscription`
       });
       
       const price = await stripe.prices.create({

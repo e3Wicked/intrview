@@ -404,9 +404,9 @@ export async function getUserFromSession(sessionToken) {
 
 // Admin/test emails that get unlimited credits
 const ADMIN_EMAILS = [
-  'admin@interviewprepper.com',
-  'test@interviewprepper.com',
-  'alberto@interviewprepper.com' // Add your email here
+  'admin@intrview.io',
+  'test@intrview.io',
+  'alberto@intrview.io' // Add your email here
 ];
 
 // Check if user is admin

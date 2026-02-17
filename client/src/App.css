@@ -85,7 +85,7 @@
   flex: 1;
   min-width: 0;
   padding-left: 0;
-  margin-left: -32px; /* Offset the header-content padding to align to left edge */
+  margin-left: 0;
 }
 
 .header-logo {

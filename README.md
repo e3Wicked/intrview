@@ -1,4 +1,4 @@
-# Interview Prepper
+# intrview.io
 
 A minimal web application that generates personalized study plans and interview questions from job description URLs using OpenAI.
 

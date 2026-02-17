@@ -121,7 +121,7 @@ function EmptyState({ url, setUrl, handleSubmit, loading, user, onSelectPlan, on
       </div>
       
       <div className="empty-state-hero">
-        <h1 className="empty-title">Interview Prepper</h1>
+        <h1 className="empty-title">intrview.io</h1>
         <p className="empty-subtitle">Transform job descriptions into personalized interview prep plans</p>
         
         {/* Prominent URL Input */}
