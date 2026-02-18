@@ -29,7 +29,8 @@ import {
   getUserJobAnalyses,
   getUserStats,
   ensureJobAnalysesTable,
-  ensureEmailVerificationCodesTable
+  ensureEmailVerificationCodesTable,
+  findStudyPlanByCompanyRole
 } from './db.js';
 import { 
   createUser,
@@ -1176,9 +1177,9 @@ If you cannot find information about the company, return null for fields you don
 }
 
 // Function to generate study plan and questions using OpenAI
-async function generateStudyPlan(jobDescription, companyName = 'the company') {
+async function generateStudyPlan(jobDescription, companyName = 'the company', roleTitle = null) {
   try {
-    // Check database cache first
+    // Check database cache first (exact hash match)
     const jobHash = hashJobDescription(jobDescription);
     try {
       const cached = await getCachedStudyPlan(jobHash);
@@ -1189,7 +1190,20 @@ async function generateStudyPlan(jobDescription, companyName = 'the company') {
     } catch (dbError) {
       console.log('Database lookup failed, generating new study plan:', dbError.message);
     }
-    
+
+    // Fallback: check if another user analyzed the same company+role
+    try {
+      const match = await findStudyPlanByCompanyRole(companyName, roleTitle);
+      if (match) {
+        console.log(`🔄 Reusing study plan from company+role match: ${companyName} / ${roleTitle} (source hash: ${match.sourceHash.substring(0, 8)}...)`);
+        // Save under this hash too so future lookups are instant
+        await saveStudyPlan(jobHash, match.studyPlan, companyName, roleTitle);
+        return match.studyPlan;
+      }
+    } catch (matchError) {
+      console.log('Company+role lookup failed (non-critical):', matchError.message);
+    }
+
     const openai = getOpenAIClient();
     
     // Extract key information from job description to create field-specific prompts
@@ -1231,7 +1245,7 @@ async function generateStudyPlan(jobDescription, companyName = 'the company') {
       techStack = foundTech.join(', ');
     }
     
-    const prompt = `You are an expert career coach and technical interviewer specializing in ${fieldContext}. Based on the following job description for ${companyName}, create a comprehensive, thoughtful study plan and interview questions.
+    const prompt = `You are an expert career coach and technical interviewer specializing in ${fieldContext}. Based on the following job description for ${companyName}, create a comprehensive study plan and a LARGE set of interview questions.
 
 IMPORTANT: Generate questions that are SPECIFIC to ${companyName} and their tech stack. Include:
 1. Company-specific culture and values questions about ${companyName}
@@ -1246,16 +1260,23 @@ ${jobDescription}
 ${questionFocus}
 
 Please provide:
-1. A structured study plan organized by topics/skills mentioned in the job description - be specific to the technologies and frameworks mentioned
-2. Interview questions organized by interview stage (if stages are mentioned) or by topic area
+1. A structured study plan organized by topics/skills mentioned in the job description
+2. **At least 20-30 interview questions** organized by interview stage, with **5-8 questions per stage across 3-5 stages**
 3. For each topic, include up-to-date information and best practices (as of 2025)
-4. Make the study plan actionable with specific areas to focus on - prioritize what's most important for THIS specific role
-5. For interview questions, provide IN-DEPTH, detailed answers with explanations, examples, and edge cases
-6. Include REAL, WORKING URLs to high-quality learning resources (official documentation, tutorials, courses, articles)
-7. Answers should be comprehensive enough to help someone actually prepare, not just brief tips
-8. Questions should be realistic and similar to what they would actually face in interviews for this specific role
-9. Think deeply about what makes a good candidate for THIS role - what would you want to test?
+4. Make the study plan actionable with specific areas to focus on
+5. For interview questions, provide detailed answers with explanations and examples
+6. Include REAL, WORKING URLs to high-quality learning resources
+7. Answers should be comprehensive enough to help someone actually prepare
+8. Questions should be realistic and similar to what they would actually face
+9. Think deeply about what makes a good candidate for THIS role
 10. Include both technical depth questions and practical problem-solving scenarios
+
+CRITICAL — CATEGORY RULES:
+- Use SPECIFIC, DESCRIPTIVE categories based on the actual job description technologies and skills
+- NEVER use generic categories like just "Technical" or "Behavioral"
+- Good categories: "React & Frontend", "Node.js & APIs", "System Design", "Databases & SQL", "TypeScript & Type Safety", "Testing & QA", "Leadership & Collaboration", "${companyName} Culture", "Problem Solving & Algorithms", "DevOps & Deployment", "Architecture Patterns", "Communication & Teamwork"
+- Each question MUST have a specific category — aim for 5-8 distinct categories across all questions
+- Categories should reflect the actual technologies and skills in the job description
 
 Format your response as JSON with the following structure:
 {
@@ -1278,12 +1299,12 @@ Format your response as JSON with the following structure:
   "interviewQuestions": {
     "stages": [
       {
-        "stageName": "Stage name (e.g., Technical Round, Behavioral Round)",
+        "stageName": "Stage name (e.g., Technical Deep Dive, System Design, Behavioral)",
         "questions": [
           {
             "question": "Question text",
-            "category": "Category (e.g., Technical, Behavioral)",
-            "answer": "Comprehensive, in-depth answer explaining the concept thoroughly with examples and context",
+            "category": "Specific category (e.g., 'React & Frontend', NOT just 'Technical')",
+            "answer": "Comprehensive answer with examples and context",
             "references": [
               {
                 "title": "Reference title",
@@ -1313,7 +1334,7 @@ Format your response as JSON with the following structure:
         }
       ],
       temperature: 0.7,
-      max_tokens: 3000, // Reduced from 4000 to save costs while maintaining quality
+      max_tokens: 6000, // Increased to allow for 20-30 questions with detailed answers
     });
 
     const responseText = completion.choices[0].message.content;
@@ -1335,7 +1356,7 @@ Format your response as JSON with the following structure:
 
     // Save to database for future use
     try {
-      await saveStudyPlan(jobHash, parsedResponse);
+      await saveStudyPlan(jobHash, parsedResponse, companyName, roleTitle);
     } catch (saveError) {
       console.log('Failed to save study plan to database (non-critical):', saveError.message);
     }
@@ -1788,7 +1809,8 @@ Job title:`;
       };
     } else {
       const companyNameForPlan = (companyInfo && companyInfo.name) ? companyInfo.name : 'the company';
-      studyPlan = await generateStudyPlan(jobDescription, companyNameForPlan);
+      const roleTitleForPlan = companyInfo?.roleTitle || null;
+      studyPlan = await generateStudyPlan(jobDescription, companyNameForPlan, roleTitleForPlan);
       await deductCredits(user.id, CREDIT_COSTS.studyPlan);
     }
 
@@ -2082,6 +2104,151 @@ Format as JSON:
       error: error.message || 'Failed to evaluate voice recording',
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
+  }
+});
+
+// API endpoint for chat-based practice
+app.post('/api/chat/practice', requireAuth, requireCredits(CREDIT_COSTS.chatPractice), async (req, res) => {
+  try {
+    const { jobDescriptionHash, topic, messages, companyName, roleTitle, sessionId } = req.body;
+
+    if (!topic) {
+      return res.status(400).json({ error: 'Topic is required' });
+    }
+
+    // Deduct credits
+    await deductCredits(req.user.id, CREDIT_COSTS.chatPractice);
+
+    const openai = getOpenAIClient();
+
+    // Get job description for context
+    let jobContext = '';
+    if (jobDescriptionHash) {
+      try {
+        const cachedPlan = await getCachedStudyPlan(jobDescriptionHash);
+        if (cachedPlan?.jobDescription) {
+          jobContext = cachedPlan.jobDescription.substring(0, 2000);
+        }
+      } catch (e) {
+        // Non-critical
+      }
+    }
+
+    // Build conversation history for GPT
+    const systemPrompt = `You are an expert technical interviewer conducting a practice interview session.
+
+Context:
+- Company: ${companyName || 'a tech company'}
+- Role: ${roleTitle || 'Software Engineer'}
+- Topic: ${topic}
+${jobContext ? `- Job Description (excerpt): ${jobContext.substring(0, 1000)}` : ''}
+
+Guidelines:
+- Act as a friendly but thorough interviewer
+- Ask follow-up questions to probe deeper understanding
+- If this is the start of the conversation (no previous messages), begin with an engaging opening question about the topic
+- Keep questions relevant to the company and role context
+- After the candidate answers, provide brief constructive feedback, then ask a follow-up or related question
+- Be encouraging but honest about gaps in knowledge
+- Vary question difficulty — start moderate, adjust based on responses
+- Keep responses concise (2-4 paragraphs max)
+
+When the candidate gives a substantive answer, include a brief evaluation in your response. Format your response as JSON:
+{
+  "reply": "Your conversational response here...",
+  "evaluation": {
+    "score": 75,
+    "feedback": "Brief feedback on the answer quality"
+  },
+  "suggestedFollowups": ["topic 1", "topic 2"]
+}
+
+If the candidate hasn't answered a question yet (e.g., it's the opening), set evaluation to null:
+{
+  "reply": "Your opening question or follow-up here...",
+  "evaluation": null,
+  "suggestedFollowups": []
+}`;
+
+    // Convert message history to GPT format
+    const gptMessages = [
+      { role: 'system', content: systemPrompt }
+    ];
+
+    if (messages && messages.length > 0) {
+      messages.forEach(msg => {
+        if (msg.role === 'interviewer') {
+          gptMessages.push({ role: 'assistant', content: msg.content });
+        } else if (msg.role === 'candidate') {
+          gptMessages.push({ role: 'user', content: msg.content });
+        }
+      });
+    } else {
+      // No messages yet — ask GPT to start the conversation
+      gptMessages.push({ role: 'user', content: `Please start the interview by asking me an opening question about ${topic}.` });
+    }
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: gptMessages,
+      temperature: 0.8,
+      max_tokens: 800,
+    });
+
+    const responseText = completion.choices[0].message.content.trim();
+
+    // Try to parse JSON response
+    let reply = responseText;
+    let evaluation = null;
+    let suggestedFollowups = [];
+
+    try {
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        reply = parsed.reply || responseText;
+        evaluation = parsed.evaluation || null;
+        suggestedFollowups = parsed.suggestedFollowups || [];
+      }
+    } catch (parseError) {
+      // Use raw text as reply
+      reply = responseText;
+    }
+
+    // Award XP for chat exchanges
+    let xpEarned = 0;
+    if (messages && messages.length > 0) {
+      // Only award XP when user has sent at least one message
+      const lastUserMsg = messages.filter(m => m.role === 'candidate').pop();
+      if (lastUserMsg) {
+        try {
+          const xpResult = await recordAttemptAndAwardXp(req.user.id, {
+            jobDescriptionHash: jobDescriptionHash || '',
+            sessionId: sessionId || null,
+            questionText: `[Chat] ${topic}: ${lastUserMsg.content.substring(0, 100)}`,
+            questionCategory: topic,
+            attemptType: 'quiz',
+            userAnswer: lastUserMsg.content,
+            score: evaluation?.score || 50,
+            evaluation: evaluation || { score: 50, feedback: 'Chat practice' },
+          });
+          xpEarned = xpResult.xpEarned || 0;
+        } catch (xpError) {
+          console.error('Error recording chat XP (non-critical):', xpError.message);
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      reply,
+      evaluation,
+      suggestedFollowups,
+      xpEarned,
+    });
+  } catch (error) {
+    console.error('Error in /api/chat/practice:', error);
+    res.status(500).json({ error: error.message || 'Failed to process chat message' });
   }
 });
 
@@ -2527,8 +2694,18 @@ app.post('/api/questions/generate-more', requireAuth, requireCredits(CREDIT_COST
       .map(q => typeof q === 'string' ? q : q.question)
       .join('\n- ');
     
+    // Extract existing categories to maintain consistency
+    const existingCategories = [...new Set(
+      existingQuestions
+        .map(q => typeof q === 'string' ? null : q.category)
+        .filter(Boolean)
+    )];
+    const categoryHint = existingCategories.length > 0
+      ? `Existing categories used: ${existingCategories.join(', ')}. Use these same categories AND add new specific ones as needed.`
+      : '';
+
     const prompt = `Generate NEW interview questions for ${companyName} ${roleTitle} position.
-    
+
 IMPORTANT: These questions must be DIFFERENT from the existing ones. Do NOT repeat any of these:
 ${existingQuestionsText}
 
@@ -2541,12 +2718,19 @@ Focus on:
 6. System design questions if applicable
 7. Real-world problem-solving scenarios
 
-Generate 10-15 NEW questions that are unique and haven't been asked before.
+${categoryHint}
+
+CRITICAL — CATEGORY RULES:
+- Use SPECIFIC, DESCRIPTIVE categories — NEVER just "Technical" or "Behavioral"
+- Good categories: "React & Frontend", "Node.js & APIs", "System Design", "Databases & SQL", "Leadership & Collaboration", "${companyName} Culture", "Problem Solving", "DevOps & Deployment", "Architecture Patterns", "Communication & Teamwork"
+- Spread questions across at least 4-5 different categories
+
+Generate 10-15 NEW unique questions.
 Format as JSON array of question objects:
 [
   {
     "question": "Question text",
-    "category": "Technical|Behavioral|System Design",
+    "category": "Specific category (e.g., 'React & Frontend', NOT just 'Technical')",
     "answer": "Comprehensive answer",
     "tips": "Additional tips"
   }
@@ -2611,7 +2795,34 @@ Format as JSON array of question objects:
     // Deduct credits
     await deductCredits(req.user.id, CREDIT_COSTS.studyPlan);
 
-    res.json({ 
+    // Persist new questions into the cached study plan so they survive page reloads
+    if (uniqueQuestions.length > 0 && jobDescriptionHash) {
+      try {
+        const cachedPlan = await getCachedStudyPlan(jobDescriptionHash);
+        if (cachedPlan) {
+          // Find the stages array (handle both nested and flat structures)
+          const stages = cachedPlan.interviewQuestions?.stages
+            || cachedPlan.studyPlan?.interviewQuestions?.stages;
+          if (stages && stages.length > 0) {
+            // Append to a "Generated Questions" stage, or create one
+            let genStage = stages.find(s =>
+              s.stageName === 'Generated Questions' || s.stageName === 'Additional Questions'
+            );
+            if (!genStage) {
+              genStage = { stageName: 'Generated Questions', questions: [] };
+              stages.push(genStage);
+            }
+            if (!genStage.questions) genStage.questions = [];
+            genStage.questions.push(...uniqueQuestions);
+            await saveStudyPlan(jobDescriptionHash, cachedPlan);
+          }
+        }
+      } catch (saveErr) {
+        console.log('Failed to persist generated questions (non-critical):', saveErr.message);
+      }
+    }
+
+    res.json({
       success: true,
       questions: uniqueQuestions,
       count: uniqueQuestions.length

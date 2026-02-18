@@ -26,17 +26,19 @@ function CreditBar({ user, onUpgrade }) {
       >
         <span className="credit-label">Credits:</span>
         <span className="credit-amount">
-          {user.creditsRemaining} / {user.creditsMonthlyAllowance}
+          {user.creditsRemaining}{user.creditsMonthlyAllowance > 0 ? ` / ${user.creditsMonthlyAllowance}` : ''}
         </span>
-        <div className="credit-progress">
-          <div 
-            className="credit-progress-fill"
-            style={{ 
-              width: `${Math.min(100, percentage)}%`,
-              backgroundColor: getCreditColor()
-            }}
-          />
-        </div>
+        {user.creditsMonthlyAllowance > 0 && (
+          <div className="credit-progress">
+            <div
+              className="credit-progress-fill"
+              style={{
+                width: `${Math.min(100, percentage)}%`,
+                backgroundColor: getCreditColor()
+              }}
+            />
+          </div>
+        )}
         {showTooltip && (
           <div className="credit-tooltip">
             Prep credits power AI-generated study plans, questions, and feedback.

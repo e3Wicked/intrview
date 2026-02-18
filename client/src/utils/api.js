@@ -14,8 +14,12 @@ export const api = {
     getSmartOrder: (data) => axios.post('/api/practice/smart-order', data),
     flashcardXp: (data) => axios.post('/api/practice/flashcard-xp', data),
   },
+  chat: {
+    practice: (data) => axios.post('/api/chat/practice', data),
+  },
   gamification: {
     getStats: () => axios.get('/api/gamification/stats'),
+    getSkillStats: () => axios.get('/api/gamification/skill-stats'),
     checkAchievements: (context) => axios.post('/api/gamification/check-achievements', { context }),
   },
 }

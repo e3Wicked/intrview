@@ -4,7 +4,7 @@ import MissionDashboard from '../components/MissionDashboard'
 import axios from 'axios'
 import './DashboardPage.css'
 
-function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSelectPlan }) {
+function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSelectPlan, setResult, setSelectedJdId, jdHistory, setJdHistory }) {
   const navigate = useNavigate()
   const [localUrl, setLocalUrl] = useState('')
   const [localLoading, setLocalLoading] = useState(false)
@@ -24,8 +24,7 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
     setError(null)
 
     try {
-      const headers = { Authorization: `Bearer ${localStorage.getItem('session_token')}` }
-      const response = await axios.post('/api/analyze', { url: localUrl }, { headers })
+      const response = await axios.post('/api/analyze', { url: localUrl })
       const analysisResult = response.data
       
       // Update user credits if returned in response
@@ -49,14 +48,21 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
           result: analysisResult,
           timestamp: new Date().toISOString()
         }
-        
-        const updatedHistory = [jdEntry, ...jdHistory.filter(jd => jd.url !== localUrl)].slice(0, 10)
+
+        // Get current history from props or localStorage
+        const currentHistory = jdHistory || []
+        const updatedHistory = [jdEntry, ...currentHistory.filter(jd => jd.url !== localUrl)].slice(0, 10)
         localStorage.setItem('jd_history', JSON.stringify(updatedHistory))
         localStorage.setItem('selected_jd_id', jdEntry.id)
-        
-        // Store result in sessionStorage so JobAnalysisPage can access it immediately
+
+        // Store result in sessionStorage as backup
         sessionStorage.setItem(`job_analysis_${jdEntry.id}`, JSON.stringify(analysisResult))
-        
+
+        // Set result directly on App state so JobAnalysisPage renders immediately
+        if (setResult) setResult(analysisResult)
+        if (setSelectedJdId) setSelectedJdId(jdEntry.id)
+        if (setJdHistory) setJdHistory(updatedHistory)
+
         // Navigate to job analysis page
         navigate(`/job/${jdEntry.id}`)
       } else {
@@ -64,8 +70,8 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
       }
     } catch (err) {
       if (err.response?.status === 401) {
-        setError('Please sign in to analyze job postings')
-      } else if (err.response?.status === 402) {
+        setError('Session expired. Please sign out and sign in again.')
+      } else if (err.response?.status === 402 || err.response?.status === 403) {
         setError('Insufficient credits. Please upgrade your plan.')
       } else {
         setError(err.response?.data?.error || 'An error occurred. Please try again.')
@@ -76,6 +82,8 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
   }
 
   const handleSelectAnalysis = (analysisResult) => {
+    if (setResult && analysisResult.result) setResult(analysisResult.result)
+    if (setSelectedJdId) setSelectedJdId(analysisResult.id)
     navigate(`/job/${analysisResult.id || Date.now()}`)
   }
 

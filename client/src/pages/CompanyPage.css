@@ -2,7 +2,6 @@
   width: 100%;
 }
 
-
 .company-page-loading,
 .company-page-empty {
   text-align: center;
@@ -10,12 +9,25 @@
   color: #888;
 }
 
+.company-page-empty button {
+  margin-top: 16px;
+  padding: 10px 20px;
+  background: #f59e0b;
+  color: #0a0a0a;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+}
+
 .company-page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0 32px 24px;
-  margin-bottom: 32px;
+  padding: 8px 0 24px 0;
+  margin-bottom: 0;
   border-bottom: 1px solid #2a2a2a;
 }
 
@@ -48,8 +60,8 @@
 }
 
 .company-logo-large-container {
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   border-radius: 12px;
   overflow: hidden;
   flex-shrink: 0;
@@ -68,97 +80,179 @@
   align-items: center;
   justify-content: center;
   color: #0a0a0a;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 600;
 }
 
-.company-title-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-}
-
 .company-page-title {
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 600;
   color: #fff;
   margin: 0;
   font-family: 'Inconsolata', 'Courier New', monospace;
 }
 
-.company-role-badge {
-  padding: 4px 12px;
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
-  border-radius: 6px;
-  color: #f59e0b;
-  font-size: 13px;
-  font-weight: 500;
-  font-family: 'Inconsolata', 'Courier New', monospace;
-  white-space: nowrap;
-}
-
 .company-header-meta {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 14px;
+  font-size: 13px;
   color: #888;
-  flex-wrap: wrap;
+  margin-top: 4px;
 }
 
-.target-role {
+.roles-badge {
+  padding: 3px 10px;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  color: #f59e0b;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ── Role Selector Section ── */
+.role-selector-section {
+  padding: 28px 0 8px;
+  border-top: 1px solid #2a2a2a;
+  margin-top: 4px;
+}
+
+.role-selector-heading {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 14px 0;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+/* Horizontal scrollable chip row */
+.role-chips {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a2a transparent;
+}
+
+.role-chips::-webkit-scrollbar {
+  height: 4px;
+}
+
+.role-chips::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.role-chips::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 2px;
+}
+
+/* Individual role chip */
+.role-chip {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 200px;
+  max-width: 300px;
+  padding: 14px 18px;
+  background: #141414;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.role-chip:hover {
+  border-color: #3a3a3a;
+  background: #1a1a1a;
+}
+
+.role-chip.selected {
+  border-color: #f59e0b;
+  background: #1a1a0a;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.15);
+}
+
+.role-chip-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.role-chip-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.role-chip.selected .role-chip-title {
   color: #f59e0b;
 }
 
-.company-header-right {
+.role-chip-stats {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+}
+
+/* Progress bar inside chip */
+.role-chip-progress {
   display: flex;
   align-items: center;
+  gap: 8px;
 }
 
-.company-progress-ring {
-  position: relative;
-  width: 80px;
-  height: 80px;
+.role-chip-bar {
+  flex: 1;
+  height: 4px;
+  background: #2a2a2a;
+  border-radius: 2px;
+  overflow: hidden;
 }
 
-.progress-ring-svg {
-  transform: rotate(-90deg);
+.role-chip-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #fb923c);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+  min-width: 2px;
 }
 
-.progress-ring-circle {
-  transition: stroke-dashoffset 0.3s;
+.role-chip-bar-fill.complete {
+  background: linear-gradient(90deg, #22c55e, #4ade80);
 }
 
-.progress-ring-text {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-}
-
-.progress-ring-value {
-  display: block;
-  font-size: 18px;
+.role-chip-percent {
+  font-size: 12px;
   font-weight: 600;
   color: #f59e0b;
+  flex-shrink: 0;
+  min-width: 28px;
+  text-align: right;
 }
 
-.progress-ring-label {
-  display: block;
-  font-size: 10px;
-  color: #888;
-  text-transform: uppercase;
+.role-chip-no-plan {
+  font-size: 11px;
+  color: #666;
+  font-style: italic;
 }
 
+/* ── Tabs (below selected role) ── */
 .company-tabs {
   display: flex;
-  gap: 8px;
-  margin-bottom: 32px;
+  gap: 4px;
   border-bottom: 1px solid #2a2a2a;
+  margin-top: 24px;
+  margin-bottom: 24px;
 }
 
 .company-tab {
@@ -186,78 +280,54 @@
   min-height: 400px;
 }
 
-/* Inline Role Switcher */
-.role-switcher-inline {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.role-switcher-btn-inline {
-  padding: 4px 10px;
-  background: #0a0a0a;
-  border: 1px solid #2a2a2a;
-  border-radius: 4px;
-  color: #888;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 12px;
+/* ── No role selected prompt ── */
+.no-role-selected {
+  text-align: center;
+  padding: 48px 24px;
+  color: #666;
+  font-size: 15px;
   font-family: 'Inconsolata', 'Courier New', monospace;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
+  border: 1px dashed #2a2a2a;
+  border-radius: 10px;
+  margin-top: 24px;
 }
 
-.role-switcher-btn-inline:hover {
-  border-color: #3a3a3a;
-  color: #fff;
+.no-role-selected p {
+  margin: 0;
 }
 
-.role-switcher-btn-inline.active {
-  background: #f59e0b;
-  border-color: #f59e0b;
-  color: #0a0a0a;
-  font-weight: 600;
+/* ── Mobile responsive ── */
+@media (max-width: 640px) {
+  .company-page-header {
+    padding: 8px 0 16px 0;
+  }
+
+  .company-logo-large-container {
+    width: 44px;
+    height: 44px;
+  }
+
+  .company-page-title {
+    font-size: 22px;
+  }
+
+  .role-chip {
+    min-width: 170px;
+    padding: 12px 14px;
+  }
+
+  .role-chip-title {
+    font-size: 13px;
+  }
+
+  .company-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .company-tab {
+    padding: 10px 16px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
 }
-
-.role-count-badge-inline {
-  padding: 1px 4px;
-  background: rgba(10, 10, 10, 0.3);
-  border-radius: 3px;
-  font-size: 10px;
-}
-
-.role-switcher-btn-inline.active .role-count-badge-inline {
-  background: rgba(10, 10, 10, 0.5);
-}
-
-.job-post-link {
-  padding: 8px 16px;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
-  border-radius: 6px;
-  color: #f59e0b;
-  text-decoration: none;
-  font-size: 13px;
-  font-family: 'Inconsolata', 'Courier New', monospace;
-  transition: all 0.2s;
-}
-
-.job-post-link:hover {
-  background: #3a3a3a;
-  border-color: #f59e0b;
-}
-
-.roles-badge {
-  padding: 4px 12px;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
-  border-radius: 6px;
-  color: #f59e0b;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-

@@ -3,31 +3,35 @@ import './InterviewPlan.css'
 
 function InterviewPlan({ analyses, studyPlans }) {
   const [expandedStages, setExpandedStages] = useState(new Set())
-  
+
   // Get the first analysis and its study plan
   const analysis = analyses[0]
   const studyPlan = analysis ? studyPlans[analysis.job_description_hash] : null
-  
+
   // Extract interview questions organized by stage
+  // Handle both nested (studyPlan.studyPlan.interviewQuestions) and flat (studyPlan.interviewQuestions) structures
   const stagesWithQuestions = useMemo(() => {
-    if (!studyPlan?.studyPlan?.interviewQuestions?.stages) {
-      // Fallback to default stages if no questions available
-      return [
-        { stageName: 'Resume Screen', description: 'Initial screening of your application', questions: [] },
-        { stageName: 'Recruiter Call', description: 'Phone screen with recruiter', questions: [] },
-        { stageName: 'Technical Screen', description: 'Coding challenge or technical interview', questions: [] },
-        { stageName: 'Onsite Interview', description: 'Multiple rounds with team members', questions: [] },
-        { stageName: 'Offer', description: 'Final decision and negotiation', questions: [] }
-      ]
+    const stages =
+      studyPlan?.studyPlan?.interviewQuestions?.stages ||
+      studyPlan?.interviewQuestions?.stages ||
+      null
+
+    if (!stages || stages.length === 0) {
+      return []
     }
-    
-    return studyPlan.studyPlan.interviewQuestions.stages.map(stage => ({
+
+    return stages.map(stage => ({
       stageName: stage.stageName || 'Interview Stage',
       description: stage.description || 'Questions for this interview stage',
       questions: stage.questions || []
     }))
   }, [studyPlan])
-  
+
+  // Count total questions across all stages
+  const totalQuestions = useMemo(() => {
+    return stagesWithQuestions.reduce((sum, stage) => sum + (stage.questions?.length || 0), 0)
+  }, [stagesWithQuestions])
+
   const toggleStage = (stageName) => {
     setExpandedStages(prev => {
       const next = new Set(prev)
@@ -48,39 +52,53 @@ function InterviewPlan({ analyses, studyPlans }) {
     )
   }
 
+  if (stagesWithQuestions.length === 0) {
+    return (
+      <div className="interview-plan-empty">
+        <p>No interview stages found in this study plan. Try analyzing the job posting again to generate interview questions.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="interview-plan">
+      <div className="interview-plan-summary">
+        <span className="plan-summary-text">
+          {stagesWithQuestions.length} interview {stagesWithQuestions.length === 1 ? 'stage' : 'stages'} &middot; {totalQuestions} {totalQuestions === 1 ? 'question' : 'questions'}
+        </span>
+      </div>
       <div className="interview-timeline">
         {stagesWithQuestions.map((stage, idx) => {
           const isExpanded = expandedStages.has(stage.stageName)
           const hasQuestions = stage.questions && stage.questions.length > 0
-          
+
           return (
             <div key={idx} className="timeline-stage">
               <div className="stage-connector">
                 {idx > 0 && <div className="connector-line" />}
-                <div className="stage-dot" />
+                <div className={`stage-dot ${hasQuestions ? 'has-questions' : ''}`} />
                 {idx < stagesWithQuestions.length - 1 && <div className="connector-line" />}
               </div>
               <div className="stage-content">
-                <div className="stage-header" onClick={() => toggleStage(stage.stageName)}>
+                <div className="stage-header" onClick={() => hasQuestions && toggleStage(stage.stageName)}>
                   <div>
-                    <h3 className="stage-name">{stage.stageName}</h3>
+                    <h3 className="stage-name">
+                      {stage.stageName}
+                      {hasQuestions && (
+                        <span className="stage-question-badge">
+                          {stage.questions.length}
+                        </span>
+                      )}
+                    </h3>
                     <p className="stage-description">{stage.description}</p>
                   </div>
                   {hasQuestions && (
                     <button className="stage-toggle">
-                      {isExpanded ? '−' : '+'}
+                      {isExpanded ? '\u2212' : '+'}
                     </button>
                   )}
                 </div>
-                
-                {hasQuestions && (
-                  <div className="stage-questions-count">
-                    {stage.questions.length} {stage.questions.length === 1 ? 'question' : 'questions'}
-                  </div>
-                )}
-                
+
                 {isExpanded && hasQuestions && (
                   <div className="stage-questions">
                     {stage.questions.map((question, qIdx) => (
@@ -124,12 +142,6 @@ function InterviewPlan({ analyses, studyPlans }) {
                     ))}
                   </div>
                 )}
-                
-                {!hasQuestions && (
-                  <div className="stage-no-questions">
-                    No specific questions available for this stage yet.
-                  </div>
-                )}
               </div>
             </div>
           )
@@ -140,4 +152,3 @@ function InterviewPlan({ analyses, studyPlans }) {
 }
 
 export default InterviewPlan
-

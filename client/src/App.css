@@ -1054,6 +1054,34 @@
   font-style: italic;
 }
 
+/* Job Analysis Back Button */
+.job-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: none;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  color: #888;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 16px;
+}
+
+.job-back-button:hover {
+  color: #f59e0b;
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.job-back-button svg {
+  flex-shrink: 0;
+}
+
 /* Context Header with Tab */
 .context-header-with-tab {
   display: flex;

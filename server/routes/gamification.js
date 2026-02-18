@@ -487,6 +487,72 @@ router.get('/api/gamification/stats', requireAuth, async (req, res) => {
   }
 });
 
+// Get skill-level stats for dashboard heatmap
+router.get('/api/gamification/skill-stats', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Aggregate question_attempts by category
+    const skillsRes = await pool.query(`
+      SELECT
+        question_category,
+        COUNT(*) as total_attempts,
+        COUNT(DISTINCT question_text) as unique_questions,
+        ROUND(AVG(score)::numeric, 1) as avg_score,
+        COUNT(CASE WHEN score >= 70 THEN 1 END) as correct_count,
+        MAX(created_at) as last_practiced
+      FROM question_attempts
+      WHERE user_id = $1 AND question_category IS NOT NULL AND question_category != ''
+      GROUP BY question_category
+      ORDER BY total_attempts DESC
+    `, [userId]);
+
+    const skills = skillsRes.rows.map(row => {
+      const totalAttempts = parseInt(row.total_attempts) || 0;
+      const correctCount = parseInt(row.correct_count) || 0;
+      const avgScore = parseFloat(row.avg_score) || 0;
+      const correctPercent = totalAttempts > 0 ? Math.round((correctCount / totalAttempts) * 100) : 0;
+      // Mastery = correct % capped at avg_score if lower
+      const mastery = Math.min(correctPercent, Math.round(avgScore));
+
+      return {
+        category: row.question_category,
+        totalAttempts,
+        uniqueQuestions: parseInt(row.unique_questions) || 0,
+        avgScore,
+        correctCount,
+        mastery,
+        lastPracticed: row.last_practiced,
+      };
+    });
+
+    // Weekly stats: questions this week vs last week
+    const weeklyRes = await pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE created_at >= date_trunc('week', CURRENT_DATE)) as this_week,
+        COUNT(*) FILTER (WHERE created_at >= date_trunc('week', CURRENT_DATE) - interval '7 days' AND created_at < date_trunc('week', CURRENT_DATE)) as last_week
+      FROM question_attempts
+      WHERE user_id = $1
+    `, [userId]);
+
+    const thisWeek = parseInt(weeklyRes.rows[0]?.this_week) || 0;
+    const lastWeek = parseInt(weeklyRes.rows[0]?.last_week) || 0;
+    const changePercent = lastWeek > 0 ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100) : (thisWeek > 0 ? 100 : 0);
+
+    res.json({
+      skills,
+      weeklyStats: {
+        questionsThisWeek: thisWeek,
+        questionsLastWeek: lastWeek,
+        changePercent,
+      },
+    });
+  } catch (error) {
+    console.error('Error getting skill stats:', error);
+    res.status(500).json({ error: 'Failed to get skill stats' });
+  }
+});
+
 // Check and unlock achievements
 router.post('/api/gamification/check-achievements', requireAuth, async (req, res) => {
   try {

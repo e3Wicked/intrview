@@ -546,21 +546,64 @@ async function getCachedStudyPlan(jobDescriptionHash) {
   }
 }
 
-// Save study plan by job description hash
-async function saveStudyPlan(jobDescriptionHash, studyPlan) {
+// Save study plan by job description hash (with optional company/role for cross-user matching)
+async function saveStudyPlan(jobDescriptionHash, studyPlan, companyName = null, roleTitle = null) {
   try {
+    // Ensure company_name and role_title columns exist (idempotent)
+    await pool.query(`
+      ALTER TABLE study_plans ADD COLUMN IF NOT EXISTS company_name VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS role_title VARCHAR(255)
+    `).catch(() => {
+      // Try individually if combined fails
+      pool.query('ALTER TABLE study_plans ADD COLUMN IF NOT EXISTS company_name VARCHAR(255)').catch(() => {});
+      pool.query('ALTER TABLE study_plans ADD COLUMN IF NOT EXISTS role_title VARCHAR(255)').catch(() => {});
+    });
+
     await pool.query(
-      `INSERT INTO study_plans (job_description_hash, study_plan, created_at)
-       VALUES ($1, $2, CURRENT_TIMESTAMP)
-       ON CONFLICT (job_description_hash) 
-       DO UPDATE SET study_plan = EXCLUDED.study_plan, created_at = CURRENT_TIMESTAMP`,
-      [jobDescriptionHash, JSON.stringify(studyPlan)]
+      `INSERT INTO study_plans (job_description_hash, study_plan, company_name, role_title, created_at)
+       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+       ON CONFLICT (job_description_hash)
+       DO UPDATE SET study_plan = EXCLUDED.study_plan,
+                     company_name = COALESCE(EXCLUDED.company_name, study_plans.company_name),
+                     role_title = COALESCE(EXCLUDED.role_title, study_plans.role_title),
+                     created_at = CURRENT_TIMESTAMP`,
+      [jobDescriptionHash, JSON.stringify(studyPlan), companyName || null, roleTitle || null]
     );
-    
-    console.log(`✅ Cached study plan (hash: ${jobDescriptionHash.substring(0, 8)}...)`);
+
+    console.log(`✅ Cached study plan (hash: ${jobDescriptionHash.substring(0, 8)}...) ${companyName || ''} ${roleTitle || ''}`);
   } catch (error) {
     console.error('Error in saveStudyPlan:', error.message);
     // Don't throw - caching failure shouldn't break the app
+  }
+}
+
+// Find a study plan from another user who analyzed the same company+role
+async function findStudyPlanByCompanyRole(companyName, roleTitle) {
+  if (!companyName || !roleTitle) return null;
+  try {
+    // Normalize: lowercase, trim whitespace
+    const normCompany = companyName.trim().toLowerCase();
+    const normRole = roleTitle.trim().toLowerCase();
+
+    const result = await pool.query(
+      `SELECT study_plan, job_description_hash FROM study_plans
+       WHERE LOWER(TRIM(company_name)) = $1
+         AND LOWER(TRIM(role_title)) = $2
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [normCompany, normRole]
+    );
+
+    if (result.rows.length > 0) {
+      return {
+        studyPlan: result.rows[0].study_plan,
+        sourceHash: result.rows[0].job_description_hash,
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error in findStudyPlanByCompanyRole:', error.message);
+    return null;
   }
 }
 
@@ -751,6 +794,7 @@ export {
   getUserJobAnalyses,
   getUserStats,
   ensureJobAnalysesTable,
-  ensureEmailVerificationCodesTable
+  ensureEmailVerificationCodesTable,
+  findStudyPlanByCompanyRole
 };
 

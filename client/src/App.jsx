@@ -313,7 +313,10 @@ function App() {
         setSelectedJdId(jdEntry.id)
         localStorage.setItem('jd_history', JSON.stringify(updatedHistory))
         localStorage.setItem('selected_jd_id', jdEntry.id)
-        
+
+        // Store result in sessionStorage as backup for page reloads
+        sessionStorage.setItem(`job_analysis_${jdEntry.id}`, JSON.stringify(analysisResult))
+
         // Navigate to job analysis page
         navigate(`/job/${jdEntry.id}`)
       }
@@ -506,7 +509,7 @@ function App() {
           path="/dashboard" 
           element={
             user ? (
-              <DashboardPage 
+              <DashboardPage
                 user={user}
                 setUser={setUser}
                 url={url}
@@ -514,6 +517,10 @@ function App() {
                 handleSubmit={handleSubmit}
                 loading={loading}
                 onSelectPlan={handleSelectPlan}
+                setResult={setResult}
+                setSelectedJdId={setSelectedJdId}
+                jdHistory={jdHistory}
+                setJdHistory={setJdHistory}
               />
             ) : (
               <SignInPrompt 

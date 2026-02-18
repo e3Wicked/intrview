@@ -12,22 +12,23 @@ function CompanyPage({ user }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [analyses, setAnalyses] = useState([])
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState('interview')
   const [studyPlans, setStudyPlans] = useState({})
+  const [serverProgress, setServerProgress] = useState({})
   const [loading, setLoading] = useState(true)
-  
-  // Get selected role from URL or default to first
+
   const selectedRoleId = searchParams.get('role') || null
-  const selectedAnalysis = useMemo(() => {
-    if (selectedRoleId) {
-      return analyses.find(a => a.id.toString() === selectedRoleId) || analyses[0]
-    }
-    return analyses[0]
-  }, [analyses, selectedRoleId])
 
   useEffect(() => {
     loadCompanyData()
   }, [companyName])
+
+  // Auto-select if only 1 analysis
+  useEffect(() => {
+    if (!selectedRoleId && analyses.length === 1) {
+      setSearchParams({ role: analyses[0].id }, { replace: true })
+    }
+  }, [analyses, selectedRoleId])
 
   const loadCompanyData = async () => {
     try {
@@ -38,17 +39,20 @@ function CompanyPage({ user }) {
       )
       setAnalyses(companyAnalyses)
 
-      // Load study plans
       const plans = {}
-      for (const analysis of companyAnalyses) {
+      const progress = {}
+      await Promise.all(companyAnalyses.map(async (analysis) => {
         try {
-          const planRes = await axios.get(`/api/user/study-plan/${analysis.job_description_hash}`)
-          plans[analysis.job_description_hash] = planRes.data
-        } catch (e) {
-          // Plan might not exist
-        }
-      }
+          const [planRes, progressRes] = await Promise.all([
+            axios.get(`/api/user/study-plan/${analysis.job_description_hash}`).catch(() => null),
+            axios.get(`/api/progress/${analysis.job_description_hash}`).catch(() => null),
+          ])
+          if (planRes?.data) plans[analysis.job_description_hash] = planRes.data
+          if (progressRes?.data) progress[analysis.job_description_hash] = progressRes.data
+        } catch (e) {}
+      }))
       setStudyPlans(plans)
+      setServerProgress(progress)
     } catch (err) {
       console.error('Error loading company data:', err)
     } finally {
@@ -56,49 +60,49 @@ function CompanyPage({ user }) {
     }
   }
 
-  // Calculate overall progress
-  const calculateProgress = () => {
-    let totalTopics = 0
-    let completedTopics = 0
-
-    analyses.forEach(analysis => {
+  // Compute per-role stats
+  const roleCards = useMemo(() => {
+    return analyses.map(analysis => {
       const plan = studyPlans[analysis.job_description_hash]
-      if (plan?.studyPlan?.topics) {
-        const saved = localStorage.getItem('interviewPrepperProgress')
-        if (saved) {
-          try {
-            const progress = JSON.parse(saved)
-            const topicsStudied = new Set(progress.topicsStudied || [])
-            const currentTopics = plan.studyPlan.topics.map(t => t.topic)
-            const studied = currentTopics.filter(t => topicsStudied.has(t))
-            completedTopics += studied.length
-            totalTopics += currentTopics.length
-          } catch (e) {}
-        } else {
-          totalTopics += plan.studyPlan.topics.length
-        }
+      const prog = serverProgress[analysis.job_description_hash]
+
+      let questionCount = 0
+      const stages = plan?.interviewQuestions?.stages || plan?.studyPlan?.interviewQuestions?.stages || []
+      stages.forEach(s => { questionCount += (s.questions || []).length })
+
+      const topics = plan?.studyPlan?.topics || plan?.topics || []
+      const topicCount = topics.length
+
+      let progressPercent = 0
+      if (topicCount > 0 && prog?.topicsStudied) {
+        const studied = new Set(prog.topicsStudied)
+        const completed = topics.filter(t => studied.has(t.topic || t)).length
+        progressPercent = Math.round((completed / topicCount) * 100)
+      }
+
+      return {
+        ...analysis,
+        questionCount,
+        topicCount,
+        progressPercent,
+        hasPlan: !!plan,
+        date: new Date(analysis.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       }
     })
+  }, [analyses, studyPlans, serverProgress])
 
-    return totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0
+  const selectedAnalysis = useMemo(() => {
+    if (selectedRoleId) {
+      return analyses.find(a => a.id.toString() === selectedRoleId) || null
+    }
+    return null
+  }, [analyses, selectedRoleId])
+
+  const handleRoleSelect = (analysisId) => {
+    if (selectedRoleId === analysisId.toString()) return // already selected
+    setSearchParams({ role: analysisId })
+    setActiveTab('interview')
   }
-
-  // Group analyses by role title for display
-  const roles = useMemo(() => {
-    const roleMap = new Map()
-    analyses.forEach(analysis => {
-      const roleTitle = analysis.role_title || 'Unknown Role'
-      if (!roleMap.has(roleTitle)) {
-        roleMap.set(roleTitle, [])
-      }
-      roleMap.get(roleTitle).push(analysis)
-    })
-    return Array.from(roleMap.entries()).map(([title, analyses]) => ({
-      title,
-      analyses,
-      count: analyses.length
-    }))
-  }, [analyses])
 
   if (loading) {
     return <div className="company-page-loading">Loading company data...</div>
@@ -113,16 +117,20 @@ function CompanyPage({ user }) {
     )
   }
 
-  const handleRoleSelect = (analysisId) => {
-    setSearchParams({ role: analysisId })
-  }
+  const firstAnalysis = analyses[0]
+  let domain = null
+  try {
+    if (firstAnalysis?.url) {
+      domain = new URL(firstAnalysis.url).hostname.replace('www.', '')
+    }
+  } catch (e) {}
 
   return (
     <div className="company-page">
       {/* Company Header */}
       <div className="company-page-header">
         <div className="company-header-left">
-          <button 
+          <button
             className="company-back-button"
             onClick={() => navigate('/dashboard')}
             title="Back to Dashboard"
@@ -132,106 +140,106 @@ function CompanyPage({ user }) {
             </svg>
           </button>
           <div className="company-logo-large-container">
-            {selectedAnalysis?.url ? (() => {
-              try {
-                const urlObj = new URL(selectedAnalysis.url)
-                const domain = urlObj.hostname.replace('www.', '')
-                return (
-                  <LogoWithFallbacks 
-                    domain={domain}
-                    name={companyName}
-                    logoUrl={selectedAnalysis.logo_url}
-                  />
-                )
-              } catch (e) {
-                return <div className="company-logo-large">{companyName.charAt(0).toUpperCase()}</div>
-              }
-            })() : (
-              <div className="company-logo-large">{companyName.charAt(0).toUpperCase()}</div>
+            {domain ? (
+              <LogoWithFallbacks
+                domain={domain}
+                name={companyName}
+                logoUrl={firstAnalysis.logo_url}
+              />
+            ) : (
+              <div className="company-logo-large">{decodeURIComponent(companyName).charAt(0).toUpperCase()}</div>
             )}
           </div>
           <div>
-            <div className="company-title-row">
-              <h1 className="company-page-title">{companyName}</h1>
-              {selectedAnalysis?.role_title && (
-                <span className="company-role-badge">{selectedAnalysis.role_title}</span>
-              )}
-            </div>
+            <h1 className="company-page-title">{decodeURIComponent(companyName)}</h1>
             <div className="company-header-meta">
-              <span className="roles-badge">{analyses.length} {analyses.length === 1 ? 'role' : 'roles'} analyzed</span>
-              {roles.length > 1 && (
-                <div className="role-switcher-inline">
-                  {roles.map((role, idx) => {
-                    const roleAnalysis = role.analyses[0]
-                    const isActive = selectedAnalysis?.id === roleAnalysis?.id
-                    return (
-                      <button
-                        key={idx}
-                        className={`role-switcher-btn-inline ${isActive ? 'active' : ''}`}
-                        onClick={() => handleRoleSelect(roleAnalysis.id)}
-                        title={role.title}
-                      >
-                        {role.title}
-                        {role.count > 1 && <span className="role-count-badge-inline">{role.count}</span>}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
+              <span className="roles-badge">
+                {analyses.length} {analyses.length === 1 ? 'role' : 'roles'} analyzed
+              </span>
             </div>
           </div>
         </div>
-        {selectedAnalysis?.url && (
-          <div className="company-header-right">
-            <a 
-              href={selectedAnalysis.url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="job-post-link"
+      </div>
+
+      {/* Company Intel — always visible, company-wide */}
+      <CompanyIntel analyses={analyses} studyPlans={studyPlans} />
+
+      {/* Role Selector — horizontal chips */}
+      <div className="role-selector-section">
+        <h2 className="role-selector-heading">Your Roles</h2>
+        <div className="role-chips">
+          {roleCards.map(role => {
+            const isSelected = selectedRoleId === role.id.toString()
+            return (
+              <button
+                key={role.id}
+                className={`role-chip ${isSelected ? 'selected' : ''}`}
+                onClick={() => handleRoleSelect(role.id)}
+              >
+                <div className="role-chip-main">
+                  <span className="role-chip-title">{role.role_title || 'Unknown Role'}</span>
+                  <span className="role-chip-stats">
+                    {role.date}
+                    {role.questionCount > 0 && <> &middot; {role.questionCount}q</>}
+                    {role.topicCount > 0 && <> &middot; {role.topicCount}t</>}
+                  </span>
+                </div>
+                {role.hasPlan && (
+                  <div className="role-chip-progress">
+                    <div className="role-chip-bar">
+                      <div
+                        className={`role-chip-bar-fill ${role.progressPercent === 100 ? 'complete' : ''}`}
+                        style={{ width: `${role.progressPercent}%` }}
+                      />
+                    </div>
+                    <span className="role-chip-percent">{role.progressPercent}%</span>
+                  </div>
+                )}
+                {!role.hasPlan && (
+                  <span className="role-chip-no-plan">No plan</span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Selected Role Content — role-specific tabs */}
+      {selectedAnalysis && (
+        <>
+          <div className="company-tabs">
+            <button
+              className={`company-tab ${activeTab === 'interview' ? 'active' : ''}`}
+              onClick={() => setActiveTab('interview')}
             >
-              View Job Post →
-            </a>
+              Interview Plan
+            </button>
+            <button
+              className={`company-tab ${activeTab === 'practice' ? 'active' : ''}`}
+              onClick={() => setActiveTab('practice')}
+            >
+              Practice & Progress
+            </button>
           </div>
-        )}
-      </div>
 
-      {/* Company Tabs */}
-      <div className="company-tabs">
-        <button
-          className={`company-tab ${activeTab === 'overview' ? 'active' : ''}`}
-          onClick={() => setActiveTab('overview')}
-        >
-          Company Intel
-        </button>
-        <button
-          className={`company-tab ${activeTab === 'interview' ? 'active' : ''}`}
-          onClick={() => setActiveTab('interview')}
-        >
-          Interview Plan
-        </button>
-        <button
-          className={`company-tab ${activeTab === 'practice' ? 'active' : ''}`}
-          onClick={() => setActiveTab('practice')}
-        >
-          Practice & Progress
-        </button>
-      </div>
+          <div className="company-tab-content">
+            {activeTab === 'interview' && (
+              <InterviewPlan analyses={[selectedAnalysis]} studyPlans={studyPlans} />
+            )}
+            {activeTab === 'practice' && (
+              <PracticeCenter analyses={[selectedAnalysis]} studyPlans={studyPlans} />
+            )}
+          </div>
+        </>
+      )}
 
-      {/* Tab Content */}
-      <div className="company-tab-content">
-        {activeTab === 'overview' && (
-          <CompanyIntel analyses={[selectedAnalysis].filter(Boolean)} studyPlans={studyPlans} />
-        )}
-        {activeTab === 'interview' && (
-          <InterviewPlan analyses={[selectedAnalysis].filter(Boolean)} studyPlans={studyPlans} />
-        )}
-        {activeTab === 'practice' && (
-          <PracticeCenter analyses={[selectedAnalysis].filter(Boolean)} studyPlans={studyPlans} />
-        )}
-      </div>
+      {!selectedAnalysis && analyses.length > 1 && (
+        <div className="no-role-selected">
+          <p>Select a role above to view study plan, practice questions, and interview prep.</p>
+        </div>
+      )}
     </div>
   )
 }
 
 export default CompanyPage
-

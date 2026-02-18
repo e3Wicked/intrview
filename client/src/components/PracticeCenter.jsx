@@ -77,6 +77,13 @@ function PracticeCenter({ analyses, studyPlans }) {
     return []
   }, [studyPlan])
 
+  // Extract study topics for chat practice
+  const studyTopics = useMemo(() => {
+    if (!studyPlan) return []
+    const topics = studyPlan.studyPlan?.topics || studyPlan.topics || []
+    return topics.map(t => typeof t === 'string' ? t : t.topic || t.name || '').filter(Boolean)
+  }, [studyPlan])
+
   // Calculate progress from server data
   const progressData = useMemo(() => {
     if (!studyPlan?.studyPlan?.topics) return { overall: 0, categories: [] }
@@ -160,6 +167,7 @@ function PracticeCenter({ analyses, studyPlans }) {
           roleTitle={analysis.role_title}
           techStack={null}
           jobDescriptionHash={analysis.job_description_hash}
+          studyTopics={studyTopics}
         />
       </div>
     </div>

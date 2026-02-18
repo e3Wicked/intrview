@@ -3,75 +3,275 @@
   max-width: 100%;
 }
 
-.dashboard-top-bar {
+/* ========== Dashboard Header ========== */
+.dash-header {
+  margin-bottom: 28px;
+}
+
+.dash-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 6px 0;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.dash-subtitle {
+  font-size: 14px;
+  color: #888;
+  margin: 0;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+/* ========== Stat Cards Row ========== */
+.stat-cards-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 16px;
+  margin-bottom: 36px;
+}
+
+.stat-card {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-card-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.stat-card-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.1;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.stat-card-unit {
+  font-size: 16px;
+  font-weight: 400;
+  color: #888;
+}
+
+.stat-card-extra {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.streak-flame {
+  font-size: 16px;
+}
+
+.stat-card-note {
+  font-size: 13px;
+  color: #f59e0b;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.streak-multiplier-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0a0a0a;
+  background: linear-gradient(135deg, #f59e0b, #fb923c);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.stat-card-change {
+  font-size: 13px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.stat-card-change.positive {
+  color: #22c55e;
+}
+
+.stat-card-change.negative {
+  color: #ef4444;
+}
+
+.stat-card-xp {
+  font-size: 13px;
+  color: #f59e0b;
+  font-weight: 600;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.stat-card-progress {
+  width: 100%;
+  height: 4px;
+  background: #2a2a2a;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.stat-card-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #fb923c);
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+/* CTA Button (4th card slot) */
+.stat-card-cta {
+  background: #f59e0b;
+  border: none;
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 140px;
+}
+
+.stat-card-cta:hover {
+  background: #fb923c;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.3);
+}
+
+.cta-icon {
+  font-size: 24px;
+  font-weight: 300;
+  color: #0a0a0a;
+  line-height: 1;
+}
+
+.cta-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0a0a0a;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  text-align: center;
+}
+
+.cta-credits {
+  font-size: 11px;
+  color: rgba(10, 10, 10, 0.6);
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+/* ========== Dashboard Sections ========== */
+.dash-section {
+  margin-bottom: 36px;
+}
+
+.dash-section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 0;
-  margin-bottom: 32px;
-  border-bottom: 1px solid #2a2a2a;
+  margin-bottom: 16px;
 }
 
-.dashboard-credits {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-family: 'Inconsolata', 'Courier New', monospace;
-}
-
-.credits-label {
-  color: #888;
-  font-size: 14px;
-}
-
-.credits-value {
-  color: #f59e0b;
+.dash-section-title {
   font-size: 18px;
   font-weight: 600;
-}
-
-.credits-usage {
-  color: #666;
-  font-size: 12px;
-  padding: 4px 8px;
-  background: #1a1a1a;
-  border-radius: 4px;
-}
-
-.dashboard-primary-cta {
-  padding: 12px 24px;
-  background: #f59e0b;
-  color: #0a0a0a;
-  border: none;
-  border-radius: 8px;
+  color: #fff;
+  margin: 0;
   font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.dash-section-action {
+  background: none;
+  border: 1px solid #2a2a2a;
+  color: #f59e0b;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dash-section-action:hover {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+/* ========== Skill Heatmap ========== */
+.skill-heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.skill-card {
+  border: 1px solid;
+  border-radius: 10px;
+  padding: 16px;
+  transition: all 0.2s;
+}
+
+.skill-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.skill-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.skill-card-name {
   font-size: 14px;
   font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.dashboard-primary-cta:hover {
-  background: #fb923c;
-}
-
-.dashboard-section {
-  margin-bottom: 48px;
-}
-
-.section-title {
-  font-size: 20px;
-  font-weight: 600;
   color: #fff;
-  margin: 0 0 24px 0;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+.skill-card-mastery {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0a0a0a;
+  padding: 3px 10px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.skill-card-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.skill-card-stats span {
+  font-size: 12px;
+  color: #999;
   font-family: 'Inconsolata', 'Courier New', monospace;
 }
 
-/* Companies Grid */
+/* ========== Companies Grid ========== */
 .companies-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
 }
 
 .company-card {
@@ -86,18 +286,19 @@
 .company-card:hover {
   border-color: #f59e0b;
   transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.15);
 }
 
 .company-card-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 14px;
+  margin-bottom: 14px;
 }
 
 .company-logo-container {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 8px;
   overflow: hidden;
   flex-shrink: 0;
@@ -122,7 +323,7 @@
   align-items: center;
   justify-content: center;
   color: #0a0a0a;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
 }
 
@@ -132,10 +333,10 @@
 }
 
 .company-name {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   color: #fff;
-  margin: 0 0 4px 0;
+  margin: 0 0 3px 0;
   font-family: 'Inconsolata', 'Courier New', monospace;
 }
 
@@ -148,149 +349,163 @@
   color: #f59e0b;
 }
 
+/* Role names inside company card */
+.company-card-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 14px;
+  padding: 0 0 0 4px;
+}
+
+.company-card-role-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #aaa;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.company-card-role-item .role-bullet {
+  color: #3a3a3a;
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 12px;
+}
+
+.company-card-role-item .role-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.company-card-role-item.more .role-name-text {
+  color: #888;
+  font-style: italic;
+}
+
 .company-progress {
   margin-bottom: 12px;
 }
 
 .progress-bar {
   width: 100%;
-  height: 6px;
+  height: 5px;
   background: #2a2a2a;
   border-radius: 3px;
   overflow: hidden;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #f59e0b 0%, #fb923c 100%);
   transition: width 0.3s;
+  border-radius: 3px;
 }
 
 .progress-text {
   font-size: 12px;
   color: #888;
+  font-family: 'Inconsolata', 'Courier New', monospace;
 }
 
+/* Kept for backward compat but no longer used in new layout */
 .company-roles-count {
-  font-size: 13px;
+  font-size: 12px;
   color: #f59e0b;
   padding-top: 12px;
   border-top: 1px solid #2a2a2a;
   font-weight: 500;
-}
-
-/* Tasks Kanban */
-.tasks-kanban {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-}
-
-.kanban-column {
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
-  border-radius: 12px;
-  padding: 20px;
-}
-
-.kanban-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #f59e0b;
-  margin: 0 0 16px 0;
   font-family: 'Inconsolata', 'Courier New', monospace;
 }
 
-.kanban-tasks {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.task-card {
-  background: #0a0a0a;
-  border: 1px solid #2a2a2a;
-  border-radius: 8px;
-  padding: 12px;
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-
-.task-card:hover {
-  border-color: #3a3a3a;
-}
-
-.task-company {
-  font-size: 11px;
-  color: #666;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-
-.task-name {
-  font-size: 13px;
-  color: #fff;
-}
-
-/* Activity Feed */
-.activity-feed {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.activity-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px;
+/* ========== Recently Completed ========== */
+.recently-completed-list {
   background: #1a1a1a;
   border: 1px solid #2a2a2a;
-  border-radius: 8px;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
-.activity-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #f59e0b;
-  color: #0a0a0a;
+.completed-item {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
+  gap: 14px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #222;
+  transition: background 0.15s;
+}
+
+.completed-item:last-child {
+  border-bottom: none;
+}
+
+.completed-item:hover {
+  background: #1f1f1f;
+}
+
+.completed-icon {
   flex-shrink: 0;
 }
 
-.activity-content {
+.completed-info {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
-.activity-message {
+.completed-label {
   font-size: 14px;
   color: #fff;
-  margin-bottom: 4px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
 }
 
-.activity-time {
+.completed-date {
   font-size: 12px;
   color: #666;
+  font-family: 'Inconsolata', 'Courier New', monospace;
 }
 
-/* Empty States */
+.completed-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.completed-xp {
+  font-size: 12px;
+  color: #f59e0b;
+  font-weight: 600;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.completed-score {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+/* ========== Empty States ========== */
 .empty-state-card {
   background: #1a1a1a;
   border: 1px solid #2a2a2a;
   border-radius: 12px;
-  padding: 48px 24px;
+  padding: 40px 24px;
   text-align: center;
 }
 
 .empty-state-card p {
   color: #888;
   margin-bottom: 16px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 14px;
 }
 
 .empty-state-cta {
@@ -303,17 +518,36 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.2s;
+}
+
+.empty-state-cta:hover {
+  background: #fb923c;
 }
 
 .dashboard-loading {
   text-align: center;
   padding: 64px;
   color: #888;
+  font-family: 'Inconsolata', 'Courier New', monospace;
 }
 
+/* ========== Responsive ========== */
 @media (max-width: 1024px) {
-  .tasks-kanban {
-    grid-template-columns: 1fr;
+  .stat-cards-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .stat-card-cta {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: center;
+    padding: 14px 24px;
+  }
+
+  .skill-heatmap-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .companies-grid {
@@ -321,3 +555,26 @@
   }
 }
 
+@media (max-width: 768px) {
+  .stat-cards-row {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-card-value {
+    font-size: 24px;
+  }
+
+  .skill-heatmap-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-title {
+    font-size: 22px;
+  }
+
+  .dash-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
