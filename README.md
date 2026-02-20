@@ -25,8 +25,15 @@ A web application that generates personalized study plans and interview question
 
 ### Prerequisites
 
-- Node.js v18+
+- Node.js v20+ (v22 LTS recommended — see `.nvmrc`)
 - Docker (for the database)
+
+If you use nvm, you can install Node.js v22:
+
+```bash
+nvm install 22
+nvm use 22
+```
 
 ### 1. Install dependencies
 
@@ -79,7 +86,7 @@ This starts a Postgres container via Docker Compose and automatically runs `serv
 make dev
 ```
 
-This runs the Vite dev server (port 5000) and the Express server (port 5001) in parallel. Open [http://localhost:5000](http://localhost:5000) in your browser.
+This runs the Vite dev server (port 5000) and the Express server (port 5001) in parallel. Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
@@ -143,6 +150,6 @@ intrview/
 - Check you have sufficient API credits
 
 **Port conflicts**
-- Client dev server: 5000
+- Client dev server: 5173
 - Express server: 5001
 - Postgres: 5435 (mapped from container port 5432)
