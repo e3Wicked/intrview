@@ -95,6 +95,6 @@ InterviewPrepper/
 ## Troubleshooting
 
 - **"OpenAI API key not configured"**: Make sure you've created `server/.env` with your API key
-- **"Could not extract meaningful content"**: The URL might not be accessible or doesn't contain enough text
+- **"Could not extract meaningful content"**: The URL might not be accessible or doesn't contain enough text.
 - **CORS errors**: Make sure the backend server is running on port 5000
 
