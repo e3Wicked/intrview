@@ -22,14 +22,11 @@ import {
   getActiveAdvertisers,
   getOrCreateAdvertiser,
   updateAdvertiserLogo,
-  ensureAdvertiserColumns,
   scrapeJobCountFromCareersPage,
   updateAdvertiserJobCount,
   trackJobAnalysis,
   getUserJobAnalyses,
   getUserStats,
-  ensureJobAnalysesTable,
-  ensureEmailVerificationCodesTable,
   findStudyPlanByCompanyRole
 } from './db.js';
 import { 
@@ -2981,9 +2978,6 @@ app.get('/api/user/study-plan/:hash', requireAuth, async (req, res) => {
 // Advertisers API route
 app.get('/api/advertisers', async (req, res) => {
   try {
-    // Ensure columns exist before querying
-    await ensureAdvertiserColumns();
-    
     const advertisers = await getActiveAdvertisers();
     
     // If no advertisers in DB, seed with 20 less-known, actively hiring companies
@@ -3179,67 +3173,6 @@ app.post('*', (req, res) => {
   });
 });
 
-// Ensure database columns exist before starting server
-ensureAdvertiserColumns().catch(err => {
-  console.error('⚠️  Warning: Could not ensure advertiser columns:', err.message);
-});
-
-ensureJobAnalysesTable().catch(err => {
-  console.error('⚠️  Warning: Could not ensure job_analyses table:', err.message);
-});
-
-ensureEmailVerificationCodesTable().catch(err => {
-  console.error('⚠️  Warning: Could not ensure email_verification_codes table:', err.message);
-});
-
-// Ensure gamification tables exist
-(async () => {
-  try {
-    await pool.query(`CREATE TABLE IF NOT EXISTS user_progress (
-      id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      job_description_hash VARCHAR(64) NOT NULL, topics_studied TEXT[] DEFAULT '{}',
-      topics_completed TEXT[] DEFAULT '{}', confidence_scores JSONB DEFAULT '{}',
-      flashcard_progress JSONB DEFAULT '{}', last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id, job_description_hash)
-    )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS practice_sessions (
-      id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      job_description_hash VARCHAR(64) NOT NULL, started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      ended_at TIMESTAMP, mode VARCHAR(20) DEFAULT 'quiz', questions_attempted INTEGER DEFAULT 0,
-      questions_correct INTEGER DEFAULT 0, average_score NUMERIC(5,2) DEFAULT 0,
-      total_xp_earned INTEGER DEFAULT 0, is_active BOOLEAN DEFAULT true
-    )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS question_attempts (
-      id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      job_description_hash VARCHAR(64) NOT NULL, session_id INTEGER,
-      question_text TEXT NOT NULL, question_category VARCHAR(100),
-      attempt_type VARCHAR(20) NOT NULL DEFAULT 'quiz', user_answer TEXT,
-      score INTEGER CHECK (score >= 0 AND score <= 100), evaluation JSONB,
-      xp_earned INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS user_streaks (
-      id SERIAL PRIMARY KEY, user_id INTEGER UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      current_streak INTEGER DEFAULT 0, longest_streak INTEGER DEFAULT 0,
-      last_practice_date DATE, streak_multiplier NUMERIC(3,2) DEFAULT 1.00,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS user_achievements (
-      id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      achievement_id VARCHAR(50) NOT NULL, unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(user_id, achievement_id)
-    )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS user_xp_log (
-      id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      xp_amount INTEGER NOT NULL, source VARCHAR(50) NOT NULL, source_id INTEGER,
-      description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS total_xp INTEGER DEFAULT 0');
-    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS current_level INTEGER DEFAULT 1');
-    console.log('✅ Gamification tables ensured');
-  } catch (err) {
-    console.error('⚠️  Warning: Could not ensure gamification tables:', err.message);
-  }
-})();
 
 app.listen(PORT, () => {
   console.log(`\n🚀 Server running on http://localhost:${PORT}`);

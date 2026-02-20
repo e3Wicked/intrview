@@ -10,7 +10,6 @@ services:
       - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./server/setup-db.sql:/docker-entrypoint-initdb.d/setup-db.sql
 
 volumes:
   postgres_data:

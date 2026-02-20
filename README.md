@@ -78,9 +78,15 @@ SMTP_FROM=intrview.io <noreply@intrview.io>
 make db-up
 ```
 
-This starts a Postgres container via Docker Compose and automatically runs `server/setup-db.sql` to initialise the schema on first launch.
+### 4. Run migrations
 
-### 4. Start the app
+```bash
+make db-migrate
+```
+
+This applies all pending migrations from `server/migrations/` in order, setting up the full schema. Re-running it is safe — already-applied migrations are skipped.
+
+### 5. Start the app
 
 ```bash
 make dev
@@ -103,6 +109,7 @@ Run `make` with no arguments to see all commands.
 | `make build` | Build the React client for production |
 | `make start` | Build client then start server (production mode) |
 | `make db-up` | Start Postgres container |
+| `make db-migrate` | Apply pending migrations |
 | `make db-down` | Stop Postgres container |
 | `make db-reset` | Wipe database volume and restart fresh |
 | `make db-logs` | Tail Postgres container logs |

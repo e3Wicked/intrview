@@ -12,13 +12,17 @@ dev-client: ## Start Vite dev server only
 
 .PHONY: dev-server
 dev-server: ## Start Express server only
-	cd server && node index.js
+	cd server && node --import ./env.js index.js
 
 # ── Database ──────────────────────────────────────────────────────────────────
 
 .PHONY: db-up
 db-up: ## Start Postgres container
 	docker compose --env-file $(ENV_FILE) up -d
+
+.PHONY: db-migrate
+db-migrate: ## Run pending database migrations
+	cd server && node --import ./env.js migrate.js
 
 .PHONY: db-down
 db-down: ## Stop and remove Postgres container
@@ -45,7 +49,7 @@ build: ## Build the client for production
 
 .PHONY: start
 start: build ## Build client then start server (production mode)
-	cd server && node index.js
+	cd server && node --import ./env.js index.js
 
 # ── Dependencies ──────────────────────────────────────────────────────────────
 

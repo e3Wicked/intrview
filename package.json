@@ -6,7 +6,7 @@
   "scripts": {
     "build": "cd client && npm run build",
     "start": "npm run build && npm run server",
-    "server": "cd server && node index.js",
+    "server": "cd server && node --import ./env.js index.js",
     "install-all": "npm install && cd server && npm install && cd ../client && npm install"
   },
   "keywords": [],
