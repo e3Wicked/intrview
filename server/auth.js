@@ -405,9 +405,7 @@ export async function getUserFromSession(sessionToken) {
 
 // Admin/test emails that get unlimited credits
 const ADMIN_EMAILS = [
-  'admin@intrview.io',
-  'test@intrview.io',
-  'alberto@intrview.io' // Add your email here
+  'admin@intrview.io' // Add your email here
 ];
 
 // Check if user is admin
@@ -491,6 +489,25 @@ export function requireAuth(req, res, next) {
     req.user = user;
     next();
   }).catch(error => {
+    res.status(500).json({ error: 'Authentication error' });
+  });
+}
+
+// Middleware to require admin
+export function requireAdmin(req, res, next) {
+  const sessionToken = req.headers.authorization?.replace('Bearer ', '') ||
+                       req.cookies?.session_token;
+
+  if (!sessionToken) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  getUserFromSession(sessionToken).then(user => {
+    if (!user) return res.status(401).json({ error: 'Invalid session' });
+    if (!isAdminUser(user.email)) return res.status(403).json({ error: 'Admin access required' });
+    req.user = user;
+    next();
+  }).catch(() => {
     res.status(500).json({ error: 'Authentication error' });
   });
 }

@@ -1,0 +1,144 @@
+.inline-loading-terminal {
+  margin-top: 20px;
+  background: #0a0a0a;
+  border: 1px solid #1a1a1a;
+  border-radius: 10px;
+  padding: 20px 24px 16px;
+  animation: iltFadeIn 0.3s ease;
+}
+
+@keyframes iltFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Header ── */
+.ilt-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.ilt-indicator {
+  display: flex;
+  gap: 6px;
+}
+
+.ilt-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #2a2a2a;
+}
+
+.ilt-dot:nth-child(1) { background: #ff5f57; }
+.ilt-dot:nth-child(2) { background: #ffbd2e; }
+.ilt-dot:nth-child(3) { background: #28ca41; }
+
+.ilt-label {
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 12px;
+  color: #555;
+  letter-spacing: 0.05em;
+}
+
+/* ── Steps ── */
+.ilt-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.ilt-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 14px;
+  transition: opacity 0.3s ease;
+}
+
+.ilt-line.pending { opacity: 0.25; }
+.ilt-line.active  { opacity: 1; }
+.ilt-line.done    { opacity: 0.5; }
+
+.ilt-prefix {
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.ilt-check {
+  color: #4ade80;
+  font-size: 13px;
+}
+
+.ilt-spinner {
+  color: #f59e0b;
+  font-size: 16px;
+  font-weight: bold;
+  animation: iltBlink 0.8s ease-in-out infinite;
+}
+
+@keyframes iltBlink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.2; }
+}
+
+.ilt-pending { color: #333; }
+
+.ilt-text { color: #e5e5e5; }
+.ilt-line.done .ilt-text   { color: #555; }
+.ilt-line.active .ilt-text { color: #f59e0b; }
+
+.ilt-dots {
+  color: #f59e0b;
+  letter-spacing: 1px;
+  display: inline-block;
+  width: 20px;
+}
+
+/* ── Progress bar ── */
+.ilt-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.ilt-bar-container {
+  flex: 1;
+  height: 3px;
+  background: #1a1a1a;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.ilt-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #fb923c);
+  border-radius: 2px;
+  transition: width 0.6s ease;
+}
+
+.ilt-pct {
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 12px;
+  color: #555;
+  width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Footer note ── */
+.ilt-note {
+  font-size: 12px;
+  color: #333;
+  margin: 0;
+  text-align: center;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}

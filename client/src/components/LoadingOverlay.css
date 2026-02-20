@@ -1,11 +1,8 @@
 .loading-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(10, 10, 10, 0.85);
-  backdrop-filter: blur(4px);
+  inset: 0;
+  background: rgba(10, 10, 10, 0.88);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -14,112 +11,166 @@
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
+/* ── Card ── */
 .loading-content {
-  background: #111111;
-  border: 1px solid #1a1a1a;
-  border-radius: 16px;
-  padding: 48px;
-  text-align: center;
-  min-width: 320px;
-  max-width: 400px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  background: #0f0f0f;
+  border: 1px solid #222;
+  border-radius: 12px;
+  padding: 28px 32px 24px;
+  width: 420px;
+  max-width: calc(100vw - 40px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
 }
 
-.loading-spinner {
+/* ── Header bar (fake terminal titlebar) ── */
+.loading-header {
   display: flex;
-  justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.loading-indicator {
+  display: flex;
+  gap: 6px;
+}
+
+.indicator-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #2a2a2a;
+}
+
+.indicator-dot:nth-child(1) { background: #ff5f57; }
+.indicator-dot:nth-child(2) { background: #ffbd2e; }
+.indicator-dot:nth-child(3) { background: #28ca41; }
+
+.loading-label {
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 12px;
+  color: #555;
+  letter-spacing: 0.05em;
+}
+
+/* ── Step list ── */
+.loading-terminal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   margin-bottom: 24px;
 }
 
-.spinner-ring {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #f59e0b;
-  animation: pulse 1.4s ease-in-out infinite;
+.terminal-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 14px;
+  transition: opacity 0.3s ease;
 }
 
-.spinner-ring:nth-child(1) {
-  animation-delay: 0s;
+.terminal-line.pending {
+  opacity: 0.25;
 }
 
-.spinner-ring:nth-child(2) {
-  animation-delay: 0.2s;
+.terminal-line.active {
+  opacity: 1;
 }
 
-.spinner-ring:nth-child(3) {
-  animation-delay: 0.4s;
+.terminal-line.done {
+  opacity: 0.5;
 }
 
-@keyframes pulse {
-  0%, 100% {
-    opacity: 0.3;
-    transform: scale(0.8);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.2);
-  }
+.terminal-prefix {
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
 }
 
-.loading-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #ffffff;
-  margin: 0 0 24px 0;
+.check {
+  color: #4ade80;
+  font-size: 13px;
 }
 
-.loading-progress {
-  margin-bottom: 16px;
+.spinner-char {
+  color: #f59e0b;
+  font-size: 16px;
+  font-weight: bold;
+  animation: blink 0.8s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+
+.pending-char {
+  color: #333;
+}
+
+.terminal-text {
+  color: #e5e5e5;
+}
+
+.terminal-line.done .terminal-text {
+  color: #555;
+}
+
+.terminal-line.active .terminal-text {
+  color: #f59e0b;
+}
+
+.trailing-dots {
+  color: #f59e0b;
+  letter-spacing: 1px;
+  display: inline-block;
+  width: 20px;
+}
+
+/* ── Progress bar ── */
+.loading-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .progress-bar-container {
-  width: 100%;
-  height: 8px;
-  background: #0a0a0a;
-  border-radius: 4px;
+  flex: 1;
+  height: 3px;
+  background: #1a1a1a;
+  border-radius: 2px;
   overflow: hidden;
-  margin-bottom: 12px;
 }
 
 .progress-bar-fill {
   height: 100%;
   background: linear-gradient(90deg, #f59e0b, #fb923c);
-  border-radius: 4px;
-  transition: width 0.3s ease;
-  animation: shimmer 2s infinite;
+  border-radius: 2px;
+  transition: width 0.6s ease;
 }
 
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
+.progress-pct {
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-size: 12px;
+  color: #555;
+  width: 32px;
+  text-align: right;
+  flex-shrink: 0;
 }
 
-.progress-text {
-  font-size: 18px;
-  font-weight: 600;
-  color: #f59e0b;
+/* ── Footer note ── */
+.loading-note {
+  font-size: 12px;
+  color: #333;
+  margin: 0;
+  text-align: center;
   font-family: 'Inconsolata', 'Courier New', monospace;
 }
-
-.loading-message {
-  font-size: 14px;
-  color: #888;
-  margin: 0;
-  font-style: italic;
-}
-

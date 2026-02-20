@@ -39,6 +39,7 @@ import {
   deductCredits,
   hasFeatureAccess,
   requireAuth,
+  requireAdmin,
   requireCredits,
   isAdminUser,
   CREDIT_COSTS,
@@ -1369,12 +1370,39 @@ Format your response as JSON with the following structure:
 app.post('/api/analyze', requireAuth, async (req, res) => {
   // User is authenticated (required by requireAuth middleware)
   const user = req.user;
-  try {
-    const { url } = req.body;
 
-    if (!url) {
-      return res.status(400).json({ error: 'URL is required' });
-    }
+  const { url } = req.body;
+  if (!url) {
+    return res.status(400).json({ error: 'URL is required' });
+  }
+
+  // --- SSE setup ---
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  res.flushHeaders();
+
+  const sendStep = (step, label) => {
+    res.write(`data: ${JSON.stringify({ type: 'step', step, label })}\n\n`);
+  };
+  const sendResult = (data) => {
+    res.write(`data: ${JSON.stringify({ type: 'result', data })}\n\n`);
+    res.end();
+  };
+  const sendError = (message) => {
+    res.write(`data: ${JSON.stringify({ type: 'error', error: message })}\n\n`);
+    res.end();
+  };
+
+  let clientDisconnected = false;
+  req.on('close', () => { clientDisconnected = true; });
+
+  try {
+    // Step 1: Fetching job posting
+    sendStep(0, 'Fetching job posting');
 
     // Check cache first for logo, role title, and company name
     let cachedUrlData = await getCachedJobUrl(url);
@@ -1393,8 +1421,11 @@ app.post('/api/analyze', requireAuth, async (req, res) => {
     const { jobDescription, logo: jobLogo, companyWebsite, linkedinCompanyUrl } = await scrapeJobDescription(url);
 
     if (!jobDescription || jobDescription.length < 100) {
-      return res.status(400).json({ error: 'Could not extract meaningful content from the URL' });
+      return sendError('Could not extract meaningful content from the URL');
     }
+
+    // Step 2: Parsing description
+    sendStep(1, 'Parsing description content');
 
     // Use cached logo if available, otherwise use scraped logo
     let finalLogo = cachedLogo || jobLogo;
@@ -1549,6 +1580,9 @@ app.post('/api/analyze', requireAuth, async (req, res) => {
       console.log('💾 Updating cache with newly found logo');
       await saveJobUrlCache(url, finalLogo, cachedRoleTitle, cachedCompanyName);
     }
+
+    // Step 3: Identifying company & role
+    sendStep(2, 'Identifying company & role');
 
     // First, try to extract company name using OpenAI (more reliable than regex)
     let companyName = cachedCompanyName || null;
@@ -1721,8 +1755,11 @@ Job title:`;
     
     // No Clearbit - only use logos from actual sources (job page, LinkedIn, company website)
 
+    // Step 4: Researching company
+    sendStep(3, 'Researching company background');
+
     // If we have a valid company name (not "us", "you", etc.), try to get more info from OpenAI
-    if (companyName && companyName.length > 2 && 
+    if (companyName && companyName.length > 2 &&
         !['us', 'us.', 'you', 'your', 'we', 'our', 'company', 'unknown'].includes(companyName.toLowerCase())) {
       try {
         console.log('Calling OpenAI for company info...');
@@ -1795,6 +1832,9 @@ Job title:`;
       fundingRoundsCount: companyInfo.fundingRounds?.length || 0
     });
 
+    // Step 5: Generating study plan
+    sendStep(4, 'Generating study plan');
+
     // Generate study plan and questions (requires auth and credits)
     // Check credits for study plan (user is authenticated)
     let studyPlan = null;
@@ -1810,6 +1850,9 @@ Job title:`;
       studyPlan = await generateStudyPlan(jobDescription, companyNameForPlan, roleTitleForPlan);
       await deductCredits(user.id, CREDIT_COSTS.studyPlan);
     }
+
+    // Step 6: Finalising
+    sendStep(5, 'Finalising your prep guide');
 
     // Track this job analysis
     const jobDescriptionHash = hashJobDescription(jobDescription);
@@ -1846,11 +1889,15 @@ Job title:`;
     
     console.log('Response keys:', Object.keys(response));
     console.log('Response has companyInfo:', 'companyInfo' in response);
-    
-    res.json(response);
+
+    sendResult(response);
   } catch (error) {
     console.error('Error in /api/analyze:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    if (res.headersSent) {
+      sendError(error.message || 'Internal server error');
+    } else {
+      res.status(500).json({ error: error.message || 'Internal server error' });
+    }
   }
 });
 
@@ -2842,6 +2889,36 @@ app.get('/api/credits', requireAuth, async (req, res) => {
       plan: req.user.plan
     });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: list all users with subscription info
+app.get('/api/admin/users', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        u.id,
+        u.email,
+        u.name,
+        u.created_at,
+        COALESCE(s.plan, 'free')                   AS plan,
+        COALESCE(s.status, 'active')               AS subscription_status,
+        COALESCE(s.credits_remaining, 0)           AS credits_remaining,
+        COALESCE(s.credits_monthly_allowance, 0)   AS credits_monthly_allowance
+      FROM users u
+      LEFT JOIN subscriptions s ON u.id = s.user_id
+      ORDER BY u.created_at DESC
+    `);
+
+    const users = result.rows.map(u => ({
+      ...u,
+      isAdmin: isAdminUser(u.email),
+    }));
+
+    res.json({ users, total: users.length });
+  } catch (error) {
+    console.error('Admin users error:', error);
     res.status(500).json({ error: error.message });
   }
 });
