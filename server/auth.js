@@ -495,6 +495,25 @@ export function requireAuth(req, res, next) {
   });
 }
 
+// Middleware to require admin
+export function requireAdmin(req, res, next) {
+  const sessionToken = req.headers.authorization?.replace('Bearer ', '') ||
+                       req.cookies?.session_token;
+
+  if (!sessionToken) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  getUserFromSession(sessionToken).then(user => {
+    if (!user) return res.status(401).json({ error: 'Invalid session' });
+    if (!isAdminUser(user.email)) return res.status(403).json({ error: 'Admin access required' });
+    req.user = user;
+    next();
+  }).catch(() => {
+    res.status(500).json({ error: 'Authentication error' });
+  });
+}
+
 // Middleware to require credits
 export function requireCredits(actionCost) {
   return async (req, res, next) => {

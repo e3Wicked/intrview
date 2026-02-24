@@ -12,6 +12,7 @@ import LoginModal from './components/LoginModal'
 import CreditBar from './components/CreditBar'
 import UpgradeModal from './components/UpgradeModal'
 import SignInPrompt from './components/SignInPrompt'
+import AdminPage from './pages/AdminPage'
 import { preloadedExamples } from './data/preloadedExamples'
 import { GamificationProvider } from './contexts/GamificationContext'
 import AchievementToast from './components/AchievementToast'
@@ -48,6 +49,11 @@ function Layout({ children, user, setUser, showLoginModal, setShowLoginModal, lo
                 <div className="header-user-info">
                   <span className="header-user-email">{user.email}</span>
                 </div>
+                {user.isAdmin && (
+                  <button className="header-btn" onClick={() => navigate('/admin')}>
+                    Admin
+                  </button>
+                )}
                 <button className="header-btn primary" onClick={() => handleSelectPlan('starter')}>
                   Pricing
                 </button>
@@ -542,8 +548,16 @@ function App() {
             <CompanyPage user={user} />
           } 
         />
-        <Route 
-          path="/job/:jobId" 
+        <Route
+          path="/admin"
+          element={
+            user?.isAdmin
+              ? <AdminPage user={user} />
+              : <div style={{ padding: '64px', textAlign: 'center', color: '#888' }}>Access denied.</div>
+          }
+        />
+        <Route
+          path="/job/:jobId"
           element={
             result ? (
               <JobAnalysisPage 

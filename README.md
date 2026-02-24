@@ -1,100 +1,162 @@
 # intrview.io
 
-A minimal web application that generates personalized study plans and interview questions from job description URLs using OpenAI.
+A web application that generates personalized study plans and interview questions from job description URLs using OpenAI.
 
 ## Features
 
-- 🎯 Paste a job description URL
-- 📝 Automatically scrapes and extracts job description content
-- 🤖 Uses OpenAI to generate:
-  - Structured study plans organized by topics
-  - Interview questions organized by interview stages
-  - Up-to-date information and best practices
-- 🎨 Clean, minimal UI design
+- Paste a job description URL
+- Automatically scrapes and extracts job description content
+- Uses OpenAI to generate structured study plans and interview questions
+- Company research with intelligent caching (PostgreSQL)
+- User accounts with Google OAuth and email/password auth
+- Stripe-powered subscription plans
 
-## Setup
+## Tech Stack
+
+- **Frontend**: React 18, Vite, React Router
+- **Backend**: Node.js, Express
+- **Database**: PostgreSQL
+- **AI**: OpenAI API (GPT-4)
+- **Payments**: Stripe
+
+---
+
+## Local Setup
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
-- npm or yarn
-- OpenAI API key
+- Node.js v20+ (v22 LTS recommended — see `.nvmrc`)
+- Docker (for the database)
 
-### Installation
+If you use nvm, you can install Node.js v22:
 
-1. Clone or navigate to this repository
-
-2. Install all dependencies:
 ```bash
-npm run install-all
+nvm install 22
+nvm use 22
 ```
 
-3. Set up environment variables:
-   - Copy `server/.env.example` to `server/.env` (if it exists) or create `server/.env`
-   - Add your OpenAI API key:
-```
-OPENAI_API_KEY=your_openai_api_key_here
-PORT=5000
-```
+### 1. Install dependencies
 
-### Running the Application
-
-1. Build the frontend and start the server:
 ```bash
-npm start
+make install
 ```
 
-This will:
-- Build the React frontend
-- Start the server on `http://localhost:5000`
+### 2. Configure environment variables
 
-2. Open your browser and navigate to `http://localhost:5000`
+Create `server/.env` based on the template below:
 
-The landing page will be at the root URL where you can paste the job description URL.
+```env
+# Server
+PORT=5001
+NODE_ENV=development
 
-**Note:** If you need to rebuild after making frontend changes:
+# Database (matches docker-compose defaults)
+DB_HOST=localhost
+DB_PORT=5435
+DB_NAME=intrview
+DB_USER=intrview
+DB_PASSWORD=intrview
+
+# OpenAI (required)
+OPENAI_API_KEY=sk-...
+
+# Stripe (optional — payments won't work without these)
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# Email / SMTP (optional — email features won't work without these)
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=you@example.com
+SMTP_PASSWORD=your_smtp_password
+SMTP_FROM=intrview.io <noreply@intrview.io>
+```
+
+### 3. Start the database
+
 ```bash
-npm run build
-npm run server
+make db-up
 ```
 
-## Usage
+### 4. Run migrations
 
-1. Paste a job description URL in the input field
-2. Click "Generate Study Plan"
-3. Wait for the analysis (this may take 30-60 seconds)
-4. Review your personalized study plan and interview questions
+```bash
+make db-migrate
+```
+
+This applies all pending migrations from `server/migrations/` in order, setting up the full schema. Re-running it is safe — already-applied migrations are skipped.
+
+### 5. Start the app
+
+```bash
+make dev
+```
+
+This runs the Vite dev server (port 5000) and the Express server (port 5001) in parallel. Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+---
+
+## Available `make` commands
+
+Run `make` with no arguments to see all commands.
+
+| Command | Description |
+|---|---|
+| `make install` | Install all dependencies (root + server + client) |
+| `make dev` | Start client and server in parallel (development) |
+| `make dev-client` | Start Vite dev server only |
+| `make dev-server` | Start Express server only |
+| `make build` | Build the React client for production |
+| `make start` | Build client then start server (production mode) |
+| `make db-up` | Start Postgres container |
+| `make db-migrate` | Apply pending migrations |
+| `make db-down` | Stop Postgres container |
+| `make db-reset` | Wipe database volume and restart fresh |
+| `make db-logs` | Tail Postgres container logs |
+| `make db-shell` | Open a `psql` shell inside the container |
+
+---
 
 ## Project Structure
 
 ```
-InterviewPrepper/
-├── client/          # React frontend
+intrview/
+├── client/               # React frontend (Vite)
 │   ├── src/
+│   │   ├── components/
+│   │   ├── contexts/
+│   │   ├── pages/
+│   │   └── utils/
 │   └── package.json
-├── server/          # Express backend
-│   ├── index.js
+├── server/               # Express backend
+│   ├── index.js          # Main server entry point
+│   ├── auth.js           # Authentication logic
+│   ├── db.js             # Database client & queries
+│   ├── email.js          # Email service
+│   ├── stripe.js         # Stripe integration
+│   ├── routes/           # Route handlers
+│   ├── utils/
+│   ├── setup-db.sql      # Database schema
 │   └── package.json
-└── package.json     # Root package.json with scripts
+├── docker-compose.yml    # Postgres container
+├── Makefile
+└── package.json
 ```
 
-## Technologies
-
-- **Frontend**: React, Vite
-- **Backend**: Node.js, Express
-- **Web Scraping**: Cheerio, Axios
-- **AI**: OpenAI API (GPT-4)
-
-## Notes
-
-- The web scraper attempts to find job description content using common HTML selectors
-- If the scraper can't find specific content, it will extract text from the main body
-- The OpenAI API uses GPT-4 Turbo for generating study plans and questions
-- Make sure you have sufficient OpenAI API credits
+---
 
 ## Troubleshooting
 
-- **"OpenAI API key not configured"**: Make sure you've created `server/.env` with your API key
-- **"Could not extract meaningful content"**: The URL might not be accessible or doesn't contain enough text
-- **CORS errors**: Make sure the backend server is running on port 5000
+**Database connection errors**
+- Confirm the container is running: `make db-logs`
+- Check credentials in `server/.env` match the Docker Compose values
+- Reset and reinitialise if needed: `make db-reset`
 
+**OpenAI errors**
+- Verify `OPENAI_API_KEY` is set in `server/.env`
+- Check you have sufficient API credits
+
+**Port conflicts**
+- Client dev server: 5173
+- Express server: 5001
+- Postgres: 5435 (mapped from container port 5432)

@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { createHash } from 'crypto';
+
 const { Pool } = pg;
 
 // PostgreSQL connection pool

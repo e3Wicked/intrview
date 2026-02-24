@@ -1,4 +1,5 @@
--- Add job_analyses table to track user job analyses
+-- Job analyses table
+
 CREATE TABLE IF NOT EXISTS job_analyses (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -12,7 +13,3 @@ CREATE TABLE IF NOT EXISTS job_analyses (
 CREATE INDEX IF NOT EXISTS idx_job_analyses_user_id ON job_analyses(user_id);
 CREATE INDEX IF NOT EXISTS idx_job_analyses_created_at ON job_analyses(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_job_analyses_hash ON job_analyses(job_description_hash);
-
-COMMENT ON TABLE job_analyses IS 'Tracks all job analyses performed by users';
-
-
