@@ -32,3 +32,12 @@
 - Pages: `client/src/pages/` (PascalCase, e.g., TrainingPage.jsx)
 - Components: `client/src/components/` (PascalCase)
 - CSS: Co-located with component (same name, .css extension)
+
+## Testing
+- **Framework**: Vitest v1 (Node 18 compat; v4+ requires Node 20+)
+- **Server tests**: `server/__tests__/*.test.js`, config in `server/vitest.config.js`
+- **Client tests**: `client/src/**/__tests__/*.test.{js,jsx}`, config in `client/vite.config.js` (test block)
+- **Client setup**: `client/src/test-setup.js` imports `@testing-library/jest-dom`
+- **Run**: `npm test` in server/ or client/; both use `vitest run`
+- **Mocking**: vi.mock for DB pool, axios, React contexts; CSS disabled in client tests
+- **jsdom v24** used for client (Node 18 compatible)
