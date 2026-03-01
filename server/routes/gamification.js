@@ -553,6 +553,135 @@ router.get('/api/gamification/skill-stats', requireAuth, async (req, res) => {
   }
 });
 
+// Weakness report: identify weak categories, trends, and struggling questions
+router.get('/api/gamification/weakness-report', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const [categoriesRes, strugglingRes] = await Promise.all([
+      // Query A: Category stats with trend data (last 3 vs previous 3 attempts)
+      pool.query(`
+        WITH recent AS (
+          SELECT
+            question_category,
+            ROUND(AVG(score)::numeric, 1) as avg_score,
+            COUNT(*) as total_attempts,
+            COUNT(CASE WHEN score >= 70 THEN 1 END) as correct_count,
+            MAX(created_at) as last_practiced
+          FROM question_attempts
+          WHERE user_id = $1
+            AND question_category IS NOT NULL
+            AND question_category != ''
+          GROUP BY question_category
+        ),
+        trend AS (
+          SELECT question_category, ROUND(AVG(score)::numeric, 1) as recent_avg
+          FROM (
+            SELECT question_category, score,
+                   ROW_NUMBER() OVER (PARTITION BY question_category ORDER BY created_at DESC) as rn
+            FROM question_attempts
+            WHERE user_id = $1 AND question_category IS NOT NULL AND question_category != ''
+          ) ranked WHERE rn <= 3
+          GROUP BY question_category
+        ),
+        older AS (
+          SELECT question_category, ROUND(AVG(score)::numeric, 1) as older_avg
+          FROM (
+            SELECT question_category, score,
+                   ROW_NUMBER() OVER (PARTITION BY question_category ORDER BY created_at DESC) as rn
+            FROM question_attempts
+            WHERE user_id = $1 AND question_category IS NOT NULL AND question_category != ''
+          ) ranked WHERE rn > 3 AND rn <= 6
+          GROUP BY question_category
+        )
+        SELECT r.question_category, r.avg_score, r.total_attempts, r.correct_count,
+               r.last_practiced, t.recent_avg, o.older_avg
+        FROM recent r
+        LEFT JOIN trend t ON t.question_category = r.question_category
+        LEFT JOIN older o ON o.question_category = r.question_category
+        ORDER BY r.avg_score ASC
+      `, [userId]),
+
+      // Query B: Struggling questions (attempted 2+ times, best < 70)
+      pool.query(`
+        SELECT question_text, question_category, job_description_hash,
+               COUNT(*) as attempt_count, MAX(score) as best_score,
+               ROUND(AVG(score)::numeric, 1) as avg_score,
+               MAX(created_at) as last_attempted
+        FROM question_attempts
+        WHERE user_id = $1 AND question_text IS NOT NULL
+        GROUP BY question_text, question_category, job_description_hash
+        HAVING COUNT(*) >= 2 AND MAX(score) < 70
+        ORDER BY MAX(score) ASC
+        LIMIT 10
+      `, [userId]),
+    ]);
+
+    const now = new Date();
+    const STALE_DAYS = 14;
+    const STALE_THRESHOLD = 75;
+
+    const weakCategories = categoriesRes.rows.map(row => {
+      const avgScore = parseFloat(row.avg_score) || 0;
+      const recentAvg = row.recent_avg != null ? parseFloat(row.recent_avg) : null;
+      const olderAvg = row.older_avg != null ? parseFloat(row.older_avg) : null;
+      const lastPracticed = row.last_practiced;
+      const daysSince = lastPracticed ? (now - new Date(lastPracticed)) / (1000 * 60 * 60 * 24) : Infinity;
+      const isStale = daysSince >= STALE_DAYS && avgScore < STALE_THRESHOLD;
+
+      let trend = 'new';
+      let trendDelta = 0;
+      if (recentAvg !== null && olderAvg !== null) {
+        trendDelta = recentAvg - olderAvg;
+        trend = trendDelta > 3 ? 'improving' : trendDelta < -3 ? 'declining' : 'stable';
+      }
+
+      const totalAttempts = parseInt(row.total_attempts) || 0;
+      const correctCount = parseInt(row.correct_count) || 0;
+      const correctPercent = totalAttempts > 0 ? Math.round((correctCount / totalAttempts) * 100) : 0;
+      const mastery = Math.min(correctPercent, Math.round(avgScore));
+
+      return {
+        category: row.question_category,
+        avgScore,
+        totalAttempts,
+        mastery,
+        lastPracticed,
+        trend,
+        trendDelta: Math.round(trendDelta * 10) / 10,
+        isStale,
+      };
+    });
+
+    const top3Focus = weakCategories
+      .filter(c => c.mastery < 80)
+      .slice(0, 3)
+      .map(c => c.category);
+
+    const strugglingQuestions = strugglingRes.rows.map(row => ({
+      questionText: row.question_text,
+      category: row.question_category,
+      jobDescriptionHash: row.job_description_hash,
+      attemptCount: parseInt(row.attempt_count) || 0,
+      bestScore: parseInt(row.best_score) || 0,
+      avgScore: parseFloat(row.avg_score) || 0,
+      lastAttempted: row.last_attempted,
+    }));
+
+    const summary = {
+      totalCategories: weakCategories.length,
+      weakCount: weakCategories.filter(c => c.avgScore < 60).length,
+      staleCount: weakCategories.filter(c => c.isStale).length,
+      decliningCount: weakCategories.filter(c => c.trend === 'declining').length,
+    };
+
+    res.json({ weakCategories, top3Focus, strugglingQuestions, summary });
+  } catch (error) {
+    console.error('Error getting weakness report:', error);
+    res.status(500).json({ error: 'Failed to get weakness report' });
+  }
+});
+
 // Check and unlock achievements
 router.post('/api/gamification/check-achievements', requireAuth, async (req, res) => {
   try {
@@ -589,7 +718,7 @@ router.post('/api/practice/flashcard-xp', requireAuth, async (req, res) => {
     // Insert attempt record
     await pool.query(`
       INSERT INTO question_attempts (user_id, job_description_hash, session_id, question_text, attempt_type, score, xp_earned)
-      VALUES ($1, $2, $3, $4, 'flashcard', $5, $6)
+      VALUES ($1, $2, $3::integer, $4, 'flashcard', $5, $6)
     `, [userId, jobDescriptionHash, sessionId || null, questionText || '', mark === 'known' ? 100 : 0, xp]);
 
     await awardXp(userId, xp, 'flashcard', null, `Flashcard: ${mark}`);
@@ -677,13 +806,13 @@ async function updateStreak(userId) {
 export async function awardXp(userId, amount, source, sourceId, description) {
   // Log XP
   await pool.query(
-    'INSERT INTO user_xp_log (user_id, xp_amount, source, source_id, description) VALUES ($1, $2, $3, $4, $5)',
+    'INSERT INTO user_xp_log (user_id, xp_amount, source, source_id, description) VALUES ($1, $2, $3, $4::integer, $5)',
     [userId, amount, source, sourceId || null, description || null]
   );
 
   // Update user's total XP and level
   const result = await pool.query(
-    'UPDATE users SET total_xp = total_xp + $2 RETURNING total_xp',
+    'UPDATE users SET total_xp = total_xp + $2 WHERE id = $1 RETURNING total_xp',
     [userId, amount]
   );
 
@@ -704,10 +833,10 @@ export async function recordAttemptAndAwardXp(userId, { jobDescriptionHash, sess
   const isFirstToday = await isFirstPracticeToday(userId);
   const { xp, base, scoreBonus, multiplier, dailyBonus } = calculateXpForAttempt(attemptType, score, streak.current_streak, isFirstToday);
 
-  // Insert attempt
+  // Insert attempt (explicit casts on nullable params to avoid PG type inference errors)
   const attemptResult = await pool.query(`
     INSERT INTO question_attempts (user_id, job_description_hash, session_id, question_text, question_category, attempt_type, user_answer, score, evaluation, xp_earned)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    VALUES ($1, $2, $3::integer, $4, $5::varchar, $6, $7, $8::integer, $9::jsonb, $10)
     RETURNING id
   `, [userId, jobDescriptionHash, sessionId || null, questionText, questionCategory || null, attemptType, userAnswer, score, JSON.stringify(evaluation), xp]);
 

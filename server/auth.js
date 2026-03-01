@@ -83,7 +83,8 @@ export const CREDIT_COSTS = {
   companyResearch: 3,
   quizEvaluation: 1,
   voiceEvaluation: 2,
-  chatPractice: 1
+  chatPractice: 1,
+  focusChat: 1
 };
 
 // Generate 6-digit verification code

@@ -1,0 +1,218 @@
+/* ========== Summary Badges ========== */
+.wp-summary {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.wp-badge {
+  font-size: 11px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.03em;
+}
+
+.wp-badge-weak {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.wp-badge-stale {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.wp-badge-declining {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+}
+
+/* ========== Category Rows ========== */
+.wp-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.wp-category-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #111;
+  border: 1px solid #1a1a1a;
+  border-radius: 10px;
+  transition: border-color 0.2s;
+}
+
+.wp-category-row:hover {
+  border-color: #2a2a2a;
+}
+
+.wp-category-clickable {
+  cursor: pointer;
+}
+
+.wp-category-clickable:hover {
+  border-color: #4ade80;
+  background: rgba(74, 222, 128, 0.03);
+}
+
+.wp-rank {
+  font-size: 14px;
+  font-weight: 700;
+  color: #555;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  min-width: 20px;
+  padding-top: 2px;
+}
+
+.wp-category-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.wp-category-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.wp-category-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e5e5e5;
+}
+
+.wp-category-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wp-tag {
+  font-size: 10px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+.wp-tag-stale {
+  background: rgba(234, 179, 8, 0.2);
+  color: #eab308;
+}
+
+.wp-trend {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ========== Mastery Bar ========== */
+.wp-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.wp-bar {
+  flex: 1;
+  height: 6px;
+  background: #1a1a1a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.wp-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.wp-mastery {
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+  min-width: 36px;
+  text-align: right;
+}
+
+.wp-meta {
+  font-size: 12px;
+  color: #555;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+/* ========== Struggling Questions ========== */
+.wp-struggling {
+  border-top: 1px solid #1a1a1a;
+  padding-top: 16px;
+}
+
+.wp-sub-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #888;
+  margin: 0 0 12px 0;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.wp-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wp-question-row {
+  padding: 10px 14px;
+  background: #0d0d0d;
+  border: 1px solid #1a1a1a;
+  border-radius: 8px;
+}
+
+.wp-q-text {
+  display: block;
+  font-size: 13px;
+  color: #ccc;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.wp-q-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}
+
+.wp-q-category {
+  color: #666;
+}
+
+.wp-q-score {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 600px) {
+  .wp-category-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .wp-category-tags {
+    order: -1;
+  }
+}

@@ -4,7 +4,6 @@ import axios from 'axios'
 import { api } from '../utils/api'
 import { useGamification } from '../contexts/GamificationContext'
 import { getLevelForXp } from '../utils/gamification'
-import AchievementsBadgeGrid from './AchievementsBadgeGrid'
 import LogoWithFallbacks from './LogoWithFallbacks'
 import './MissionDashboard.css'
 
@@ -15,9 +14,9 @@ function MissionDashboard({ user, onAnalyzeClick }) {
   const [loading, setLoading] = useState(true)
   const [studyPlans, setStudyPlans] = useState({})
   const [serverProgress, setServerProgress] = useState({})
-  const [skillStats, setSkillStats] = useState({ skills: [], weeklyStats: { questionsThisWeek: 0, questionsLastWeek: 0, changePercent: 0 } })
-  const [practiceHistory, setPracticeHistory] = useState([])
-  const [showAllAchievements, setShowAllAchievements] = useState(false)
+  const [weaknessNudge, setWeaknessNudge] = useState(null)
+  const [nudgeDismissed, setNudgeDismissed] = useState(false)
+  const [lastSessions, setLastSessions] = useState({})
 
   useEffect(() => {
     loadData()
@@ -26,20 +25,35 @@ function MissionDashboard({ user, onAnalyzeClick }) {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [analysesRes, statsRes, skillStatsRes, historyRes] = await Promise.all([
+      const [analysesRes, weaknessRes, historyRes] = await Promise.all([
         axios.get('/api/user/analyses?limit=100'),
-        axios.get('/api/user/stats'),
-        api.gamification.getSkillStats().catch(() => ({ data: { skills: [], weeklyStats: { questionsThisWeek: 0, questionsLastWeek: 0, changePercent: 0 } } })),
-        api.practice.getHistory({ limit: 5 }).catch(() => ({ data: { sessions: [] } })),
+        api.gamification.getWeaknessReport().catch(() => ({ data: null })),
+        api.practice.getHistory({ limit: 20 }).catch(() => ({ data: { sessions: [] } })),
       ])
       setAnalyses(analysesRes.data)
-      setSkillStats(skillStatsRes.data)
-      setPracticeHistory(historyRes.data.sessions || [])
+
+      // Build weakness nudge from top weakness
+      if (weaknessRes.data?.weakCategories?.length > 0) {
+        const weakest = weaknessRes.data.weakCategories[0]
+        if (weakest.mastery < 80) {
+          setWeaknessNudge(weakest)
+        }
+      }
+
+      // Build last session per job hash for "Resume" CTA
+      const sessionMap = {}
+      const sessions = historyRes.data.sessions || []
+      for (const session of sessions) {
+        if (session.job_description_hash && !sessionMap[session.job_description_hash]) {
+          sessionMap[session.job_description_hash] = session
+        }
+      }
+      setLastSessions(sessionMap)
 
       // Load study plans and server progress in parallel
       const plans = {}
       const progressMap = {}
-      for (const analysis of analysesRes.data) {
+      await Promise.all(analysesRes.data.map(async (analysis) => {
         try {
           const [planRes, progressRes] = await Promise.all([
             axios.get(`/api/user/study-plan/${analysis.job_description_hash}`),
@@ -50,7 +64,7 @@ function MissionDashboard({ user, onAnalyzeClick }) {
         } catch (e) {
           // Plan might not exist yet
         }
-      }
+      }))
       setStudyPlans(plans)
       setServerProgress(progressMap)
     } catch (err) {
@@ -60,89 +74,61 @@ function MissionDashboard({ user, onAnalyzeClick }) {
     }
   }
 
-  // Group analyses by company
-  const companiesData = useMemo(() => {
-    const grouped = analyses.reduce((acc, analysis) => {
-      const company = analysis.company_name || 'Unknown Company'
-      if (!acc[company]) {
-        acc[company] = {
-          name: company,
-          roles: [],
-          analyses: []
-        }
-      }
-      acc[company].roles.push(analysis.role_title || 'Unknown Role')
-      acc[company].analyses.push(analysis)
-      return acc
-    }, {})
+  // Build job cards: one card per analysis (not grouped by company)
+  const jobCards = useMemo(() => {
+    return analyses.map(analysis => {
+      const plan = studyPlans[analysis.job_description_hash]
+      const sp = serverProgress[analysis.job_description_hash]
 
-    return Object.values(grouped).map(company => {
       let completedTopics = 0
       let totalTopics = 0
+      const topics = plan?.studyPlan?.topics || plan?.topics || []
+      if (topics.length > 0) {
+        const topicsStudied = new Set(sp?.topicsStudied || [])
+        const currentTopics = topics.map(t => t.topic || t)
+        completedTopics = currentTopics.filter(t => topicsStudied.has(t)).length
+        totalTopics = currentTopics.length
+      }
+      const progressPercent = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0
 
-      company.analyses.forEach(analysis => {
-        const plan = studyPlans[analysis.job_description_hash]
-        if (plan?.studyPlan?.topics) {
-          const sp = serverProgress[analysis.job_description_hash]
-          const topicsStudied = new Set(sp?.topicsStudied || [])
-          const currentTopics = plan.studyPlan.topics.map(t => t.topic)
-          const studied = currentTopics.filter(t => topicsStudied.has(t))
-          completedTopics += studied.length
-          totalTopics += currentTopics.length
-        }
-      })
-
-      const avgProgress = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0
-
-      const latestAnalysis = company.analyses[0]
-      let logoUrl = latestAnalysis?.logo_url || null
+      let logoUrl = analysis.logo_url || null
       let domain = null
-
-      if (latestAnalysis?.url) {
+      if (analysis.url) {
         try {
-          const urlObj = new URL(latestAnalysis.url)
-          domain = urlObj.hostname.replace('www.', '')
+          domain = new URL(analysis.url).hostname.replace('www.', '')
         } catch (e) {}
       }
 
+      // Determine last mode for "Resume" CTA
+      const lastSession = lastSessions[analysis.job_description_hash]
+      let lastMode = null
+      if (lastSession) {
+        const mode = lastSession.mode
+        if (mode === 'flashcards') lastMode = 'Flashcards'
+        else if (mode === 'quiz') lastMode = 'Quiz'
+        else if (mode === 'voice') lastMode = 'Voice'
+        else if (mode === 'focus' || mode === 'coach') lastMode = 'Coach'
+        else lastMode = null
+      }
+
       return {
-        ...company,
-        roleCount: company.roles.length,
-        uniqueRoles: [...new Set(company.roles)],
-        progress: avgProgress,
-        latestAnalysis: latestAnalysis,
-        logoUrl: logoUrl,
-        domain: domain
+        id: analysis.id,
+        companyName: analysis.company_name || 'Unknown Company',
+        roleTitle: analysis.role_title || 'Unknown Role',
+        progressPercent,
+        logoUrl,
+        domain,
+        jobDescriptionHash: analysis.job_description_hash,
+        lastMode,
       }
     })
-  }, [analyses, studyPlans, serverProgress])
+  }, [analyses, studyPlans, serverProgress, lastSessions])
 
-  // Helpers
-  const getStreakMessage = (days) => {
-    if (days >= 30) return "You're unstoppable!"
-    if (days >= 14) return "Amazing dedication!"
-    if (days >= 7) return "On fire!"
-    if (days >= 3) return "Keep it up!"
-    if (days >= 1) return "Good start!"
-    return "Start today!"
-  }
+  // Find the most recently active job for nudge link
+  const mostRecentJobId = analyses.length > 0 ? analyses[0].id : null
 
-  const getMasteryColor = (mastery) => {
-    if (mastery >= 80) return '#22c55e'
-    if (mastery >= 60) return '#f59e0b'
-    return '#ef4444'
-  }
-
-  const getMasteryBg = (mastery) => {
-    if (mastery >= 80) return 'rgba(34, 197, 94, 0.1)'
-    if (mastery >= 60) return 'rgba(245, 158, 11, 0.1)'
-    return 'rgba(239, 68, 68, 0.1)'
-  }
-
-  const getMasteryBorder = (mastery) => {
-    if (mastery >= 80) return 'rgba(34, 197, 94, 0.25)'
-    if (mastery >= 60) return 'rgba(245, 158, 11, 0.25)'
-    return 'rgba(239, 68, 68, 0.25)'
+  const handleDismissNudge = () => {
+    setNudgeDismissed(true)
   }
 
   if (loading) {
@@ -155,7 +141,8 @@ function MissionDashboard({ user, onAnalyzeClick }) {
 
   const levelInfo = gamStats ? getLevelForXp(gamStats.totalXp) : null
   const streak = gamStats?.streak || { current: 0, multiplier: 1.0 }
-  const weeklyStats = skillStats.weeklyStats || { questionsThisWeek: 0, changePercent: 0 }
+
+  const hasTrainingData = streak.current > 0 || (gamStats?.totalXp || 0) > 0 || (weaknessNudge && !nudgeDismissed)
 
   return (
     <div className="mission-dashboard">
@@ -163,167 +150,77 @@ function MissionDashboard({ user, onAnalyzeClick }) {
       <div className="dash-header">
         <div className="dash-header-text">
           <h1 className="dash-title">Dashboard</h1>
-          <p className="dash-subtitle">Your interview prep command center</p>
         </div>
       </div>
 
-      {/* Stat Cards Row */}
-      <div className="stat-cards-row">
-        <div className="stat-card">
-          <div className="stat-card-label">STUDY STREAK</div>
-          <div className="stat-card-value">{streak.current} <span className="stat-card-unit">{streak.current === 1 ? 'day' : 'days'}</span></div>
-          <div className="stat-card-extra">
-            <span className="streak-flame">{streak.current > 0 ? '\uD83D\uDD25' : '\uD83D\uDCA4'}</span>
-            <span className="stat-card-note">{getStreakMessage(streak.current)}</span>
-            {streak.multiplier > 1.0 && (
-              <span className="streak-multiplier-badge">{streak.multiplier}x</span>
-            )}
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-card-label">THIS WEEK</div>
-          <div className="stat-card-value">{weeklyStats.questionsThisWeek}</div>
-          <div className="stat-card-extra">
-            {weeklyStats.questionsLastWeek > 0 ? (
-              <span className={`stat-card-change ${weeklyStats.changePercent >= 0 ? 'positive' : 'negative'}`}>
-                {weeklyStats.changePercent >= 0 ? '+' : ''}{weeklyStats.changePercent}% from last week
-              </span>
-            ) : weeklyStats.questionsThisWeek > 0 ? (
-              <span className="stat-card-note">Great start this week!</span>
-            ) : (
-              <span className="stat-card-note">Start practicing!</span>
-            )}
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-card-label">LEVEL</div>
-          <div className="stat-card-value">{levelInfo?.title || 'Applicant'}</div>
-          <div className="stat-card-extra">
-            <span className="stat-card-xp">{gamStats?.totalXp || 0} XP</span>
-            {levelInfo && (
-              <div className="stat-card-progress">
-                <div className="stat-card-progress-fill" style={{ width: `${levelInfo.progressPercent || 0}%` }} />
-              </div>
-            )}
-          </div>
-        </div>
-
-        <button className="stat-card-cta" onClick={onAnalyzeClick}>
-          <span className="cta-icon">+</span>
-          <span className="cta-text">Add New Job URL</span>
-          {user && <span className="cta-credits">5 credits</span>}
+      {/* Analyze New Job CTA — primary action */}
+      <div className="analyze-cta-row">
+        <button className="analyze-cta-btn" onClick={onAnalyzeClick}>
+          <span className="analyze-cta-icon">+</span>
+          <span className="analyze-cta-text">Analyze New Job</span>
+          {user && <span className="analyze-cta-credits">5 credits</span>}
         </button>
       </div>
 
-      {/* Skill Heatmap */}
+      {/* Your Jobs */}
       <section className="dash-section">
         <div className="dash-section-header">
-          <h2 className="dash-section-title">Skill Heatmap</h2>
-          {skillStats.skills.length > 0 && (
-            <button className="dash-section-action" onClick={() => {}}>
-              Smart Practice &rarr;
-            </button>
-          )}
+          <h2 className="dash-section-title">Your Jobs</h2>
         </div>
-        {skillStats.skills.length === 0 ? (
+        {jobCards.length === 0 ? (
           <div className="empty-state-card">
-            <p>Complete some practice questions to see your skill breakdown</p>
-          </div>
-        ) : (
-          <div className="skill-heatmap-grid">
-            {skillStats.skills.slice(0, 6).map((skill) => (
-              <div
-                key={skill.category}
-                className="skill-card"
-                style={{
-                  backgroundColor: getMasteryBg(skill.mastery),
-                  borderColor: getMasteryBorder(skill.mastery),
-                }}
-              >
-                <div className="skill-card-top">
-                  <span className="skill-card-name">{skill.category}</span>
-                  <span
-                    className="skill-card-mastery"
-                    style={{ backgroundColor: getMasteryColor(skill.mastery) }}
-                  >
-                    {skill.mastery}%
-                  </span>
-                </div>
-                <div className="skill-card-stats">
-                  <span>Avg score {Math.round(skill.avgScore)}%</span>
-                  <span>{skill.totalAttempts} {skill.totalAttempts === 1 ? 'drill' : 'drills'} completed</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Target Companies */}
-      <section className="dash-section">
-        <div className="dash-section-header">
-          <h2 className="dash-section-title">Your Target Companies</h2>
-        </div>
-        {companiesData.length === 0 ? (
-          <div className="empty-state-card">
-            <p>No companies yet. Start by analyzing a job posting!</p>
+            <p>No jobs yet. Start by analyzing a job posting!</p>
             <button className="empty-state-cta" onClick={onAnalyzeClick}>
               Analyze Your First Job Posting
             </button>
           </div>
         ) : (
-          <div className="companies-grid">
-            {companiesData.map((company) => (
-              <div
-                key={company.name}
-                className="company-card"
-                onClick={() => navigate(`/company/${encodeURIComponent(company.name)}`)}
-                onKeyDown={(e) => e.key === 'Enter' && navigate(`/company/${encodeURIComponent(company.name)}`)}
-                tabIndex={0}
-                role="button"
-              >
-                <div className="company-card-header">
-                  <div className="company-logo-container">
+          <div className="jobs-grid">
+            {jobCards.map((job) => (
+              <div key={job.id} className="job-card">
+                <div
+                  className="job-card-header"
+                  onClick={() => navigate(`/job/${job.id}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/job/${job.id}`)}
+                  title="View Job Brief"
+                >
+                  <div className="job-card-logo">
                     <LogoWithFallbacks
-                      domain={company.domain}
-                      name={company.name}
-                      logoUrl={company.logoUrl}
+                      domain={job.domain}
+                      name={job.companyName}
+                      logoUrl={job.logoUrl}
                     />
                   </div>
-                  <div className="company-card-info">
-                    <h3 className="company-name">{company.name}</h3>
-                    <div className="company-meta">
-                      <span className="roles-count">{company.roleCount} {company.roleCount === 1 ? 'role' : 'roles'}</span>
-                    </div>
+                  <div className="job-card-info">
+                    <h3 className="job-card-company">{job.companyName}</h3>
+                    <p className="job-card-role">{job.roleTitle}</p>
                   </div>
                 </div>
-                {/* Role names list */}
-                {company.uniqueRoles.length > 0 && (
-                  <div className="company-card-roles">
-                    {company.uniqueRoles.slice(0, 3).map((role, idx) => (
-                      <div key={idx} className="company-card-role-item">
-                        <span className="role-bullet">{idx === company.uniqueRoles.slice(0, 3).length - 1 && company.uniqueRoles.length <= 3 ? '└' : '├'}</span>
-                        <span className="role-name-text">{role}</span>
-                      </div>
-                    ))}
-                    {company.uniqueRoles.length > 3 && (
-                      <div className="company-card-role-item more">
-                        <span className="role-bullet">└</span>
-                        <span className="role-name-text">+{company.uniqueRoles.length - 3} more</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-                <div className="company-progress">
+
+                <div className="job-card-progress">
                   <div className="progress-bar">
-                    <div
-                      className="progress-fill"
-                      style={{ width: `${company.progress}%` }}
-                    />
+                    <div className="progress-fill" style={{ width: `${job.progressPercent}%` }} />
                   </div>
-                  <span className="progress-text">{company.progress}% complete</span>
+                  <span className="progress-text">{job.progressPercent}%</span>
+                </div>
+
+                <div className="job-card-actions">
+                  <button
+                    className="job-card-cta primary"
+                    onClick={() => navigate(`/job/${job.id}/train`)}
+                  >
+                    Start Training &rarr;
+                  </button>
+                  {job.lastMode && (
+                    <button
+                      className="job-card-cta secondary"
+                      onClick={() => navigate(`/job/${job.id}/train?mode=${job.lastMode.toLowerCase()}`)}
+                    >
+                      Resume {job.lastMode} &rarr;
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -331,60 +228,59 @@ function MissionDashboard({ user, onAnalyzeClick }) {
         )}
       </section>
 
-      {/* Recently Completed */}
-      <section className="dash-section">
-        <div className="dash-section-header">
-          <h2 className="dash-section-title">Recently Completed</h2>
-        </div>
-        {practiceHistory.length === 0 ? (
-          <div className="empty-state-card">
-            <p>No practice sessions yet. Start practicing to track your progress!</p>
+      {/* Your Training — hidden when user has no training data */}
+      {hasTrainingData && (
+        <section className="dash-section">
+          <div className="dash-section-header">
+            <h2 className="dash-section-title">Your Training</h2>
           </div>
-        ) : (
-          <div className="recently-completed-list">
-            {practiceHistory.map((session, idx) => {
-              const scoreDisplay = session.average_score > 0 ? `${Math.round(session.average_score / 10)}/10` : null
-              const mode = session.mode === 'voice' ? 'Voice Practice' : 'Quiz'
-              return (
-                <div key={session.id || idx} className="completed-item">
-                  <div className="completed-icon">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                      <rect width="20" height="20" rx="4" fill="#22c55e" fillOpacity="0.15"/>
-                      <path d="M6 10l3 3 5-6" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                  <div className="completed-info">
-                    <span className="completed-label">Completed {mode}</span>
-                    <span className="completed-date">{new Date(session.ended_at || session.started_at).toLocaleDateString()}</span>
-                  </div>
-                  <div className="completed-stats">
-                    {session.total_xp_earned > 0 && (
-                      <span className="completed-xp">+{session.total_xp_earned} XP</span>
-                    )}
-                    {scoreDisplay && (
-                      <span className="completed-score">{scoreDisplay}</span>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </section>
 
-      {/* Achievements */}
-      <section className="dash-section">
-        <div className="dash-section-header">
-          <h2 className="dash-section-title">Achievements</h2>
-          <button
-            className="dash-section-action"
-            onClick={() => setShowAllAchievements(!showAllAchievements)}
-          >
-            {showAllAchievements ? 'Show Less' : 'View All'} &rarr;
-          </button>
-        </div>
-        <AchievementsBadgeGrid limit={showAllAchievements ? undefined : 8} />
-      </section>
+          <div className="training-stats">
+            <div className="status-bar">
+              <div className="status-bar-item">
+                <span className="status-bar-icon">{streak.current > 0 ? '\uD83D\uDD25' : '\uD83D\uDCA4'}</span>
+                <span className="status-bar-label">{streak.current} day streak</span>
+                {streak.multiplier > 1.0 && (
+                  <span className="status-bar-multiplier">{streak.multiplier}x</span>
+                )}
+              </div>
+              <span className="status-bar-divider" />
+              <div className="status-bar-item">
+                <span className="status-bar-label">{levelInfo?.title || 'Applicant'}</span>
+              </div>
+              <span className="status-bar-divider" />
+              <div className="status-bar-item">
+                <span className="status-bar-xp">{gamStats?.totalXp || 0} XP</span>
+                {levelInfo && (
+                  <div className="status-bar-progress">
+                    <div className="status-bar-progress-fill" style={{ width: `${levelInfo.progressPercent || 0}%` }} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {weaknessNudge && !nudgeDismissed && mostRecentJobId && (
+              <div className="nudge-banner">
+                <span className="nudge-text">
+                  You're weakest in <strong>{weaknessNudge.category}</strong> ({weaknessNudge.mastery}% mastery)
+                </span>
+                <button
+                  className="nudge-action"
+                  onClick={() => navigate(`/job/${mostRecentJobId}/train?mode=coach&focus=${encodeURIComponent(weaknessNudge.category)}`)}
+                >
+                  Practice now &rarr;
+                </button>
+                <button className="nudge-dismiss" onClick={handleDismissNudge} title="Dismiss">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
