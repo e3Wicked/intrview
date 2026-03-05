@@ -86,7 +86,7 @@ app.use(cors({
   origin: true,
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
 // Log all API requests for debugging
@@ -2296,6 +2296,144 @@ If the candidate hasn't answered a question yet (e.g., it's the opening), set ev
   }
 });
 
+// Focus Chat — SSE streaming skill coaching
+app.post('/api/chat/focus', requireAuth, async (req, res) => {
+  try {
+    const { skill, messages, sessionId } = req.body;
+
+    if (!skill) {
+      return res.status(400).json({ error: 'Skill is required' });
+    }
+
+    // Check and deduct credits BEFORE starting SSE
+    const user = req.user;
+    const creditCheck = await checkCredits(user.id, CREDIT_COSTS.focusChat);
+    if (!creditCheck.hasCredits) {
+      return res.status(402).json({ error: 'Insufficient credits' });
+    }
+    await deductCredits(user.id, CREDIT_COSTS.focusChat);
+
+    // Set SSE headers
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.flushHeaders();
+
+    const openai = getOpenAIClient();
+
+    const systemPrompt = `You are a focused skill coach helping a software engineer improve their understanding of: ${skill}.
+
+Your approach:
+- Start by asking a diagnostic question to gauge their current level
+- Use Socratic questioning — guide them to discover answers rather than lecturing
+- When you identify a gap, give a brief, clear explanation (2-3 sentences) then ask a follow-up to check understanding
+- Provide concrete examples, analogies, and real-world scenarios
+- If they answer well, increase difficulty progressively
+- Be encouraging but precise — correct misconceptions immediately
+- Keep responses concise (2-3 paragraphs max)
+- Use markdown for code snippets when relevant
+
+You are NOT an interviewer. You are a patient, expert tutor. Your goal is to build their understanding from wherever they currently are.`;
+
+    const gptMessages = [{ role: 'system', content: systemPrompt }];
+
+    // Cap history to last 20 messages
+    const recentMessages = (messages || []).slice(-20);
+
+    if (recentMessages.length > 0) {
+      recentMessages.forEach(msg => {
+        if (msg.role === 'coach') {
+          gptMessages.push({ role: 'assistant', content: msg.content });
+        } else if (msg.role === 'user') {
+          gptMessages.push({ role: 'user', content: msg.content });
+        }
+      });
+    } else {
+      gptMessages.push({
+        role: 'user',
+        content: `I want to improve my understanding of ${skill}. Start by asking me a diagnostic question.`
+      });
+    }
+
+    // Stream from OpenAI
+    const stream = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: gptMessages,
+      temperature: 0.8,
+      max_tokens: 800,
+      stream: true,
+    });
+
+    let fullReply = '';
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) {
+        fullReply += delta;
+        res.write(`data: ${JSON.stringify({ type: 'token', content: delta })}\n\n`);
+      }
+    }
+
+    // After stream: evaluate user's last message and award XP
+    let xpEarned = 0;
+    let evaluation = null;
+
+    if (recentMessages.length > 0) {
+      const lastUserMsg = recentMessages.filter(m => m.role === 'user').pop();
+      if (lastUserMsg) {
+        try {
+          const evalCompletion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: `Score this answer about ${skill} from 0-100. Return JSON only: {"score": N, "feedback": "brief feedback"}` },
+              { role: 'user', content: lastUserMsg.content }
+            ],
+            temperature: 0.3,
+            max_tokens: 150,
+          });
+
+          const evalText = evalCompletion.choices[0].message.content.trim();
+          const jsonMatch = evalText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) evaluation = JSON.parse(jsonMatch[0]);
+        } catch (e) {
+          evaluation = { score: 50, feedback: 'Practice recorded' };
+        }
+
+        try {
+          const xpResult = await recordAttemptAndAwardXp(user.id, {
+            jobDescriptionHash: '',
+            sessionId: sessionId || null,
+            questionText: `[Focus] ${skill}: ${lastUserMsg.content.substring(0, 100)}`,
+            questionCategory: skill,
+            attemptType: 'quiz',
+            userAnswer: lastUserMsg.content,
+            score: evaluation?.score || 50,
+            evaluation: evaluation || { score: 50, feedback: 'Focus practice' },
+          });
+          xpEarned = xpResult.xpEarned || 0;
+        } catch (xpError) {
+          console.error('Focus chat XP error (non-critical):', xpError.message);
+        }
+      }
+    }
+
+    res.write(`data: ${JSON.stringify({ type: 'done', evaluation, xpEarned })}\n\n`);
+    res.end();
+
+  } catch (error) {
+    console.error('Error in /api/chat/focus:', error);
+    if (res.headersSent) {
+      res.write(`data: ${JSON.stringify({ type: 'error', error: error.message || 'Stream failed' })}\n\n`);
+      res.end();
+    } else {
+      res.status(500).json({ error: error.message || 'Failed to process focus chat' });
+    }
+  }
+});
+
 // Helper function to extract funding rounds from text
 function extractFundingFromText(text, currentYear) {
   const fundingRounds = [];
@@ -3019,6 +3157,44 @@ app.get('/api/user/analyses', requireAuth, async (req, res) => {
     res.json(analyses);
   } catch (error) {
     console.error('Error getting user job analyses:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// User endpoint to get full analysis result by DB id
+app.get('/api/user/analysis/:id', requireAuth, async (req, res) => {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+
+    const analysisRes = await pool.query(
+      `SELECT ja.*, juc.logo_url
+       FROM job_analyses ja
+       LEFT JOIN job_url_cache juc ON ja.url = juc.url
+       WHERE ja.id = $1 AND ja.user_id = $2`,
+      [id, user.id]
+    );
+
+    if (analysisRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Analysis not found' });
+    }
+
+    const analysis = analysisRes.rows[0];
+    const studyPlan = await getCachedStudyPlan(analysis.job_description_hash);
+
+    res.json({
+      success: true,
+      jobDescription: '',
+      jobDescriptionHash: analysis.job_description_hash,
+      companyInfo: {
+        name: analysis.company_name,
+        roleTitle: analysis.role_title,
+      },
+      studyPlan: studyPlan || null,
+      url: analysis.url,
+    });
+  } catch (error) {
+    console.error('Error getting analysis by id:', error);
     res.status(500).json({ error: error.message });
   }
 });

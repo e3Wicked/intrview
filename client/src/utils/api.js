@@ -20,6 +20,7 @@ export const api = {
   gamification: {
     getStats: () => axios.get('/api/gamification/stats'),
     getSkillStats: () => axios.get('/api/gamification/skill-stats'),
+    getWeaknessReport: () => axios.get('/api/gamification/weakness-report'),
     checkAchievements: (context) => axios.post('/api/gamification/check-achievements', { context }),
   },
 }

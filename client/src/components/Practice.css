@@ -230,3 +230,22 @@
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* Generate More bar — only shows when questions exhausted */
+.practice-generate-more-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+  border-radius: 10px;
+  margin-bottom: 24px;
+}
+
+.practice-exhausted-text {
+  font-size: 14px;
+  color: #aaa;
+  font-family: 'Inconsolata', 'Courier New', monospace;
+}

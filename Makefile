@@ -41,6 +41,21 @@ db-logs: ## Tail Postgres container logs
 db-shell: ## Open psql shell inside the container
 	docker compose exec db psql -U intrview -d intrview
 
+# ── Tests ─────────────────────────────────────────────────────────────────────
+
+.PHONY: test
+test: ## Run all unit tests (server + client)
+	cd server && npm test
+	cd client && npm test
+
+.PHONY: test-server
+test-server: ## Run server unit tests only
+	cd server && npm test
+
+.PHONY: test-client
+test-client: ## Run client unit tests only
+	cd client && npm test
+
 # ── Build & production ────────────────────────────────────────────────────────
 
 .PHONY: build

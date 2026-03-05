@@ -13,6 +13,9 @@ import CreditBar from './components/CreditBar'
 import UpgradeModal from './components/UpgradeModal'
 import SignInPrompt from './components/SignInPrompt'
 import AdminPage from './pages/AdminPage'
+import TrainingPage from './pages/TrainingPage'
+import ProgressPage from './pages/ProgressPage'
+import FocusChatPage from './pages/FocusChatPage'
 import { preloadedExamples } from './data/preloadedExamples'
 import { GamificationProvider } from './contexts/GamificationContext'
 import AchievementToast from './components/AchievementToast'
@@ -46,6 +49,9 @@ function Layout({ children, user, setUser, showLoginModal, setShowLoginModal, lo
             {user ? (
               <>
                 <CreditBar user={user} onUpgrade={() => setShowUpgradeModal(true)} />
+                <button className="header-btn" onClick={() => navigate('/progress')}>
+                  Progress
+                </button>
                 <div className="header-user-info">
                   <span className="header-user-email">{user.email}</span>
                 </div>
@@ -57,7 +63,7 @@ function Layout({ children, user, setUser, showLoginModal, setShowLoginModal, lo
                 <button className="header-btn primary" onClick={() => handleSelectPlan('starter')}>
                   Pricing
                 </button>
-                <button 
+                <button
                   className="header-btn"
                   onClick={handleLogout}
                 >
@@ -415,7 +421,7 @@ function App() {
             console.error('Error parsing sessionStorage data:', e)
           }
         }
-        
+
         // Fallback to jdHistory
         if (jdHistory.length > 0) {
           const job = jdHistory.find(jd => jd.id === jobId)
@@ -426,7 +432,7 @@ function App() {
             return
           }
         }
-        
+
         // If not found, try loading from localStorage
         const savedHistory = localStorage.getItem('jd_history')
         if (savedHistory) {
@@ -438,10 +444,27 @@ function App() {
               setUrl(job.url)
               setSelectedJdId(job.id)
               setJdHistory(history)
+              return
             }
           } catch (e) {
             console.error('Error loading from localStorage:', e)
           }
+        }
+
+        // Server fallback: fetch by database ID (for MissionDashboard navigation + page refreshes)
+        const token = localStorage.getItem('session_token')
+        if (token && /^\d+$/.test(jobId)) {
+          axios.get(`/api/user/analysis/${jobId}`)
+            .then(res => {
+              const analysisResult = res.data
+              setResult(analysisResult)
+              setUrl(analysisResult.url || '')
+              setSelectedJdId(jobId)
+              sessionStorage.setItem(`job_analysis_${jobId}`, JSON.stringify(analysisResult))
+            })
+            .catch(err => {
+              console.error('Error loading analysis from server:', err)
+            })
         }
       }
     }
@@ -557,20 +580,78 @@ function App() {
           }
         />
         <Route
+          path="/focus-chat"
+          element={
+            user ? (
+              <FocusChatPage user={user} />
+            ) : (
+              <SignInPrompt
+                onSignIn={() => {
+                  setLoginModalMode('signin')
+                  setShowLoginModal(true)
+                }}
+                onSignUp={() => {
+                  setLoginModalMode('signup')
+                  setShowLoginModal(true)
+                }}
+              />
+            )
+          }
+        />
+        <Route
+          path="/job/:jobId/train"
+          element={
+            user ? (
+              <TrainingPage result={result} user={user} />
+            ) : (
+              <SignInPrompt
+                onSignIn={() => {
+                  setLoginModalMode('signin')
+                  setShowLoginModal(true)
+                }}
+                onSignUp={() => {
+                  setLoginModalMode('signup')
+                  setShowLoginModal(true)
+                }}
+              />
+            )
+          }
+        />
+        <Route
           path="/job/:jobId"
           element={
             result ? (
-              <JobAnalysisPage 
+              <JobAnalysisPage
                 result={result}
                 companyName={companyName}
                 progress={progress}
+                user={user}
               />
             ) : (
               <div style={{ padding: '64px', textAlign: 'center', color: '#888' }}>
                 <p>Loading job analysis...</p>
               </div>
             )
-          } 
+          }
+        />
+        <Route
+          path="/progress"
+          element={
+            user ? (
+              <ProgressPage user={user} />
+            ) : (
+              <SignInPrompt
+                onSignIn={() => {
+                  setLoginModalMode('signin')
+                  setShowLoginModal(true)
+                }}
+                onSignUp={() => {
+                  setLoginModalMode('signup')
+                  setShowLoginModal(true)
+                }}
+              />
+            )
+          }
         />
       </Routes>
     </Layout>
