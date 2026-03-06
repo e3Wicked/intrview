@@ -3,6 +3,29 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../utils/api'
 import './DrillsPage.css'
 
+function timeAgo(dateStr) {
+  if (!dateStr) return null
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days < 7) return `${days}d ago`
+  return new Date(dateStr).toLocaleDateString()
+}
+
+function getSavedSession(topicName) {
+  try {
+    const raw = sessionStorage.getItem(`focus_chat_${topicName}`)
+    if (!raw) return null
+    const data = JSON.parse(raw)
+    if (data.messages?.length > 0) return data
+    return null
+  } catch { return null }
+}
+
 function DrillsPage({ user }) {
   const navigate = useNavigate()
   const [topics, setTopics] = useState([])
@@ -10,33 +33,34 @@ function DrillsPage({ user }) {
   const [backfilling, setBackfilling] = useState(false)
   const [filter, setFilter] = useState('all')
 
-  useEffect(() => {
-    const fetchTopics = async () => {
-      try {
-        let res = await api.topics.getAllTopics()
-        let data = res.data || []
+  const fetchTopics = async () => {
+    try {
+      let res = await api.topics.getAllTopics()
+      let data = res.data || []
 
-        if (data.length === 0) {
-          setBackfilling(true)
-          try {
-            const backfillRes = await api.topics.backfill()
-            if (backfillRes.data?.totalTopics > 0) {
-              res = await api.topics.getAllTopics()
-              data = res.data || []
-            }
-          } catch (backfillErr) {
-            console.error('Backfill failed:', backfillErr)
+      if (data.length === 0) {
+        setBackfilling(true)
+        try {
+          const backfillRes = await api.topics.backfill()
+          if (backfillRes.data?.totalTopics > 0) {
+            res = await api.topics.getAllTopics()
+            data = res.data || []
           }
-          setBackfilling(false)
+        } catch (backfillErr) {
+          console.error('Backfill failed:', backfillErr)
         }
-
-        setTopics(data)
-      } catch (err) {
-        console.error('Error fetching topics:', err)
-      } finally {
-        setLoading(false)
+        setBackfilling(false)
       }
+
+      setTopics(data)
+    } catch (err) {
+      console.error('Error fetching topics:', err)
+    } finally {
+      setLoading(false)
     }
+  }
+
+  useEffect(() => {
     if (user) fetchTopics()
     else setLoading(false)
   }, [user])
@@ -64,15 +88,27 @@ function DrillsPage({ user }) {
   }, [topics])
 
   const filteredTopics = useMemo(() => {
-    if (filter === 'all') return topics
-    if (filter === 'not-started') return topics.filter(t => Number(t.attempts) === 0)
-    if (filter === 'in-progress') return topics.filter(t => Number(t.attempts) > 0 && Number(t.score) < 80)
-    if (filter === 'mastered') return topics.filter(t => Number(t.score) >= 80)
-    return topics.filter(t => t.category === filter)
+    let filtered
+    if (filter === 'all') filtered = topics
+    else if (filter === 'not-started') filtered = topics.filter(t => Number(t.attempts) === 0)
+    else if (filter === 'in-progress') filtered = topics.filter(t => Number(t.attempts) > 0 && Number(t.score) < 80)
+    else if (filter === 'mastered') filtered = topics.filter(t => Number(t.score) >= 80)
+    else filtered = topics.filter(t => t.category === filter)
+
+    // Sort: active sessions first, then recently practiced, then by name
+    return [...filtered].sort((a, b) => {
+      const aActive = getSavedSession(a.topic_name) ? 1 : 0
+      const bActive = getSavedSession(b.topic_name) ? 1 : 0
+      if (bActive !== aActive) return bActive - aActive
+      const aP = a.last_practiced_at ? new Date(a.last_practiced_at).getTime() : 0
+      const bP = b.last_practiced_at ? new Date(b.last_practiced_at).getTime() : 0
+      if (bP !== aP) return bP - aP
+      return (a.topic_name || '').localeCompare(b.topic_name || '')
+    })
   }, [topics, filter])
 
   const handlePractice = (topicName) => {
-    navigate(`/focus-chat?skill=${encodeURIComponent(topicName)}`)
+    navigate(`/focus-chat?skill=${encodeURIComponent(topicName)}&from=/study/drills`)
   }
 
   if (loading) {
@@ -169,54 +205,78 @@ function DrillsPage({ user }) {
             ))}
           </div>
 
-          {/* Topic list - table-like rows instead of cards */}
+          {/* Topic list */}
           <div className="drills-list">
             <div className="drills-list-header">
               <span className="drills-col-name">Topic</span>
               <span className="drills-col-stat">Mastery</span>
-              <span className="drills-col-stat">Drills</span>
-              <span className="drills-col-stat">Accuracy</span>
+              <span className="drills-col-drills">Drills</span>
+              <span className="drills-col-last">Status</span>
               <span className="drills-col-action" />
             </div>
             {filteredTopics.map(topic => {
               const score = Math.round(Number(topic.score))
               const attempts = Number(topic.attempts)
-              const accuracy = attempts > 0 ? Math.round((Number(topic.correct_count) / attempts) * 100) : 0
               const isMastered = score >= 80
+              const lastPracticed = timeAgo(topic.last_practiced_at)
+              const session = getSavedSession(topic.topic_name)
+              const sessionAvg = session?.scores?.length > 0
+                ? Math.round(session.scores.reduce((a, b) => a + b, 0) / session.scores.length)
+                : null
 
               return (
                 <div
                   key={topic.id}
-                  className={`drills-list-row ${isMastered ? 'mastered' : ''}`}
+                  className={`drills-list-row ${isMastered ? 'mastered' : ''} ${session ? 'has-session' : ''}`}
                   onClick={() => handlePractice(topic.topic_name)}
                 >
                   <div className="drills-col-name">
-                    <span className="drills-row-name">{topic.topic_name}</span>
+                    <div className="drills-row-name-line">
+                      {session && <span className="drills-active-dot" title="Active session" />}
+                      <span className="drills-row-name">{topic.topic_name}</span>
+                    </div>
                     {topic.category && (
                       <span className="drills-row-category">{topic.category.replace('_', ' ')}</span>
+                    )}
+                    {session && (
+                      <span className="drills-session-info">
+                        {session.exchangeCount} {session.exchangeCount === 1 ? 'answer' : 'answers'}
+                        {sessionAvg !== null && (
+                          <> &middot; avg <strong className={sessionAvg >= 70 ? 'score-good' : sessionAvg >= 40 ? 'score-mid' : 'score-low'}>{sessionAvg}%</strong></>
+                        )}
+                        {session.sessionXp > 0 && (
+                          <> &middot; +{session.sessionXp} XP</>
+                        )}
+                      </span>
                     )}
                   </div>
                   <div className="drills-col-stat">
                     <div className="drills-row-bar">
                       <div
                         className={`drills-row-bar-fill ${score >= 80 ? 'high' : score >= 40 ? 'mid' : 'low'}`}
-                        style={{ width: `${Math.min(100, score)}%` }}
+                        style={{ width: `${Math.min(100, Math.max(attempts > 0 ? 3 : 0, score))}%` }}
                       />
                     </div>
-                    <span className="drills-row-score">{score}%</span>
+                    <span className="drills-row-score">{attempts > 0 ? `${score}%` : '--'}</span>
                   </div>
-                  <div className="drills-col-stat">
-                    <span className="drills-row-value">{attempts}</span>
+                  <div className="drills-col-drills">
+                    <span className="drills-row-value">{attempts > 0 ? attempts : '--'}</span>
                   </div>
-                  <div className="drills-col-stat">
-                    <span className="drills-row-value">{accuracy}%</span>
+                  <div className="drills-col-last">
+                    {session ? (
+                      <span className="drills-row-active-tag">In progress</span>
+                    ) : (
+                      <span className={`drills-row-last ${lastPracticed ? 'has-date' : ''}`}>
+                        {lastPracticed || 'Not started'}
+                      </span>
+                    )}
                   </div>
                   <div className="drills-col-action">
                     <button
-                      className="drills-practice-btn"
+                      className={`drills-practice-btn ${session ? 'resume' : attempts > 0 ? 'continue' : ''}`}
                       onClick={(e) => { e.stopPropagation(); handlePractice(topic.topic_name) }}
                     >
-                      Practice
+                      {session ? 'Resume' : attempts > 0 ? 'Continue' : 'Start'}
                     </button>
                   </div>
                 </div>

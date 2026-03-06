@@ -1,24 +1,53 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../utils/api'
 import { useGamification } from '../contexts/GamificationContext'
 import './FocusChat.css'
 
+const STORAGE_KEY = (skill) => `focus_chat_${skill}`
+
+function loadSavedSession(skill) {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY(skill))
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch { return null }
+}
+
+function saveChatSession(skill, data) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY(skill), JSON.stringify(data))
+  } catch { /* storage full, non-critical */ }
+}
+
+function clearChatSession(skill) {
+  try { sessionStorage.removeItem(STORAGE_KEY(skill)) } catch {}
+}
+
 function FocusChat({ skill, user }) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('from') || '/dashboard'
   const { refreshStats } = useGamification()
-  const [messages, setMessages] = useState([])
+
+  // Try to restore a saved session for this skill
+  const saved = useRef(loadSavedSession(skill))
+
+  const [messages, setMessages] = useState(saved.current?.messages || [])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
-  const [sessionXp, setSessionXp] = useState(0)
-  const [exchangeCount, setExchangeCount] = useState(0)
-  const [sessionId, setSessionId] = useState(null)
+  const [sessionXp, setSessionXp] = useState(saved.current?.sessionXp || 0)
+  const [exchangeCount, setExchangeCount] = useState(saved.current?.exchangeCount || 0)
+  const [scores, setScores] = useState(saved.current?.scores || [])
+  const [sessionId, setSessionId] = useState(saved.current?.sessionId || null)
   const [showEndSummary, setShowEndSummary] = useState(false)
   const [error, setError] = useState(null)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const abortRef = useRef(null)
-  const startedRef = useRef(false)
+  const startedRef = useRef(!!saved.current)
+  const sessionIdRef = useRef(saved.current?.sessionId || null)
+  const messagesRef = useRef(saved.current?.messages || [])
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -34,40 +63,54 @@ function FocusChat({ skill, user }) {
     }
   }, [streaming])
 
-  // Start session and first message on mount
+  // Keep ref in sync with state
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+
+  // Save chat state to sessionStorage whenever it changes
+  useEffect(() => {
+    if (messages.length > 0 && !showEndSummary) {
+      saveChatSession(skill, {
+        messages: messages.filter(m => m.content), // skip empty streaming messages
+        sessionXp,
+        exchangeCount,
+        scores,
+        sessionId: sessionIdRef.current,
+      })
+    }
+  }, [messages, sessionXp, exchangeCount, scores, skill, showEndSummary])
+
+  // Start session and first message on mount (only if no saved session)
   useEffect(() => {
     if (!skill || startedRef.current) return
     startedRef.current = true
 
     const init = async () => {
-      // Start practice session
       try {
         const res = await api.practice.startSession({ jobDescriptionHash: '', mode: 'focus' })
         setSessionId(res.data.sessionId)
+        sessionIdRef.current = res.data.sessionId
       } catch (e) {
-        // Non-critical — session tracking may fail
+        // Non-critical
       }
-
-      // Send first message (empty history triggers diagnostic question)
-      sendMessage(null)
+      doSendMessage(null)
     }
     init()
-
-    return () => {
-      // End session on unmount
-      if (sessionId) {
-        api.practice.endSession({ sessionId }).catch(() => {})
-      }
-    }
   }, [skill])
 
-  const sendMessage = async (userText) => {
+  // On unmount: DON'T end the session — we're saving state for resume.
+  // Session gets ended explicitly via "End Session" button.
+
+  const doSendMessage = async (userText) => {
+    const currentMessages = messagesRef.current
     const updatedMessages = userText
-      ? [...messages, { role: 'user', content: userText }]
-      : [...messages]
+      ? [...currentMessages, { role: 'user', content: userText }]
+      : [...currentMessages]
 
     if (userText) {
       setMessages(updatedMessages)
+      messagesRef.current = updatedMessages
       setInput('')
       setExchangeCount(prev => prev + 1)
     }
@@ -75,8 +118,9 @@ function FocusChat({ skill, user }) {
     setStreaming(true)
     setError(null)
 
-    // Add empty coach message to be filled by tokens
-    setMessages(prev => [...prev, { role: 'coach', content: '' }])
+    const withCoach = [...updatedMessages, { role: 'coach', content: '' }]
+    setMessages(withCoach)
+    messagesRef.current = withCoach
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -92,7 +136,7 @@ function FocusChat({ skill, user }) {
         body: JSON.stringify({
           skill,
           messages: updatedMessages.map(m => ({ role: m.role, content: m.content })),
-          sessionId,
+          sessionId: sessionIdRef.current,
         }),
         signal: controller.signal,
       })
@@ -104,8 +148,8 @@ function FocusChat({ skill, user }) {
         } else {
           setError(err.error || 'Request failed')
         }
-        // Remove the empty coach message
-        setMessages(prev => prev.slice(0, -1))
+        setMessages(updatedMessages)
+        messagesRef.current = updatedMessages
         setStreaming(false)
         return
       }
@@ -135,6 +179,7 @@ function FocusChat({ skill, user }) {
               const updated = [...prev]
               const last = updated[updated.length - 1]
               updated[updated.length - 1] = { ...last, content: last.content + event.content }
+              messagesRef.current = updated
               return updated
             })
           } else if (event.type === 'done') {
@@ -145,8 +190,12 @@ function FocusChat({ skill, user }) {
                   ...updated[updated.length - 1],
                   evaluation: event.evaluation
                 }
+                messagesRef.current = updated
                 return updated
               })
+              if (typeof event.evaluation.score === 'number') {
+                setScores(prev => [...prev, event.evaluation.score])
+              }
             }
             if (event.xpEarned) {
               setSessionXp(prev => prev + event.xpEarned)
@@ -156,6 +205,7 @@ function FocusChat({ skill, user }) {
             setMessages(prev => {
               const updated = [...prev]
               updated[updated.length - 1] = { role: 'system', content: event.error }
+              messagesRef.current = updated
               return updated
             })
           }
@@ -171,6 +221,7 @@ function FocusChat({ skill, user }) {
         } else {
           updated.push({ role: 'system', content: err.message || 'Connection failed' })
         }
+        messagesRef.current = updated
         return updated
       })
     } finally {
@@ -182,7 +233,7 @@ function FocusChat({ skill, user }) {
   const handleSend = () => {
     const text = input.trim()
     if (!text || streaming) return
-    sendMessage(text)
+    doSendMessage(text)
   }
 
   const handleKeyDown = (e) => {
@@ -194,11 +245,22 @@ function FocusChat({ skill, user }) {
 
   const handleEndChat = () => {
     if (abortRef.current) abortRef.current.abort()
-    if (sessionId) {
-      api.practice.endSession({ sessionId }).catch(() => {})
+    if (sessionIdRef.current) {
+      api.practice.endSession({ sessionId: sessionIdRef.current }).catch(() => {})
     }
+    clearChatSession(skill)
     setShowEndSummary(true)
   }
+
+  const goBack = () => {
+    // Save is automatic via the useEffect — just navigate away
+    if (abortRef.current) abortRef.current.abort()
+    navigate(returnTo)
+  }
+
+  const avgScore = scores.length > 0
+    ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+    : null
 
   if (showEndSummary) {
     return (
@@ -210,21 +272,50 @@ function FocusChat({ skill, user }) {
         <div className="focus-summary-stats">
           <div className="focus-summary-stat">
             <span className="focus-stat-value">{exchangeCount}</span>
-            <span className="focus-stat-label">Exchanges</span>
+            <span className="focus-stat-label">Questions Answered</span>
           </div>
+          {avgScore !== null && (
+            <div className="focus-summary-stat">
+              <span className={`focus-stat-value ${avgScore >= 70 ? 'score-good' : avgScore >= 40 ? 'score-mid' : 'score-low'}`}>
+                {avgScore}%
+              </span>
+              <span className="focus-stat-label">Avg Score</span>
+            </div>
+          )}
           <div className="focus-summary-stat">
             <span className="focus-stat-value xp-value">+{sessionXp}</span>
             <span className="focus-stat-label">XP Earned</span>
           </div>
         </div>
+        {scores.length > 0 && (
+          <div className="focus-summary-breakdown">
+            <h4>Score Breakdown</h4>
+            <div className="focus-summary-scores">
+              {scores.map((s, i) => (
+                <div key={i} className="focus-score-dot-row">
+                  <span className="focus-score-dot-label">Q{i + 1}</span>
+                  <div className="focus-score-dot-bar">
+                    <div
+                      className={`focus-score-dot-fill ${s >= 70 ? 'high' : s >= 40 ? 'mid' : 'low'}`}
+                      style={{ width: `${Math.min(100, s)}%` }}
+                    />
+                  </div>
+                  <span className="focus-score-dot-value">{s}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="focus-summary-actions">
-          <button className="focus-back-btn" onClick={() => navigate('/dashboard')}>
-            Back to Dashboard
+          <button className="focus-back-btn" onClick={() => navigate(returnTo)}>
+            Back to {returnTo === '/study/drills' ? 'Drills' : 'Dashboard'}
           </button>
           <button className="focus-restart-btn" onClick={() => {
             setMessages([])
+            messagesRef.current = []
             setExchangeCount(0)
             setSessionXp(0)
+            setScores([])
             setShowEndSummary(false)
             startedRef.current = false
           }}>
@@ -235,28 +326,40 @@ function FocusChat({ skill, user }) {
     )
   }
 
+  const isResumed = saved.current && messages.length > 0
+
   return (
     <div className="focus-chat-container">
       {/* Header */}
       <div className="focus-header">
         <div className="focus-header-left">
-          <button className="focus-nav-back" onClick={() => navigate('/dashboard')}>
+          <button className="focus-nav-back" onClick={goBack} title="Back (session saved)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 12H5M12 19l-7-7 7-7"/>
             </svg>
           </button>
           <span className="focus-skill-badge">{skill}</span>
-          <span className="focus-exchange-count">{exchangeCount} exchanges</span>
+          <span className="focus-exchange-count">
+            {exchangeCount} {exchangeCount === 1 ? 'answer' : 'answers'}
+            {avgScore !== null && <> &middot; avg {avgScore}%</>}
+          </span>
         </div>
         <div className="focus-header-right">
           {sessionXp > 0 && (
             <span className="focus-xp-counter">+{sessionXp} XP</span>
           )}
           <button className="focus-end-btn" onClick={handleEndChat}>
-            End Chat
+            End Session
           </button>
         </div>
       </div>
+
+      {/* Resumed banner */}
+      {isResumed && (
+        <div className="focus-resumed-banner">
+          Resumed previous session &middot; {exchangeCount} answers so far
+        </div>
+      )}
 
       {/* Messages */}
       <div className="focus-messages">
@@ -291,8 +394,8 @@ function FocusChat({ skill, user }) {
               <div className="focus-message-text">{msg.content}</div>
               {msg.evaluation && (
                 <div className="focus-evaluation">
-                  <span className="focus-eval-score">
-                    Score: <strong>{msg.evaluation.score}/100</strong>
+                  <span className={`focus-eval-badge ${msg.evaluation.score >= 70 ? 'good' : msg.evaluation.score >= 40 ? 'mid' : 'low'}`}>
+                    {msg.evaluation.score}/100
                   </span>
                   {msg.evaluation.feedback && (
                     <span className="focus-eval-feedback">{msg.evaluation.feedback}</span>

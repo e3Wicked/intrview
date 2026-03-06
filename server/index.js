@@ -2464,6 +2464,17 @@ You are NOT an interviewer. You are a patient, expert tutor. Your goal is to bui
         } catch (xpError) {
           console.error('Focus chat XP error (non-critical):', xpError.message);
         }
+
+        // Update user_topic_scores so Drills page reflects practice
+        try {
+          const topic = await getOrCreateTopic(skill);
+          if (topic) {
+            const score = evaluation?.score || 50;
+            await updateUserTopicScore(user.id, topic.id, score, score >= 70);
+          }
+        } catch (topicErr) {
+          console.error('Focus chat topic score update (non-critical):', topicErr.message);
+        }
       }
     }
 
