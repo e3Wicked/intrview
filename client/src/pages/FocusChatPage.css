@@ -1,0 +1,230 @@
+.focus-chat-page {
+  padding: 32px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.focus-chat-picker h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 8px;
+}
+
+.focus-chat-picker > p {
+  color: #6b6b6b;
+  font-size: 15px;
+  margin: 0 0 32px;
+}
+
+.focus-chat-loading {
+  color: #999;
+  padding: 40px 0;
+  text-align: center;
+}
+
+.focus-chat-section {
+  margin-bottom: 32px;
+}
+
+.focus-chat-section h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 12px;
+}
+
+.focus-chat-topics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.focus-chat-topic-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #e6e3de;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.focus-chat-topic-card:hover {
+  border-color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+}
+
+.focus-chat-topic-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.focus-chat-topic-category {
+  font-size: 12px;
+  color: #999;
+  text-transform: capitalize;
+}
+
+/* --- Topic pills --- */
+.focus-chat-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.focus-chat-pill {
+  padding: 7px 14px;
+  background: #f0f4ff;
+  border: 1px solid #d4ddf7;
+  border-radius: 20px;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Inter', -apple-system, sans-serif;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.focus-chat-pill:hover {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+/* --- Job accordion --- */
+.focus-chat-jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.focus-chat-job-accordion {
+  background: #ffffff;
+  border: 1px solid #e6e3de;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.focus-chat-job-accordion.expanded {
+  border-color: #2563eb;
+}
+
+.focus-chat-job-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 14px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, sans-serif;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.focus-chat-job-header:hover {
+  background: #fafafa;
+}
+
+.focus-chat-job-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.focus-chat-chevron {
+  color: #999;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.focus-chat-chevron.rotated {
+  transform: rotate(180deg);
+}
+
+.focus-chat-job-topics {
+  padding: 0 16px 14px;
+}
+
+.focus-chat-job-topics-loading,
+.focus-chat-job-topics-empty {
+  display: block;
+  font-size: 13px;
+  color: #999;
+}
+
+.focus-chat-empty {
+  padding: 40px;
+  text-align: center;
+  color: #6b6b6b;
+  background: #ffffff;
+  border: 1px dashed #e6e3de;
+  border-radius: 12px;
+}
+
+.focus-chat-custom {
+  display: flex;
+  gap: 10px;
+}
+
+.focus-chat-custom input {
+  flex: 1;
+  padding: 11px 14px;
+  background: #ffffff;
+  border: 1px solid #e6e3de;
+  border-radius: 8px;
+  color: #1a1a1a;
+  font-size: 14px;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.focus-chat-custom input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.focus-chat-custom input::placeholder {
+  color: #aaa;
+}
+
+.focus-chat-custom button {
+  padding: 11px 20px;
+  background: #2563eb;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Inter', -apple-system, sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.focus-chat-custom button:hover {
+  background: #1d4ed8;
+}
+
+@media (max-width: 600px) {
+  .focus-chat-page {
+    padding: 20px 16px;
+  }
+
+  .focus-chat-topics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .focus-chat-custom {
+    flex-direction: column;
+  }
+}

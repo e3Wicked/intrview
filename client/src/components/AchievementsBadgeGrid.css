@@ -11,13 +11,13 @@
 
 .achievements-header h3 {
   font-size: 16px;
-  color: #e5e5e5;
+  color: var(--color-text-primary, #1a1a1a);
   margin: 0;
 }
 
 .achievements-count {
   font-size: 13px;
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
 }
 
 .achievements-grid {
@@ -39,19 +39,19 @@
 }
 
 .achievement-badge.unlocked {
-  background: #1a1510;
-  border: 1px solid #f59e0b33;
+  background: #eff6ff;
+  border: 1px solid rgba(37, 99, 235, 0.2);
 }
 
 .achievement-badge.locked {
-  background: #111;
-  border: 1px solid #1a1a1a;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
   opacity: 0.5;
 }
 
 .achievement-badge.unlocked:hover {
   transform: translateY(-2px);
-  border-color: #f59e0b66;
+  border-color: rgba(37, 99, 235, 0.4);
 }
 
 .badge-icon {
@@ -62,23 +62,23 @@
 .badge-name {
   font-size: 12px;
   font-weight: 600;
-  color: #e5e5e5;
+  color: var(--color-text-primary, #1a1a1a);
   line-height: 1.2;
 }
 
 .locked .badge-name {
-  color: #555;
+  color: #a0a0a0;
 }
 
 .badge-xp {
   font-size: 11px;
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
   font-weight: 600;
 }
 
 .badge-desc {
   font-size: 10px;
-  color: #444;
+  color: #a0a0a0;
   line-height: 1.2;
   max-width: 120px;
 }

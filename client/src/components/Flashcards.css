@@ -1,12 +1,13 @@
 .flashcards-container {
-  background: #111111;
+  background: var(--color-bg-card, #ffffff);
   border-radius: 12px;
   padding: 24px;
-  border: 1px solid #1a1a1a;
+  border: 1px solid var(--color-border, #e6e3de);
   margin-bottom: 32px;
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
 }
 
-/* ── Category pills ── */
+/* -- Category pills -- */
 .category-pills {
   display: flex;
   flex-wrap: wrap;
@@ -17,11 +18,11 @@
 .category-pill {
   position: relative;
   padding: 7px 14px;
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 20px;
-  color: #888;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -31,24 +32,24 @@
 }
 
 .category-pill:hover {
-  border-color: #3a3a3a;
-  color: #b0b0b0;
+  border-color: #d0cdc7;
+  color: var(--color-text-primary, #1a1a1a);
 }
 
 .category-pill.active {
-  background: #f59e0b;
-  border-color: #f59e0b;
-  color: #0a0a0a;
+  background: var(--color-accent, #2563eb);
+  border-color: var(--color-accent, #2563eb);
+  color: #ffffff;
   font-weight: 600;
 }
 
 .category-pill.active .pill-count {
-  background: rgba(0, 0, 0, 0.2);
-  color: #0a0a0a;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
 }
 
 .category-pill.active .pill-progress {
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .pill-count {
@@ -58,11 +59,11 @@
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  background: #2a2a2a;
+  background: var(--color-bg-secondary, #f4f2ee);
   border-radius: 9px;
   font-size: 10px;
   font-weight: 600;
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
   margin-left: 6px;
   vertical-align: middle;
 }
@@ -72,7 +73,7 @@
   bottom: 0;
   left: 0;
   height: 3px;
-  background: #f59e0b;
+  background: var(--color-accent, #2563eb);
   border-radius: 0 0 20px 20px;
   transition: width 0.3s ease;
 }
@@ -83,15 +84,15 @@
 
 .generate-pill {
   border-style: dashed;
-  border-color: #f59e0b44;
-  color: #f59e0b;
+  border-color: rgba(37, 99, 235, 0.3);
+  color: var(--color-accent, #2563eb);
 }
 
 .generate-pill:hover:not(:disabled) {
-  background: #f59e0b;
-  border-color: #f59e0b;
+  background: var(--color-accent, #2563eb);
+  border-color: var(--color-accent, #2563eb);
   border-style: solid;
-  color: #0a0a0a;
+  color: #ffffff;
 }
 
 .generate-pill:disabled {
@@ -99,7 +100,7 @@
   cursor: not-allowed;
 }
 
-/* ── Toolbar ── */
+/* -- Toolbar -- */
 .fc-toolbar {
   display: flex;
   justify-content: space-between;
@@ -118,37 +119,37 @@
   gap: 5px;
   padding: 5px 10px;
   background: transparent;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 6px;
-  color: #666;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 11px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .fc-tool-btn:hover {
-  border-color: #3a3a3a;
-  color: #b0b0b0;
+  border-color: #d0cdc7;
+  color: var(--color-text-primary, #1a1a1a);
 }
 
 .fc-tool-btn.active {
-  background: #f59e0b;
-  border-color: #f59e0b;
-  color: #0a0a0a;
+  background: var(--color-accent, #2563eb);
+  border-color: var(--color-accent, #2563eb);
+  color: #ffffff;
 }
 
 .fc-position {
   font-size: 13px;
-  color: #666;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
   font-weight: 600;
 }
 
-/* ── Progress bar ── */
+/* -- Progress bar -- */
 .fc-progress-bar {
   height: 4px;
-  background: #1a1a1a;
+  background: var(--color-bg-secondary, #f4f2ee);
   border-radius: 2px;
   overflow: hidden;
   margin-bottom: 16px;
@@ -156,19 +157,19 @@
 
 .fc-progress-fill {
   height: 100%;
-  background: #f59e0b;
+  background: var(--color-accent, #2563eb);
   transition: width 0.3s ease;
   border-radius: 2px;
 }
 
-/* ── Completion banner ── */
+/* -- Completion banner -- */
 .flashcards-complete-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 14px 18px;
-  background: rgba(34, 197, 94, 0.08);
+  background: rgba(34, 197, 94, 0.06);
   border: 1px solid rgba(34, 197, 94, 0.2);
   border-radius: 10px;
   margin-bottom: 16px;
@@ -181,15 +182,15 @@
 }
 
 .complete-content strong {
-  color: #22c55e;
+  color: #16a34a;
   font-size: 14px;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .complete-stats {
   font-size: 12px;
-  color: #888;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .review-weak-btn {
@@ -197,8 +198,8 @@
   background: #22c55e;
   border: none;
   border-radius: 6px;
-  color: #0a0a0a;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: #ffffff;
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -213,7 +214,7 @@
 .flashcards-empty-filter {
   text-align: center;
   padding: 48px;
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
 }
 
 .flashcards-empty-filter p {
@@ -223,22 +224,22 @@
 
 .filter-btn {
   padding: 8px 14px;
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 6px;
-  color: #b0b0b0;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .filter-btn:hover {
-  border-color: #3a3a3a;
-  color: #fff;
+  border-color: #d0cdc7;
+  color: var(--color-text-primary, #1a1a1a);
 }
 
-/* ── Flashcard ── */
+/* -- Flashcard -- */
 .flashcard-wrapper {
   perspective: 1000px;
   margin-bottom: 16px;
@@ -266,12 +267,13 @@
   height: 100%;
   backface-visibility: hidden;
   border-radius: 12px;
-  border: 1px solid #2a2a2a;
-  background: #1a1a1a;
+  border: 1px solid var(--color-border, #e6e3de);
+  background: var(--color-bg-card, #ffffff);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   padding: 24px 28px;
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
 }
 
 .flashcard-back {
@@ -293,7 +295,7 @@
 .fc-card-header h3 {
   font-size: 11px;
   font-weight: 600;
-  color: #555;
+  color: #b0ada6;
   text-transform: uppercase;
   letter-spacing: 1px;
   margin: 0;
@@ -301,50 +303,50 @@
 
 .fc-card-meta {
   font-size: 11px;
-  color: #f59e0b;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: var(--color-accent, #2563eb);
+  font-family: 'Inter', -apple-system, sans-serif;
   font-weight: 500;
-  background: #f59e0b15;
+  background: rgba(37, 99, 235, 0.06);
   padding: 3px 10px;
   border-radius: 10px;
-  border: 1px solid #f59e0b33;
+  border: 1px solid rgba(37, 99, 235, 0.15);
 }
 
 .flashcard-content p {
   font-size: 17px;
-  color: #ffffff;
+  color: var(--color-text-primary, #1a1a1a);
   line-height: 1.6;
   margin: 0;
 }
 
 .flashcard-answer {
   font-size: 15px;
-  color: #b0b0b0;
+  color: var(--color-text-secondary, #6b6b6b);
   line-height: 1.7;
   white-space: pre-wrap;
 }
 
 .flashcard-hint {
   font-size: 11px;
-  color: #444;
+  color: #b0ada6;
   text-align: center;
   padding-top: 12px;
-  border-top: 1px solid #222;
+  border-top: 1px solid var(--color-border, #e6e3de);
 }
 
-/* ── XP Toast ── */
+/* -- XP Toast -- */
 .xp-toast {
   position: absolute;
   top: 50%;
   right: -10px;
   transform: translateY(-50%);
-  background: #f59e0b;
-  color: #0a0a0a;
+  background: var(--color-accent, #2563eb);
+  color: #ffffff;
   padding: 5px 12px;
   border-radius: 16px;
   font-size: 13px;
   font-weight: 700;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
   animation: xpFloat 1.5s ease-out forwards;
   pointer-events: none;
   z-index: 10;
@@ -356,7 +358,7 @@
   100% { opacity: 0; transform: translateY(-120%) translateX(20px); }
 }
 
-/* ── Controls ── */
+/* -- Controls -- */
 .flashcards-controls {
   display: flex;
   justify-content: space-between;
@@ -375,11 +377,11 @@
   align-items: center;
   gap: 6px;
   padding: 10px 18px;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 8px;
-  background: #1a1a1a;
-  color: #ffffff;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  background: var(--color-bg-card, #ffffff);
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -387,8 +389,8 @@
 }
 
 .flashcard-btn:hover:not(:disabled) {
-  background: #2a2a2a;
-  border-color: #3a3a3a;
+  background: var(--color-bg-hover, #f0eeea);
+  border-color: #d0cdc7;
 }
 
 .flashcard-btn:disabled {
@@ -397,29 +399,29 @@
 }
 
 .mark-known {
-  background: #1a3a1a;
-  border-color: #2a5a2a;
+  background: rgba(34, 197, 94, 0.06);
+  border-color: rgba(34, 197, 94, 0.2);
 }
 
 .mark-known:hover:not(:disabled) {
-  background: #2a5a2a;
+  background: rgba(34, 197, 94, 0.12);
 }
 
 .mark-needs-practice {
-  background: #3a2a1a;
-  border-color: #5a3a2a;
+  background: rgba(234, 179, 8, 0.06);
+  border-color: rgba(234, 179, 8, 0.2);
 }
 
 .mark-needs-practice:hover:not(:disabled) {
-  background: #5a3a2a;
+  background: rgba(234, 179, 8, 0.12);
 }
 
-/* ── Stats footer ── */
+/* -- Stats footer -- */
 .flashcards-stats {
   display: flex;
   gap: 24px;
   padding-top: 16px;
-  border-top: 1px solid #1a1a1a;
+  border-top: 1px solid var(--color-border, #e6e3de);
 }
 
 .stat-item {
@@ -440,36 +442,36 @@
 }
 
 .practice-dot {
-  background: #f59e0b;
+  background: #eab308;
 }
 
 .unreviewed-dot {
-  background: #333;
-  border: 1px solid #555;
+  background: #d8d5ce;
+  border: 1px solid #c0bdb6;
 }
 
 .stat-label {
   font-size: 12px;
-  color: #666;
+  color: var(--color-text-secondary, #6b6b6b);
 }
 
 .stat-value {
   font-size: 15px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--color-text-primary, #1a1a1a);
 }
 
 .stat-value.known {
-  color: #22c55e;
+  color: #16a34a;
 }
 
 .stat-value.practice {
-  color: #f59e0b;
+  color: #ca8a04;
 }
 
 .flashcards-empty {
   text-align: center;
   padding: 48px;
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
   font-size: 15px;
 }

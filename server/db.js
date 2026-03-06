@@ -773,6 +773,161 @@ async function ensureEmailVerificationCodesTable() {
   }
 }
 
+// Normalize a topic name for deduplication
+function normalizeTopicName(name) {
+  return name.toLowerCase().trim()
+    .replace(/\s+/g, ' ')
+    .replace(/['']/g, "'")
+}
+
+// Get or create a topic, returning its id
+async function getOrCreateTopic(name, category = null, description = null) {
+  const normalized = normalizeTopicName(name)
+  try {
+    const existing = await pool.query(
+      'SELECT * FROM topics WHERE normalized_name = $1',
+      [normalized]
+    )
+    if (existing.rows.length > 0) return existing.rows[0]
+
+    const result = await pool.query(
+      `INSERT INTO topics (name, normalized_name, category, description)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (normalized_name) DO UPDATE SET
+         category = COALESCE(EXCLUDED.category, topics.category),
+         description = COALESCE(EXCLUDED.description, topics.description)
+       RETURNING *`,
+      [name, normalized, category, description]
+    )
+    return result.rows[0]
+  } catch (error) {
+    console.error('Error in getOrCreateTopic:', error.message)
+    throw error
+  }
+}
+
+// Link topics to a job by hash
+async function linkTopicsToJob(jobDescriptionHash, topicIds) {
+  try {
+    for (const topicId of topicIds) {
+      await pool.query(
+        `INSERT INTO job_topics (job_description_hash, topic_id)
+         VALUES ($1, $2)
+         ON CONFLICT (job_description_hash, topic_id) DO NOTHING`,
+        [jobDescriptionHash, topicId]
+      )
+    }
+  } catch (error) {
+    console.error('Error in linkTopicsToJob:', error.message)
+  }
+}
+
+// Get all topic scores for a user
+async function getUserTopicScores(userId) {
+  try {
+    const result = await pool.query(
+      `SELECT uts.*, t.name as topic_name, t.normalized_name, t.category, t.description as topic_description
+       FROM user_topic_scores uts
+       JOIN topics t ON t.id = uts.topic_id
+       WHERE uts.user_id = $1
+       ORDER BY uts.updated_at DESC`,
+      [userId]
+    )
+    return result.rows
+  } catch (error) {
+    console.error('Error in getUserTopicScores:', error.message)
+    return []
+  }
+}
+
+// Get ALL topics linked to any of the user's jobs, with scores when available
+async function getAllUserTopics(userId) {
+  try {
+    const result = await pool.query(
+      `SELECT t.id, t.name as topic_name, t.normalized_name, t.category, t.description as topic_description,
+              COALESCE(uts.score, 0) as score,
+              COALESCE(uts.attempts, 0) as attempts,
+              COALESCE(uts.correct_count, 0) as correct_count,
+              uts.last_practiced_at,
+              COUNT(DISTINCT jt.job_description_hash) as job_count
+       FROM topics t
+       JOIN job_topics jt ON jt.topic_id = t.id
+       JOIN job_analyses ja ON ja.job_description_hash = jt.job_description_hash
+       LEFT JOIN user_topic_scores uts ON uts.topic_id = t.id AND uts.user_id = $1
+       WHERE ja.user_id = $1
+       GROUP BY t.id, t.name, t.normalized_name, t.category, t.description, uts.score, uts.attempts, uts.correct_count, uts.last_practiced_at
+       ORDER BY COALESCE(uts.attempts, 0) DESC, t.name`,
+      [userId]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error in getAllUserTopics:', error.message);
+    return [];
+  }
+}
+
+// Update a user's score on a topic
+async function updateUserTopicScore(userId, topicId, score, isCorrect) {
+  try {
+    await pool.query(
+      `INSERT INTO user_topic_scores (user_id, topic_id, score, attempts, correct_count, last_practiced_at, updated_at)
+       VALUES ($1, $2, $3, 1, $4, NOW(), NOW())
+       ON CONFLICT (user_id, topic_id) DO UPDATE SET
+         score = (user_topic_scores.score * user_topic_scores.attempts + $3) / (user_topic_scores.attempts + 1),
+         attempts = user_topic_scores.attempts + 1,
+         correct_count = user_topic_scores.correct_count + $4,
+         last_practiced_at = NOW(),
+         updated_at = NOW()`,
+      [userId, topicId, score, isCorrect ? 1 : 0]
+    )
+  } catch (error) {
+    console.error('Error in updateUserTopicScore:', error.message)
+  }
+}
+
+// Get topics linked to a job
+async function getTopicsForJob(jobDescriptionHash) {
+  try {
+    const result = await pool.query(
+      `SELECT t.*, jt.relevance_score
+       FROM topics t
+       JOIN job_topics jt ON jt.topic_id = t.id
+       WHERE jt.job_description_hash = $1
+       ORDER BY jt.relevance_score DESC`,
+      [jobDescriptionHash]
+    )
+    return result.rows
+  } catch (error) {
+    console.error('Error in getTopicsForJob:', error.message)
+    return []
+  }
+}
+
+// Get topics shared across multiple of a user's jobs
+async function getSharedTopicsAcrossJobs(userId) {
+  try {
+    const result = await pool.query(
+      `SELECT t.id, t.name, t.normalized_name, t.category,
+              COUNT(DISTINCT jt.job_description_hash) as job_count,
+              COALESCE(uts.score, 0) as user_score,
+              COALESCE(uts.attempts, 0) as user_attempts
+       FROM topics t
+       JOIN job_topics jt ON jt.topic_id = t.id
+       JOIN job_analyses ja ON ja.job_description_hash = jt.job_description_hash
+       LEFT JOIN user_topic_scores uts ON uts.topic_id = t.id AND uts.user_id = $1
+       WHERE ja.user_id = $1
+       GROUP BY t.id, t.name, t.normalized_name, t.category, uts.score, uts.attempts
+       HAVING COUNT(DISTINCT jt.job_description_hash) > 1
+       ORDER BY job_count DESC, t.name`,
+      [userId]
+    )
+    return result.rows
+  } catch (error) {
+    console.error('Error in getSharedTopicsAcrossJobs:', error.message)
+    return []
+  }
+}
+
 export {
   pool,
   getOrCreateCompany,
@@ -796,6 +951,14 @@ export {
   getUserStats,
   ensureJobAnalysesTable,
   ensureEmailVerificationCodesTable,
-  findStudyPlanByCompanyRole
+  findStudyPlanByCompanyRole,
+  getOrCreateTopic,
+  linkTopicsToJob,
+  getUserTopicScores,
+  updateUserTopicScore,
+  getTopicsForJob,
+  getSharedTopicsAcrossJobs,
+  normalizeTopicName,
+  getAllUserTopics
 };
 

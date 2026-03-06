@@ -85,7 +85,7 @@ function ProgressTracker({ topics, studyPlan, jobDescriptionHash }) {
   const completionPercent = totalTopics > 0 ? Math.min(100, (completedCount / totalTopics) * 100) : 0
 
   if (loading) {
-    return <div className="progress-container"><p style={{ color: '#888' }}>Loading progress...</p></div>
+    return <div className="progress-container"><p style={{ color: '#6b6b6b' }}>Loading progress...</p></div>
   }
 
   return (

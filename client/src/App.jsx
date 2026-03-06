@@ -6,16 +6,18 @@ import HomePage from './pages/HomePage'
 import DashboardPage from './pages/DashboardPage'
 import JobAnalysisPage from './pages/JobAnalysisPage'
 import CompanyPage from './pages/CompanyPage'
-import RotatingAds from './components/RotatingAds'
+
 import LoadingOverlay from './components/LoadingOverlay'
 import LoginModal from './components/LoginModal'
-import CreditBar from './components/CreditBar'
 import UpgradeModal from './components/UpgradeModal'
 import SignInPrompt from './components/SignInPrompt'
 import AdminPage from './pages/AdminPage'
 import TrainingPage from './pages/TrainingPage'
 import ProgressPage from './pages/ProgressPage'
 import FocusChatPage from './pages/FocusChatPage'
+import MockInterviewPage from './pages/MockInterviewPage'
+import DrillsPage from './pages/DrillsPage'
+import Sidebar from './components/Sidebar'
 import { preloadedExamples } from './data/preloadedExamples'
 import { GamificationProvider } from './contexts/GamificationContext'
 import AchievementToast from './components/AchievementToast'
@@ -26,133 +28,35 @@ function Layout({ children, user, setUser, showLoginModal, setShowLoginModal, lo
   const navigate = useNavigate()
   const location = useLocation()
 
+  const isHomepage = location.pathname === '/'
+  const showSidebar = user && !isHomepage
+
   return (
-    <div className="app">
-      <header className="app-header">
-        <div className="header-content">
-          <div className="header-left">
-            <button 
-              className="header-logo"
-              onClick={() => navigate(user ? '/dashboard' : '/')}
-              title={user ? "Go to Dashboard" : "Go to Home"}
-            >
-              <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="32" height="32" rx="6" fill="#fff"/>
-                <path d="M16 8L20 14H22L18 20H14L10 14H12L16 8Z" fill="#0a0a0a"/>
-                <path d="M16 24L12 18H10L14 12H18L22 18H20L16 24Z" fill="#0a0a0a"/>
-              </svg>
-              <span className="header-logo-text">intrview.io</span>
-            </button>
-          </div>
-          
-          <div className="header-right">
-            {user ? (
-              <>
-                <CreditBar user={user} onUpgrade={() => setShowUpgradeModal(true)} />
-                <button className="header-btn" onClick={() => navigate('/progress')}>
-                  Progress
-                </button>
-                <div className="header-user-info">
-                  <span className="header-user-email">{user.email}</span>
-                </div>
-                {user.isAdmin && (
-                  <button className="header-btn" onClick={() => navigate('/admin')}>
-                    Admin
-                  </button>
-                )}
-                <button className="header-btn primary" onClick={() => handleSelectPlan('starter')}>
-                  Pricing
-                </button>
-                <button
-                  className="header-btn"
-                  onClick={handleLogout}
-                >
-                  Sign Out
-                </button>
-              </>
-            ) : (
-              <>
-                <button className="header-btn" onClick={() => {
-                  setLoginModalMode('signin')
-                  setShowLoginModal(true)
-                }}>
-                  Sign In
-                </button>
-                <button className="header-btn" onClick={() => {
-                  setLoginModalMode('signup')
-                  setShowLoginModal(true)
-                }}>
-                  Sign Up
-                </button>
-                <button className="header-btn primary" onClick={() => handleSelectPlan('starter')}>
-                  Pricing
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
-      
-
-        {/* Mobile Ad Bars - Top and Bottom */}
-        <div className="mobile-ad-bar mobile-ad-bar-top">
-          <RotatingAds position="top" />
-        </div>
-
+    <div className={`app ${showSidebar ? 'app-with-sidebar' : ''}`}>
+      {showSidebar ? (
+        /* Authenticated layout: sidebar + content, no header */
         <div className="app-body">
-          {/* Left Sidebar - Desktop Only */}
-          <aside className="sidebar">
-            <div className="sidebar-content">
-              <div className="sidebar-logo-header">
-                <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect width="32" height="32" rx="6" fill="#fff"/>
-                  <path d="M16 8L20 14H22L18 20H14L10 14H12L16 8Z" fill="#0a0a0a"/>
-                  <path d="M16 24L12 18H10L14 12H18L22 18H20L16 24Z" fill="#0a0a0a"/>
-                </svg>
-              </div>
-              
-              {location.pathname.startsWith('/job/') && (
-                <button 
-                  className="back-to-home-btn"
-                  onClick={() => navigate(user ? '/dashboard' : '/')}
-                  title={user ? "Back to Dashboard" : "Back to Home"}
-                >
-                  <svg className="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                  </svg>
-                  <span>Back</span>
-                </button>
-              )}
-              
- 
-              <RotatingAds position="left" />
-            </div>
-          </aside>
-
+          <Sidebar user={user} onLogout={handleLogout} onUpgrade={() => setShowUpgradeModal(true)} isAdmin={user?.isAdmin} />
           <main className="main-content">
             {children}
           </main>
-
-          {/* Right Sidebar - Desktop Only */}
-          <aside className="right-sidebar">
-            <div className="right-sidebar-content">
-              <RotatingAds position="right" />
-            </div>
-          </aside>
         </div>
-
-        {/* Mobile Ad Bar - Bottom */}
-        <div className="mobile-ad-bar mobile-ad-bar-bottom">
-          <RotatingAds position="bottom" />
+      ) : (
+        /* Unauthenticated / homepage layout: just content */
+        <div className="app-body app-body-no-sidebar">
+          <main className="main-content main-content-full">
+            {children}
+          </main>
         </div>
+      )}
 
-      <LoginModal 
+      <LoginModal
         isOpen={showLoginModal}
         mode={loginModalMode}
         onClose={() => setShowLoginModal(false)}
         onSuccess={handleLoginSuccess}
       />
-      
+
       <UpgradeModal
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
@@ -523,14 +427,9 @@ function App() {
         <Route 
           path="/" 
           element={
-            <HomePage 
-              url={url}
-              setUrl={setUrl}
-              handleSubmit={handleSubmit}
-              loading={loading}
+            <HomePage
               user={user}
-              onSelectPlan={handleSelectPlan}
-              onLoadExample={handleLoadExample}
+              onLoginSuccess={handleLoginSuccess}
             />
           } 
         />
@@ -576,7 +475,7 @@ function App() {
           element={
             user?.isAdmin
               ? <AdminPage user={user} />
-              : <div style={{ padding: '64px', textAlign: 'center', color: '#888' }}>Access denied.</div>
+              : <div style={{ padding: '64px', textAlign: 'center', color: '#6b6b6b' }}>Access denied.</div>
           }
         />
         <Route
@@ -598,11 +497,29 @@ function App() {
             )
           }
         />
+        {/* /job/:jobId/train removed — training now via sidebar (Chat, Drills) */}
         <Route
-          path="/job/:jobId/train"
+          path="/job/:jobId"
+          element={
+            result ? (
+              <JobAnalysisPage
+                result={result}
+                companyName={companyName}
+                progress={progress}
+                user={user}
+              />
+            ) : (
+              <div style={{ padding: '64px', textAlign: 'center', color: '#6b6b6b' }}>
+                <p>Loading job analysis...</p>
+              </div>
+            )
+          }
+        />
+        <Route
+          path="/progress"
           element={
             user ? (
-              <TrainingPage result={result} user={user} />
+              <ProgressPage user={user} />
             ) : (
               <SignInPrompt
                 onSignIn={() => {
@@ -618,27 +535,29 @@ function App() {
           }
         />
         <Route
-          path="/job/:jobId"
+          path="/study/mock-interview"
           element={
-            result ? (
-              <JobAnalysisPage
-                result={result}
-                companyName={companyName}
-                progress={progress}
-                user={user}
-              />
+            user ? (
+              <MockInterviewPage />
             ) : (
-              <div style={{ padding: '64px', textAlign: 'center', color: '#888' }}>
-                <p>Loading job analysis...</p>
-              </div>
+              <SignInPrompt
+                onSignIn={() => {
+                  setLoginModalMode('signin')
+                  setShowLoginModal(true)
+                }}
+                onSignUp={() => {
+                  setLoginModalMode('signup')
+                  setShowLoginModal(true)
+                }}
+              />
             )
           }
         />
         <Route
-          path="/progress"
+          path="/study/drills"
           element={
             user ? (
-              <ProgressPage user={user} />
+              <DrillsPage user={user} />
             ) : (
               <SignInPrompt
                 onSignIn={() => {

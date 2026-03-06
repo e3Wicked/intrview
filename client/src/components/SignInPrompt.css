@@ -16,7 +16,7 @@
   display: flex;
   justify-content: center;
   margin-bottom: 24px;
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
 }
 
 .sign-in-prompt-icon svg {
@@ -27,17 +27,17 @@
 .sign-in-prompt-title {
   font-size: 28px;
   font-weight: 600;
-  color: #fff;
+  color: var(--color-text-primary, #1a1a1a);
   margin: 0 0 12px 0;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .sign-in-prompt-message {
   font-size: 16px;
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
   margin: 0 0 32px 0;
   line-height: 1.6;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .sign-in-prompt-actions {
@@ -50,7 +50,7 @@
 .sign-in-prompt-btn {
   padding: 14px 28px;
   border-radius: 8px;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -60,23 +60,23 @@
 }
 
 .sign-in-prompt-btn.primary {
-  background: #f59e0b;
-  color: #0a0a0a;
+  background: var(--color-accent, #2563eb);
+  color: #ffffff;
 }
 
 .sign-in-prompt-btn.primary:hover {
-  background: #fb923c;
+  background: #1d4ed8;
 }
 
 .sign-in-prompt-btn.secondary {
   background: transparent;
-  color: #fff;
-  border: 1px solid #2a2a2a;
+  color: var(--color-text-primary, #1a1a1a);
+  border: 1px solid var(--color-border, #e6e3de);
 }
 
 .sign-in-prompt-btn.secondary:hover {
-  border-color: #3a3a3a;
-  background: #1a1a1a;
+  border-color: #d0cdc7;
+  background: var(--color-bg-hover, #f0eeea);
 }
 
 @media (max-width: 768px) {
@@ -101,5 +101,3 @@
     width: 100%;
   }
 }
-
-

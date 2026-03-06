@@ -27,7 +27,14 @@ import {
   trackJobAnalysis,
   getUserJobAnalyses,
   getUserStats,
-  findStudyPlanByCompanyRole
+  findStudyPlanByCompanyRole,
+  getOrCreateTopic,
+  linkTopicsToJob,
+  getUserTopicScores,
+  updateUserTopicScore,
+  getTopicsForJob,
+  getSharedTopicsAcrossJobs,
+  getAllUserTopics
 } from './db.js';
 import { 
   createUser,
@@ -66,6 +73,24 @@ const __dirname = path.dirname(__filename);
 
 // Load .env file from the server directory
 dotenv.config({ path: path.join(__dirname, '.env') });
+
+// Infer topic category from name using keyword heuristics
+function inferTopicCategory(topicName) {
+  const lower = topicName.toLowerCase();
+  if (/system design|architecture|scalab|distributed/i.test(lower)) return 'system_design';
+  if (/algorithm|data structure|sorting|graph|tree|dynamic programming|leetcode/i.test(lower)) return 'algorithms';
+  if (/behavioral|leadership|teamwork|conflict|communication/i.test(lower)) return 'behavioral';
+  if (/react|vue|angular|css|html|frontend|front-end|ui\/ux/i.test(lower)) return 'frontend';
+  if (/node|express|django|flask|backend|back-end|api design|rest|graphql/i.test(lower)) return 'backend';
+  if (/sql|database|postgres|mongo|redis|caching/i.test(lower)) return 'databases';
+  if (/docker|kubernetes|ci\/cd|devops|aws|gcp|azure|cloud|infrastructure/i.test(lower)) return 'devops';
+  if (/machine learning|ml|ai|deep learning|nlp|computer vision/i.test(lower)) return 'ml';
+  if (/security|authentication|encryption|oauth/i.test(lower)) return 'security';
+  if (/testing|tdd|unit test|integration test|qa/i.test(lower)) return 'testing';
+  if (/python|javascript|typescript|java|go|rust|c\+\+|ruby|swift|kotlin/i.test(lower)) return 'language';
+  if (/product|pm|roadmap|metrics|a\/b test|user research/i.test(lower)) return 'product';
+  return 'general';
+}
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -1864,6 +1889,28 @@ Job title:`;
       companyInfo.roleTitle
     );
 
+    // Index topics from the study plan for cross-job linking
+    try {
+      const planTopics = studyPlan?.studyPlan?.topics || studyPlan?.topics || [];
+      if (planTopics.length > 0) {
+        const topicIds = [];
+        for (const topicObj of planTopics) {
+          const topicName = typeof topicObj === 'string' ? topicObj : (topicObj.topic || topicObj.name || '');
+          if (!topicName) continue;
+          const description = typeof topicObj === 'object' ? topicObj.description : null;
+          const category = inferTopicCategory(topicName);
+          const topic = await getOrCreateTopic(topicName, category, description);
+          topicIds.push(topic.id);
+        }
+        if (topicIds.length > 0) {
+          await linkTopicsToJob(jobDescriptionHash, topicIds);
+          console.log(`✅ Indexed ${topicIds.length} topics for job ${jobDescriptionHash.substring(0, 8)}...`);
+        }
+      }
+    } catch (topicErr) {
+      console.error('Non-critical: topic indexing failed:', topicErr.message);
+    }
+
     // Refresh user to get updated credits after deduction
     const updatedUser = await getUserFromSession(req.headers.authorization?.replace('Bearer ', ''));
     
@@ -3182,6 +3229,12 @@ app.get('/api/user/analysis/:id', requireAuth, async (req, res) => {
     const analysis = analysisRes.rows[0];
     const studyPlan = await getCachedStudyPlan(analysis.job_description_hash);
 
+    // Fetch full company data (founders, funding, research)
+    let companyData = null;
+    if (analysis.company_name) {
+      companyData = await getCompanyFullData(analysis.company_name);
+    }
+
     res.json({
       success: true,
       jobDescription: '',
@@ -3189,12 +3242,33 @@ app.get('/api/user/analysis/:id', requireAuth, async (req, res) => {
       companyInfo: {
         name: analysis.company_name,
         roleTitle: analysis.role_title,
+        logoUrl: analysis.logo_url || null,
+        founded: companyData?.founded || null,
+        description: companyData?.description || null,
+        website: companyData?.company_website || null,
+        linkedinUrl: companyData?.linkedin_url || null,
+        founders: companyData?.founders || [],
+        fundingRounds: companyData?.fundingRounds || [],
       },
+      companyResearch: companyData?.research || null,
       studyPlan: studyPlan || null,
       url: analysis.url,
     });
   } catch (error) {
     console.error('Error getting analysis by id:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete all user job analyses
+app.delete('/api/user/analyses', requireAuth, async (req, res) => {
+  try {
+    const user = req.user;
+    await pool.query('DELETE FROM job_analyses WHERE user_id = $1', [user.id]);
+    await pool.query('DELETE FROM user_topic_scores WHERE user_id = $1', [user.id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting user analyses:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -3396,6 +3470,94 @@ app.get('/api/advertisers', async (req, res) => {
 // Mount gamification routes
 app.use(gamificationRouter);
 
+// Topic API endpoints
+app.get('/api/user/topic-scores', requireAuth, async (req, res) => {
+  try {
+    const scores = await getUserTopicScores(req.user.id);
+    res.json(scores);
+  } catch (error) {
+    console.error('Error getting user topic scores:', error);
+    res.status(500).json({ error: 'Failed to get topic scores' });
+  }
+});
+
+app.get('/api/user/all-topics', requireAuth, async (req, res) => {
+  try {
+    const topics = await getAllUserTopics(req.user.id);
+    res.json(topics);
+  } catch (error) {
+    console.error('Error getting all user topics:', error);
+    res.status(500).json({ error: 'Failed to get topics' });
+  }
+});
+
+app.get('/api/topics/shared', requireAuth, async (req, res) => {
+  try {
+    const shared = await getSharedTopicsAcrossJobs(req.user.id);
+    res.json(shared);
+  } catch (error) {
+    console.error('Error getting shared topics:', error);
+    res.status(500).json({ error: 'Failed to get shared topics' });
+  }
+});
+
+app.get('/api/topics/job/:hash', requireAuth, async (req, res) => {
+  try {
+    const topics = await getTopicsForJob(req.params.hash);
+    res.json(topics);
+  } catch (error) {
+    console.error('Error getting topics for job:', error);
+    res.status(500).json({ error: 'Failed to get topics for job' });
+  }
+});
+
+// Retroactively extract topics from existing study plans that haven't been indexed
+app.post('/api/topics/backfill', requireAuth, async (req, res) => {
+  try {
+    const user = req.user;
+    const analyses = await getUserJobAnalyses(user.id);
+    let totalTopics = 0;
+    let processedJobs = 0;
+
+    for (const analysis of analyses) {
+      const hash = analysis.job_description_hash;
+      const existing = await getTopicsForJob(hash);
+      if (existing.length > 0) continue;
+
+      const cached = await getCachedStudyPlan(hash);
+      if (!cached) continue;
+
+      let plan;
+      try {
+        plan = typeof cached === 'string' ? JSON.parse(cached) : cached;
+      } catch { continue; }
+
+      const planTopics = plan?.studyPlan?.topics || plan?.topics || [];
+      if (planTopics.length === 0) continue;
+
+      const topicIds = [];
+      for (const topicObj of planTopics) {
+        const topicName = typeof topicObj === 'string' ? topicObj : (topicObj.topic || topicObj.name || '');
+        if (!topicName) continue;
+        const description = typeof topicObj === 'object' ? topicObj.description : null;
+        const category = inferTopicCategory(topicName);
+        const topic = await getOrCreateTopic(topicName, category, description);
+        topicIds.push(topic.id);
+      }
+      if (topicIds.length > 0) {
+        await linkTopicsToJob(hash, topicIds);
+        totalTopics += topicIds.length;
+        processedJobs++;
+      }
+    }
+
+    res.json({ success: true, processedJobs, totalTopics });
+  } catch (error) {
+    console.error('Error backfilling topics:', error);
+    res.status(500).json({ error: 'Failed to backfill topics' });
+  }
+});
+
 // IMPORTANT: All API routes must be defined BEFORE this line
 // Serve static files from the React app (AFTER all API routes)
 app.use(express.static(path.join(__dirname, '../client/dist')));
@@ -3403,7 +3565,6 @@ app.use(express.static(path.join(__dirname, '../client/dist')));
 // The "catchall" handler: for any request that doesn't match an API route, send back React's index.html file.
 // IMPORTANT: This must be LAST, after all API routes and static files
 app.get('*', (req, res) => {
-  // Don't serve index.html for API routes (only GET requests reach here, POST should be handled above)
   if (req.path.startsWith('/api')) {
     console.log('[Catch-all GET] API route not found:', req.path);
     return res.status(404).json({ error: 'API endpoint not found' });

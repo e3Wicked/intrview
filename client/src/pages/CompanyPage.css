@@ -6,17 +6,17 @@
 .company-page-empty {
   text-align: center;
   padding: 64px;
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
 }
 
 .company-page-empty button {
   margin-top: 16px;
   padding: 10px 20px;
-  background: #f59e0b;
-  color: #0a0a0a;
+  background: var(--color-accent, #2563eb);
+  color: #ffffff;
   border: none;
   border-radius: 6px;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
   font-weight: 600;
   cursor: pointer;
   font-size: 14px;
@@ -28,7 +28,7 @@
   align-items: center;
   padding: 8px 0 24px 0;
   margin-bottom: 0;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--color-border, #e6e3de);
 }
 
 .company-header-left {
@@ -38,273 +38,13 @@
 }
 
 .company-back-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
-  border-radius: 8px;
-  color: #b0b0b0;
-  cursor: pointer;
-  transition: all 0.2s;
-  flex-shrink: 0;
-  padding: 0;
-}
-
-.company-back-button:hover {
-  background: #2a2a2a;
-  border-color: #3a3a3a;
-  color: #f59e0b;
-}
-
-.company-logo-large-container {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  overflow: hidden;
-  flex-shrink: 0;
-  background: #2a2a2a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.company-logo-large {
-  width: 100%;
-  height: 100%;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #f59e0b 0%, #fb923c 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #0a0a0a;
-  font-size: 24px;
-  font-weight: 600;
-}
-
-.company-page-title {
-  font-size: 28px;
-  font-weight: 600;
-  color: #fff;
-  margin: 0;
-  font-family: 'Inconsolata', 'Courier New', monospace;
-}
-
-.company-header-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 13px;
-  color: #888;
-  margin-top: 4px;
-}
-
-.roles-badge {
-  padding: 3px 10px;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
-  border-radius: 6px;
-  color: #f59e0b;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-/* ── Role Selector Section ── */
-.role-selector-section {
-  padding: 28px 0 8px;
-  border-top: 1px solid #2a2a2a;
-  margin-top: 4px;
-}
-
-.role-selector-heading {
-  font-size: 16px;
-  font-weight: 600;
-  color: #fff;
-  margin: 0 0 14px 0;
-  font-family: 'Inconsolata', 'Courier New', monospace;
-}
-
-/* Horizontal scrollable chip row */
-.role-chips {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: #2a2a2a transparent;
-}
-
-.role-chips::-webkit-scrollbar {
-  height: 4px;
-}
-
-.role-chips::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.role-chips::-webkit-scrollbar-thumb {
-  background: #2a2a2a;
-  border-radius: 2px;
-}
-
-/* Individual role chip */
-.role-chip {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 200px;
-  max-width: 300px;
-  padding: 14px 18px;
-  background: #141414;
-  border: 1px solid #2a2a2a;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: left;
-  font-family: 'Inconsolata', 'Courier New', monospace;
-}
-
-.role-chip:hover {
-  border-color: #3a3a3a;
-  background: #1a1a1a;
-}
-
-.role-chip.selected {
-  border-color: #f59e0b;
-  background: #1a1a0a;
-  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.15);
-}
-
-.role-chip-main {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.role-chip-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.role-chip.selected .role-chip-title {
-  color: #f59e0b;
-}
-
-.role-chip-stats {
-  font-size: 11px;
-  color: #888;
-  white-space: nowrap;
-}
-
-/* Progress bar inside chip */
-.role-chip-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.role-chip-bar {
-  flex: 1;
-  height: 4px;
-  background: #2a2a2a;
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.role-chip-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #f59e0b, #fb923c);
-  border-radius: 2px;
-  transition: width 0.4s ease;
-  min-width: 2px;
-}
-
-.role-chip-bar-fill.complete {
-  background: linear-gradient(90deg, #22c55e, #4ade80);
-}
-
-.role-chip-percent {
-  font-size: 12px;
-  font-weight: 600;
-  color: #f59e0b;
-  flex-shrink: 0;
-  min-width: 28px;
-  text-align: right;
-}
-
-.role-chip-no-plan {
-  font-size: 11px;
-  color: #666;
-  font-style: italic;
-}
-
-/* ── Tabs (below selected role) ── */
-.company-tabs {
-  display: flex;
-  gap: 4px;
-  border-bottom: 1px solid #2a2a2a;
-  margin-top: 24px;
-  margin-bottom: 24px;
-}
-
-.company-tab {
-  padding: 12px 24px;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: #888;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: 'Inconsolata', 'Courier New', monospace;
-  font-size: 14px;
-}
-
-.company-tab:hover {
-  color: #fff;
-}
-
-.company-tab.active {
-  color: #f59e0b;
-  border-bottom-color: #f59e0b;
-}
-
-.company-tab-content {
-  min-height: 400px;
-}
-
-/* ── No role selected prompt ── */
-.no-role-selected {
-  text-align: center;
-  padding: 48px 24px;
-  color: #666;
-  font-size: 15px;
-  font-family: 'Inconsolata', 'Courier New', monospace;
-  border: 1px dashed #2a2a2a;
-  border-radius: 10px;
-  margin-top: 24px;
-}
-
-.no-role-selected p {
-  margin: 0;
-}
-
-/* ── New back button style ── */
-.company-back-button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   background: none;
   border: none;
-  color: #888;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 14px;
   cursor: pointer;
   padding: 8px 0;
@@ -315,22 +55,321 @@
 }
 
 .company-back-button:hover {
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
   background: none;
   border-color: transparent;
 }
 
-/* ── Role Cards Grid (simplified company page) ── */
+.company-logo-large-container {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--color-bg-secondary, #f4f2ee);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.company-logo-large {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--color-accent, #2563eb) 0%, #3b82f6 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.company-page-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  margin: 0;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.company-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b6b6b);
+  margin-top: 4px;
+}
+
+.roles-badge {
+  padding: 3px 10px;
+  background: var(--color-bg-secondary, #f4f2ee);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 6px;
+  color: var(--color-accent, #2563eb);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.company-founded-badge {
+  font-size: 12px;
+  color: var(--color-text-secondary, #6b6b6b);
+}
+
+/* -- Intel Loading -- */
+.company-intel-loading {
+  text-align: center;
+  padding: 32px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 14px;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+/* -- About Section -- */
+.company-about {
+  margin-top: 24px;
+  padding: 20px 24px;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
+}
+
+.company-about-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.company-about-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--color-accent, #2563eb);
+  text-decoration: none;
+  font-family: 'Inter', -apple-system, sans-serif;
+  transition: opacity 0.2s;
+}
+
+.company-about-link:hover {
+  opacity: 0.8;
+}
+
+/* -- Intel Grid -- */
+.company-intel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.company-intel-card {
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
+}
+
+.company-intel-card h3 {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b6b6b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 14px 0;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.company-intel-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+/* -- Founders -- */
+.company-founders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.company-founder-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.company-founder-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.company-founder-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.company-founder-background {
+  font-size: 12px;
+  color: var(--color-text-secondary, #6b6b6b);
+  line-height: 1.5;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.company-founder-linkedin {
+  flex-shrink: 0;
+  color: var(--color-accent, #2563eb);
+  transition: opacity 0.2s;
+  padding: 2px;
+}
+
+.company-founder-linkedin:hover {
+  opacity: 0.7;
+}
+
+/* -- Tech & Value Pills -- */
+.company-tech-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.company-tech-pill {
+  display: inline-block;
+  padding: 5px 12px;
+  background: var(--color-bg-secondary, #f4f2ee);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.company-value-pill {
+  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.15);
+  color: var(--color-accent, #2563eb);
+}
+
+/* -- Funding Timeline -- */
+.company-funding-section {
+  margin-top: 16px;
+}
+
+.company-funding-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b6b6b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 12px 0;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.company-funding-timeline {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border, #e6e3de) transparent;
+}
+
+.company-funding-timeline::-webkit-scrollbar {
+  height: 4px;
+}
+
+.company-funding-timeline::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.company-funding-timeline::-webkit-scrollbar-thumb {
+  background: var(--color-border, #e6e3de);
+  border-radius: 2px;
+}
+
+.company-funding-card {
+  flex-shrink: 0;
+  min-width: 180px;
+  max-width: 240px;
+  padding: 16px;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
+}
+
+.company-funding-year {
+  font-size: 12px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.company-funding-type {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.company-funding-amount {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-accent, #2563eb);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.company-funding-investors {
+  font-size: 11px;
+  color: var(--color-text-secondary, #6b6b6b);
+  line-height: 1.4;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+/* -- Roles Section -- */
+.company-roles-section {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-border, #e6e3de);
+}
+
+.company-roles-heading {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b6b6b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 16px 0;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
 .company-roles-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
-  margin-top: 24px;
 }
 
 .company-role-card {
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 12px;
   padding: 20px;
   cursor: pointer;
@@ -338,10 +377,11 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
 }
 
 .company-role-card:hover {
-  border-color: #3a3a3a;
+  border-color: #d0cdc7;
   transform: translateY(-1px);
 }
 
@@ -357,7 +397,7 @@
   border-radius: 8px;
   overflow: hidden;
   flex-shrink: 0;
-  background: #2a2a2a;
+  background: var(--color-bg-secondary, #f4f2ee);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -371,21 +411,21 @@
 .company-role-title {
   font-size: 15px;
   font-weight: 600;
-  color: #fff;
+  color: var(--color-text-primary, #1a1a1a);
   margin: 0 0 2px 0;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .company-role-date {
   font-size: 12px;
-  color: #666;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .company-role-progress .progress-bar {
   width: 100%;
   height: 5px;
-  background: #2a2a2a;
+  background: var(--color-bg-secondary, #f4f2ee);
   border-radius: 3px;
   overflow: hidden;
   margin-bottom: 4px;
@@ -393,24 +433,24 @@
 
 .company-role-progress .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #f59e0b 0%, #fb923c 100%);
+  background: linear-gradient(90deg, var(--color-accent, #2563eb) 0%, #3b82f6 100%);
   border-radius: 3px;
   transition: width 0.3s;
 }
 
 .company-role-progress .progress-text {
   font-size: 12px;
-  color: #888;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .company-role-cta {
   padding: 10px 18px;
-  background: #f59e0b;
-  color: #0a0a0a;
+  background: var(--color-accent, #2563eb);
+  color: #ffffff;
   border: none;
   border-radius: 8px;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -419,10 +459,190 @@
 }
 
 .company-role-cta:hover {
-  background: #fb923c;
+  background: #1d4ed8;
 }
 
-/* ── Mobile responsive ── */
+/* -- Legacy selectors kept for compatibility -- */
+.role-selector-section {
+  padding: 28px 0 8px;
+  border-top: 1px solid var(--color-border, #e6e3de);
+  margin-top: 4px;
+}
+
+.role-selector-heading {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  margin: 0 0 14px 0;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.role-chips {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border, #e6e3de) transparent;
+}
+
+.role-chips::-webkit-scrollbar {
+  height: 4px;
+}
+
+.role-chips::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.role-chips::-webkit-scrollbar-thumb {
+  background: var(--color-border, #e6e3de);
+  border-radius: 2px;
+}
+
+.role-chip {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 200px;
+  max-width: 300px;
+  padding: 14px 18px;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.role-chip:hover {
+  border-color: #d0cdc7;
+  background: var(--color-bg-card, #ffffff);
+}
+
+.role-chip.selected {
+  border-color: var(--color-accent, #2563eb);
+  background: rgba(37, 99, 235, 0.04);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.12);
+}
+
+.role-chip-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.role-chip-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.role-chip.selected .role-chip-title {
+  color: var(--color-accent, #2563eb);
+}
+
+.role-chip-stats {
+  font-size: 11px;
+  color: var(--color-text-secondary, #6b6b6b);
+  white-space: nowrap;
+}
+
+.role-chip-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.role-chip-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--color-bg-secondary, #f4f2ee);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.role-chip-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-accent, #2563eb), #3b82f6);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+  min-width: 2px;
+}
+
+.role-chip-bar-fill.complete {
+  background: linear-gradient(90deg, #16a34a, #22c55e);
+}
+
+.role-chip-percent {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-accent, #2563eb);
+  flex-shrink: 0;
+  min-width: 28px;
+  text-align: right;
+}
+
+.role-chip-no-plan {
+  font-size: 11px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-style: italic;
+}
+
+.company-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-border, #e6e3de);
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+
+.company-tab {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-secondary, #6b6b6b);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 14px;
+}
+
+.company-tab:hover {
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.company-tab.active {
+  color: var(--color-accent, #2563eb);
+  border-bottom-color: var(--color-accent, #2563eb);
+}
+
+.company-tab-content {
+  min-height: 400px;
+}
+
+.no-role-selected {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 15px;
+  font-family: 'Inter', -apple-system, sans-serif;
+  border: 1px dashed var(--color-border, #e6e3de);
+  border-radius: 10px;
+  margin-top: 24px;
+}
+
+.no-role-selected p {
+  margin: 0;
+}
+
+/* -- Mobile responsive -- */
 @media (max-width: 640px) {
   .company-page-header {
     padding: 8px 0 16px 0;
@@ -435,6 +655,14 @@
 
   .company-page-title {
     font-size: 22px;
+  }
+
+  .company-intel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .company-funding-card {
+    min-width: 160px;
   }
 
   .role-chip {

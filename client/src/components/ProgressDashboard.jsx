@@ -142,8 +142,8 @@ function ProgressDashboard({ analyses, studyPlans }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {practiceHistory.slice(0, 5).map((session, idx) => (
               <div key={idx} style={{
-                background: '#1a1a1a',
-                border: '1px solid #2a2a2a',
+                background: '#ffffff',
+                border: '1px solid #e6e3de',
                 borderRadius: '8px',
                 padding: '12px 16px',
                 display: 'flex',
@@ -151,10 +151,10 @@ function ProgressDashboard({ analyses, studyPlans }) {
                 alignItems: 'center',
               }}>
                 <div>
-                  <span style={{ color: '#fff', fontSize: '14px' }}>
+                  <span style={{ color: '#1a1a1a', fontSize: '14px' }}>
                     {session.mode || 'Practice'} Session
                   </span>
-                  <span style={{ color: '#666', fontSize: '12px', marginLeft: '8px' }}>
+                  <span style={{ color: '#999', fontSize: '12px', marginLeft: '8px' }}>
                     {new Date(session.started_at).toLocaleDateString()}
                   </span>
                 </div>

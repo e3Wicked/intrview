@@ -163,7 +163,7 @@
   color: #ffffff;
   font-size: 16px;
   font-weight: 600;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
@@ -213,7 +213,7 @@
   border: 1px solid #2a2a2a;
   border-radius: 6px;
   color: #fff;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 14px;
   transition: all 0.2s;
 }

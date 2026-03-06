@@ -1,44 +1,48 @@
 .credit-bar {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 8px 16px;
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
-  border-radius: 6px;
-  font-family: 'Inconsolata', 'Courier New', monospace;
-  font-size: 13px;
+  gap: 12px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 12px;
 }
 
 .credit-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   position: relative;
+  flex: 1;
+  min-width: 0;
 }
 
 .credit-label {
-  color: #888;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
 }
 
 .credit-amount {
-  color: #fff;
+  color: rgba(255, 255, 255, 0.8);
   font-weight: 600;
-  min-width: 80px;
+  font-size: 12px;
 }
 
 .credit-progress {
-  width: 100px;
-  height: 6px;
-  background: #0a0a0a;
-  border-radius: 3px;
+  width: 60px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .credit-progress-fill {
   height: 100%;
   transition: width 0.3s, background-color 0.3s;
-  border-radius: 3px;
+  border-radius: 2px;
 }
 
 .credit-tooltip {
@@ -47,12 +51,12 @@
   left: 50%;
   transform: translateX(-50%);
   margin-bottom: 8px;
-  background: #0a0a0a;
-  border: 1px solid #2a2a2a;
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 8px 12px;
   border-radius: 6px;
-  font-size: 12px;
-  color: #b0b0b0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
   white-space: nowrap;
   z-index: 100;
   pointer-events: none;
@@ -65,23 +69,23 @@
   left: 50%;
   transform: translateX(-50%);
   border: 6px solid transparent;
-  border-top-color: #2a2a2a;
+  border-top-color: #1a1a1a;
 }
 
 .credit-upgrade-btn {
-  background: #f59e0b;
-  color: #0a0a0a;
+  background: var(--color-accent, #2563eb);
+  color: #ffffff;
   border: none;
   border-radius: 4px;
-  padding: 6px 12px;
-  font-family: 'Inconsolata', 'Courier New', monospace;
-  font-size: 12px;
+  padding: 4px 10px;
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.2s;
+  flex-shrink: 0;
 }
 
 .credit-upgrade-btn:hover {
   opacity: 0.9;
 }
-

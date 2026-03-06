@@ -23,4 +23,15 @@ export const api = {
     getWeaknessReport: () => axios.get('/api/gamification/weakness-report'),
     checkAchievements: (context) => axios.post('/api/gamification/check-achievements', { context }),
   },
+  topics: {
+    getUserScores: () => axios.get('/api/user/topic-scores'),
+    getShared: () => axios.get('/api/topics/shared'),
+    getForJob: (hash) => axios.get(`/api/topics/job/${hash}`),
+    getAllTopics: () => axios.get('/api/user/all-topics'),
+    backfill: () => axios.post('/api/topics/backfill'),
+  },
+  user: {
+    getAnalyses: (limit = 50, offset = 0) => axios.get(`/api/user/analyses?limit=${limit}&offset=${offset}`),
+    deleteAllAnalyses: () => axios.delete('/api/user/analyses'),
+  },
 }
