@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import axios from 'axios'
 import { api } from '../utils/api'
 import { useGamification } from '../contexts/GamificationContext'
 import { getLevelForXp } from '../utils/gamification'
@@ -10,63 +9,90 @@ import './ProgressPage.css'
 function ProgressPage({ user }) {
   const navigate = useNavigate()
   const { gamStats } = useGamification()
-  const [skillStats, setSkillStats] = useState({ skills: [], weeklyStats: { questionsThisWeek: 0, questionsLastWeek: 0, changePercent: 0 } })
-  const [weaknessReport, setWeaknessReport] = useState(null)
+  const [topics, setTopics] = useState([])
   const [practiceHistory, setPracticeHistory] = useState([])
-  const [analyses, setAnalyses] = useState([])
-  const [heatmapScope, setHeatmapScope] = useState('all')
-  const [selectedJobHash, setSelectedJobHash] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      const [skillRes, weakRes, historyRes, analysesRes] = await Promise.all([
-        api.gamification.getSkillStats().catch(() => ({ data: { skills: [], weeklyStats: {} } })),
-        api.gamification.getWeaknessReport().catch(() => ({ data: null })),
-        api.practice.getHistory({ limit: 10 }).catch(() => ({ data: { sessions: [] } })),
-        axios.get('/api/user/analyses?limit=100').catch(() => ({ data: [] })),
-      ])
-      setSkillStats(skillRes.data)
-      setWeaknessReport(weakRes.data)
-      setPracticeHistory(historyRes.data.sessions || [])
-      setAnalyses(analysesRes.data)
-
-      // Default to first job if available
-      if (analysesRes.data.length > 0) {
-        setSelectedJobHash(analysesRes.data[0].job_description_hash)
+    const loadData = async () => {
+      try {
+        setLoading(true)
+        const [topicsRes, historyRes] = await Promise.all([
+          api.topics.getAllTopics().catch(() => ({ data: [] })),
+          api.practice.getHistory({ limit: 10 }).catch(() => ({ data: { sessions: [] } })),
+        ])
+        setTopics(topicsRes.data || [])
+        setPracticeHistory(historyRes.data.sessions || [])
+      } catch (err) {
+        console.error('Error loading progress data:', err)
+      } finally {
+        setLoading(false)
       }
-    } catch (err) {
-      console.error('Error loading progress data:', err)
-    } finally {
-      setLoading(false)
     }
-  }
+    if (user) loadData()
+    else setLoading(false)
+  }, [user])
 
   const levelInfo = gamStats ? getLevelForXp(gamStats.totalXp) : null
   const streak = gamStats?.streak || { current: 0, multiplier: 1.0 }
 
   const getMasteryColor = (mastery) => {
     if (mastery >= 80) return '#22c55e'
-    if (mastery >= 60) return '#f59e0b'
+    if (mastery >= 40) return '#f59e0b'
     return '#ef4444'
   }
 
-  // Filter skills by job scope
-  const displaySkills = skillStats.skills || []
+  const getMasteryClass = (mastery) => {
+    if (mastery >= 80) return 'high'
+    if (mastery >= 40) return 'mid'
+    return 'low'
+  }
 
-  // Top 3 weaknesses
-  const weakSpots = useMemo(() => {
-    if (!weaknessReport?.weakCategories) return []
-    return weaknessReport.weakCategories.filter(c => c.mastery < 80).slice(0, 3)
-  }, [weaknessReport])
+  // Compute stats from real topic data
+  const stats = useMemo(() => {
+    const total = topics.length
+    const practiced = topics.filter(t => Number(t.attempts) > 0)
+    const totalDrills = practiced.reduce((sum, t) => sum + Number(t.attempts), 0)
+    const avgMastery = practiced.length > 0
+      ? Math.round(practiced.reduce((sum, t) => sum + Number(t.score), 0) / practiced.length)
+      : 0
+    const mastered = topics.filter(t => Number(t.score) >= 80).length
 
-  // Most recently active job ID for "Practice this" links
-  const mostRecentJobId = analyses.length > 0 ? analyses[0].id : null
+    // Group by category
+    const categoryMap = {}
+    topics.forEach(t => {
+      const cat = t.category || 'general'
+      if (!categoryMap[cat]) categoryMap[cat] = { total: 0, practiced: 0, totalScore: 0, totalAttempts: 0 }
+      categoryMap[cat].total++
+      if (Number(t.attempts) > 0) {
+        categoryMap[cat].practiced++
+        categoryMap[cat].totalScore += Number(t.score)
+        categoryMap[cat].totalAttempts += Number(t.attempts)
+      }
+    })
+    const categories = Object.entries(categoryMap)
+      .map(([name, data]) => ({
+        name,
+        total: data.total,
+        practiced: data.practiced,
+        mastery: data.practiced > 0 ? Math.round(data.totalScore / data.practiced) : 0,
+        totalAttempts: data.totalAttempts,
+      }))
+      .sort((a, b) => b.totalAttempts - a.totalAttempts)
+
+    // Weakest practiced topics (score < 80, sorted ascending)
+    const weakTopics = practiced
+      .filter(t => Number(t.score) < 80)
+      .sort((a, b) => Number(a.score) - Number(b.score))
+      .slice(0, 5)
+
+    // Top practiced topics sorted by mastery descending
+    const topTopics = [...practiced]
+      .sort((a, b) => Number(b.score) - Number(a.score))
+      .slice(0, 10)
+
+    return { total, practiced: practiced.length, totalDrills, avgMastery, mastered, categories, weakTopics, topTopics }
+  }, [topics])
 
   if (loading) {
     return (
@@ -80,6 +106,7 @@ function ProgressPage({ user }) {
     <div className="progress-page">
       <div className="progress-page-header">
         <h1 className="progress-page-title">Progress</h1>
+        <p className="progress-page-subtitle">Track your mastery across all topics.</p>
       </div>
 
       {/* Stats Bar */}
@@ -110,165 +137,192 @@ function ProgressPage({ user }) {
         </div>
         <div className="progress-stat-divider" />
         <div className="progress-stat-block">
-          <span className="progress-stat-label">This Week</span>
-          <span className="progress-stat-value">{skillStats.weeklyStats?.questionsThisWeek || 0} questions</span>
-          {skillStats.weeklyStats?.changePercent != null && skillStats.weeklyStats.questionsLastWeek > 0 && (
-            <span className={`progress-stat-change ${skillStats.weeklyStats.changePercent >= 0 ? 'positive' : 'negative'}`}>
-              {skillStats.weeklyStats.changePercent >= 0 ? '+' : ''}{skillStats.weeklyStats.changePercent}% vs last week
-            </span>
-          )}
+          <span className="progress-stat-label">Topics</span>
+          <span className="progress-stat-value">{stats.practiced}/{stats.total}</span>
+          <span className="progress-stat-multiplier">{stats.mastered} mastered</span>
         </div>
       </div>
 
-      {/* Skill Heatmap */}
-      <section className="progress-section">
-        <div className="progress-section-header">
-          <h2 className="progress-section-title">Skill Heatmap</h2>
-          <div className="heatmap-scope-toggle">
-            <button
-              className={`heatmap-scope-btn ${heatmapScope === 'all' ? 'active' : ''}`}
-              onClick={() => setHeatmapScope('all')}
-            >
-              All Jobs
-            </button>
-            {analyses.length > 0 && (
-              <button
-                className={`heatmap-scope-btn ${heatmapScope === 'job' ? 'active' : ''}`}
-                onClick={() => setHeatmapScope('job')}
-              >
-                Per Job
-              </button>
+      {/* Overview Cards */}
+      <div className="progress-overview-grid">
+        <div className="progress-overview-card">
+          <span className="progress-overview-value">{stats.avgMastery}%</span>
+          <span className="progress-overview-label">Avg Mastery</span>
+        </div>
+        <div className="progress-overview-card">
+          <span className="progress-overview-value">{stats.totalDrills}</span>
+          <span className="progress-overview-label">Total Drills</span>
+        </div>
+        <div className="progress-overview-card">
+          <span className="progress-overview-value">{stats.practiced}</span>
+          <span className="progress-overview-label">Topics Practiced</span>
+        </div>
+        <div className="progress-overview-card">
+          <span className="progress-overview-value">{stats.mastered}</span>
+          <span className="progress-overview-label">Mastered</span>
+        </div>
+      </div>
+
+      {/* Two Column Layout */}
+      <div className="progress-columns">
+        {/* Left: Skill Breakdown by Category */}
+        <div className="progress-col-main">
+          <section className="progress-section">
+            <h2 className="progress-section-title">Mastery by Category</h2>
+            {stats.categories.length === 0 ? (
+              <div className="progress-empty-card">
+                <p>Analyze a job post and practice to see your skill breakdown.</p>
+              </div>
+            ) : (
+              <div className="progress-category-list">
+                {stats.categories.map(cat => (
+                  <div key={cat.name} className="progress-category-row">
+                    <div className="progress-category-info">
+                      <span className="progress-category-name">{cat.name.replace('_', ' ')}</span>
+                      <span className="progress-category-meta">
+                        {cat.practiced}/{cat.total} topics &middot; {cat.totalAttempts} drills
+                      </span>
+                    </div>
+                    <div className="progress-category-bar-wrap">
+                      <div className="progress-category-bar">
+                        <div
+                          className={`progress-category-bar-fill ${getMasteryClass(cat.mastery)}`}
+                          style={{ width: `${Math.min(100, cat.mastery)}%` }}
+                        />
+                      </div>
+                      <span className="progress-category-score" style={{ color: getMasteryColor(cat.mastery) }}>
+                        {cat.mastery}%
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
-          </div>
+          </section>
+
+          {/* Top Topics */}
+          {stats.topTopics.length > 0 && (
+            <section className="progress-section">
+              <h2 className="progress-section-title">Top Topics</h2>
+              <div className="progress-topic-table">
+                <div className="progress-topic-header">
+                  <span>Topic</span>
+                  <span>Mastery</span>
+                  <span>Drills</span>
+                </div>
+                {stats.topTopics.map(topic => {
+                  const score = Math.round(Number(topic.score))
+                  return (
+                    <div
+                      key={topic.id}
+                      className="progress-topic-row"
+                      onClick={() => navigate(`/focus-chat?skill=${encodeURIComponent(topic.topic_name)}`)}
+                    >
+                      <div className="progress-topic-name">
+                        <span>{topic.topic_name}</span>
+                        {topic.category && (
+                          <span className="progress-topic-cat">{topic.category.replace('_', ' ')}</span>
+                        )}
+                      </div>
+                      <div className="progress-topic-mastery">
+                        <div className="progress-topic-bar">
+                          <div
+                            className={`progress-topic-bar-fill ${getMasteryClass(score)}`}
+                            style={{ width: `${Math.min(100, score)}%` }}
+                          />
+                        </div>
+                        <span className="progress-topic-score">{score}%</span>
+                      </div>
+                      <span className="progress-topic-drills">{Number(topic.attempts)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          )}
         </div>
 
-        {heatmapScope === 'job' && analyses.length > 0 && (
-          <div className="heatmap-job-selector">
-            {analyses.map(a => (
-              <button
-                key={a.id}
-                className={`heatmap-job-chip ${selectedJobHash === a.job_description_hash ? 'active' : ''}`}
-                onClick={() => setSelectedJobHash(a.job_description_hash)}
-              >
-                {a.company_name} - {a.role_title}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {displaySkills.length === 0 ? (
-          <div className="progress-empty-card">
-            <p>Complete some practice sessions to see your skill breakdown.</p>
-          </div>
-        ) : (
-          <div className="skill-heatmap">
-            {displaySkills.slice(0, 12).map((skill, i) => (
-              <div key={skill.category} className="skill-heatmap-row">
-                <span className="skill-heatmap-label">{skill.category}</span>
-                <div className="skill-heatmap-track">
-                  <div
-                    className="skill-heatmap-fill"
-                    style={{
-                      '--bar-width': `${skill.mastery}%`,
-                      '--bar-color': getMasteryColor(skill.mastery),
-                      animationDelay: `${i * 0.06}s`,
-                    }}
-                  />
-                </div>
-                <span className="skill-heatmap-value" style={{ color: getMasteryColor(skill.mastery) }}>
-                  {skill.mastery}%
-                </span>
-                <span className="skill-heatmap-meta">
-                  {skill.totalAttempts} {skill.totalAttempts === 1 ? 'drill' : 'drills'}
-                </span>
+        {/* Right: Weak Spots + Recent Activity */}
+        <div className="progress-col-side">
+          {/* Weak Spots */}
+          {stats.weakTopics.length > 0 && (
+            <section className="progress-section">
+              <h2 className="progress-section-title">Needs Work</h2>
+              <div className="progress-weak-list">
+                {stats.weakTopics.map(topic => {
+                  const score = Math.round(Number(topic.score))
+                  return (
+                    <div key={topic.id} className="progress-weak-item">
+                      <div className="progress-weak-info">
+                        <span className="progress-weak-name">{topic.topic_name}</span>
+                        <span className="progress-weak-score" style={{ color: getMasteryColor(score) }}>{score}%</span>
+                      </div>
+                      <div className="progress-weak-bar">
+                        <div
+                          className={`progress-weak-bar-fill ${getMasteryClass(score)}`}
+                          style={{ width: `${Math.min(100, score)}%` }}
+                        />
+                      </div>
+                      <button
+                        className="progress-weak-action"
+                        onClick={() => navigate(`/focus-chat?skill=${encodeURIComponent(topic.topic_name)}`)}
+                      >
+                        Practice &rarr;
+                      </button>
+                    </div>
+                  )
+                })}
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            </section>
+          )}
 
-      {/* Weak Spots */}
-      {weakSpots.length > 0 && (
-        <section className="progress-section">
-          <div className="progress-section-header">
-            <h2 className="progress-section-title">Weak Spots</h2>
-          </div>
-          <div className="weak-spots-list">
-            {weakSpots.map((cat, i) => (
-              <div key={cat.category} className="weak-spot-card">
-                <div className="weak-spot-info">
-                  <span className="weak-spot-rank">{i + 1}.</span>
-                  <span className="weak-spot-name">{cat.category}</span>
-                  <span className="weak-spot-mastery" style={{ color: getMasteryColor(cat.mastery) }}>
-                    {cat.mastery}%
-                  </span>
-                </div>
-                <div className="weak-spot-bar">
-                  <div className="weak-spot-bar-fill" style={{ width: `${cat.mastery}%`, background: getMasteryColor(cat.mastery) }} />
-                </div>
-                {mostRecentJobId && (
-                  <button
-                    className="weak-spot-action"
-                    onClick={() => navigate(`/job/${mostRecentJobId}/train?mode=coach&focus=${encodeURIComponent(cat.category)}`)}
-                  >
-                    Practice this &rarr;
-                  </button>
-                )}
+          {/* Recent Activity */}
+          <section className="progress-section">
+            <h2 className="progress-section-title">Recent Activity</h2>
+            {practiceHistory.length === 0 ? (
+              <div className="progress-empty-card">
+                <p>No practice sessions yet.</p>
               </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Recent Activity */}
-      <section className="progress-section">
-        <div className="progress-section-header">
-          <h2 className="progress-section-title">Recent Activity</h2>
+            ) : (
+              <div className="recent-activity-list">
+                {practiceHistory.slice(0, 5).map((session, idx) => {
+                  const scoreDisplay = session.average_score > 0 ? `${Math.round(session.average_score / 10)}/10` : null
+                  const modeLabel = session.mode === 'voice' ? 'Voice Practice'
+                    : session.mode === 'focus' ? 'Coach'
+                    : session.mode === 'flashcards' ? 'Flashcards'
+                    : 'Quiz'
+                  return (
+                    <div key={session.id || idx} className="activity-item">
+                      <div className="activity-icon">
+                        <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                          <rect width="20" height="20" rx="4" fill="#22c55e" fillOpacity="0.15"/>
+                          <path d="M6 10l3 3 5-6" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                      <div className="activity-info">
+                        <span className="activity-label">{modeLabel}</span>
+                        <span className="activity-date">{new Date(session.ended_at || session.started_at).toLocaleDateString()}</span>
+                      </div>
+                      <div className="activity-stats">
+                        {session.total_xp_earned > 0 && (
+                          <span className="activity-xp">+{session.total_xp_earned} XP</span>
+                        )}
+                        {scoreDisplay && (
+                          <span className="activity-score">{scoreDisplay}</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </section>
         </div>
-        {practiceHistory.length === 0 ? (
-          <div className="progress-empty-card">
-            <p>No practice sessions yet. Start practicing to track your progress!</p>
-          </div>
-        ) : (
-          <div className="recent-activity-list">
-            {practiceHistory.slice(0, 5).map((session, idx) => {
-              const scoreDisplay = session.average_score > 0 ? `${Math.round(session.average_score / 10)}/10` : null
-              const modeLabel = session.mode === 'voice' ? 'Voice Practice'
-                : session.mode === 'focus' ? 'Coach'
-                : session.mode === 'flashcards' ? 'Flashcards'
-                : 'Quiz'
-              return (
-                <div key={session.id || idx} className="activity-item">
-                  <div className="activity-icon">
-                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                      <rect width="20" height="20" rx="4" fill="#22c55e" fillOpacity="0.15"/>
-                      <path d="M6 10l3 3 5-6" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                  <div className="activity-info">
-                    <span className="activity-label">{modeLabel}</span>
-                    <span className="activity-date">{new Date(session.ended_at || session.started_at).toLocaleDateString()}</span>
-                  </div>
-                  <div className="activity-stats">
-                    {session.total_xp_earned > 0 && (
-                      <span className="activity-xp">+{session.total_xp_earned} XP</span>
-                    )}
-                    {scoreDisplay && (
-                      <span className="activity-score">{scoreDisplay}</span>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </section>
+      </div>
 
       {/* Achievements */}
       <section className="progress-section">
-        <div className="progress-section-header">
-          <h2 className="progress-section-title">Achievements</h2>
-        </div>
+        <h2 className="progress-section-title">Achievements</h2>
         <AchievementsBadgeGrid />
       </section>
     </div>

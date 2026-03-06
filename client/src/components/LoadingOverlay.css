@@ -1,7 +1,7 @@
 .loading-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 10, 10, 0.88);
+  background: rgba(250, 250, 248, 0.88);
   backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
@@ -15,25 +15,25 @@
   to   { opacity: 1; }
 }
 
-/* ── Card ── */
+/* -- Card -- */
 .loading-content {
-  background: #0f0f0f;
-  border: 1px solid #222;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 12px;
   padding: 28px 32px 24px;
   width: 420px;
   max-width: calc(100vw - 40px);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.08);
 }
 
-/* ── Header bar (fake terminal titlebar) ── */
+/* -- Header bar (fake terminal titlebar) -- */
 .loading-header {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 20px;
   padding-bottom: 14px;
-  border-bottom: 1px solid #1a1a1a;
+  border-bottom: 1px solid var(--color-border, #e6e3de);
 }
 
 .loading-indicator {
@@ -45,7 +45,7 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #2a2a2a;
+  background: #d8d5ce;
 }
 
 .indicator-dot:nth-child(1) { background: #ff5f57; }
@@ -53,13 +53,13 @@
 .indicator-dot:nth-child(3) { background: #28ca41; }
 
 .loading-label {
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 12px;
-  color: #555;
+  color: #b0ada6;
   letter-spacing: 0.05em;
 }
 
-/* ── Step list ── */
+/* -- Step list -- */
 .loading-terminal {
   display: flex;
   flex-direction: column;
@@ -71,7 +71,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 14px;
   transition: opacity 0.3s ease;
 }
@@ -95,12 +95,12 @@
 }
 
 .check {
-  color: #4ade80;
+  color: #16a34a;
   font-size: 13px;
 }
 
 .spinner-char {
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
   font-size: 16px;
   font-weight: bold;
   animation: blink 0.8s ease-in-out infinite;
@@ -112,29 +112,29 @@
 }
 
 .pending-char {
-  color: #333;
+  color: #d8d5ce;
 }
 
 .terminal-text {
-  color: #e5e5e5;
+  color: var(--color-text-primary, #1a1a1a);
 }
 
 .terminal-line.done .terminal-text {
-  color: #555;
+  color: #b0ada6;
 }
 
 .terminal-line.active .terminal-text {
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
 }
 
 .trailing-dots {
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
   letter-spacing: 1px;
   display: inline-block;
   width: 20px;
 }
 
-/* ── Progress bar ── */
+/* -- Progress bar -- */
 .loading-footer {
   display: flex;
   align-items: center;
@@ -145,32 +145,32 @@
 .progress-bar-container {
   flex: 1;
   height: 3px;
-  background: #1a1a1a;
+  background: var(--color-bg-secondary, #f4f2ee);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #f59e0b, #fb923c);
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
   border-radius: 2px;
   transition: width 0.6s ease;
 }
 
 .progress-pct {
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 12px;
-  color: #555;
+  color: #b0ada6;
   width: 32px;
   text-align: right;
   flex-shrink: 0;
 }
 
-/* ── Footer note ── */
+/* -- Footer note -- */
 .loading-note {
   font-size: 12px;
-  color: #333;
+  color: #c0bdb6;
   margin: 0;
   text-align: center;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
 }

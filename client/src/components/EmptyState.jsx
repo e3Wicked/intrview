@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import './EmptyState.css'
 import { preloadedExamples } from '../data/preloadedExamples'
-import RotatingAds from './RotatingAds'
 
 // Logo component with multiple fallback options (same as RotatingAds)
 function LogoWithFallbacks({ domain, name, logoUrl }) {
@@ -115,11 +114,6 @@ function EmptyState({ url, setUrl, handleSubmit, loading, user, onSelectPlan, on
 
   return (
     <div className="empty-state">
-      {/* Mobile ads at top */}
-      <div className="mobile-ads-container">
-        <RotatingAds position="left" />
-      </div>
-      
       <div className="empty-state-hero">
         <h1 className="empty-title">intrview.io</h1>
         <p className="empty-subtitle">Transform job descriptions into personalized interview prep plans</p>

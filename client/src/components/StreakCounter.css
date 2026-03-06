@@ -3,15 +3,15 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 20px;
   font-size: 13px;
 }
 
 .streak-counter.active {
-  border-color: #f59e0b33;
-  background: #1a1510;
+  border-color: rgba(37, 99, 235, 0.3);
+  background: #eff6ff;
 }
 
 .streak-counter.compact {
@@ -30,7 +30,7 @@
 
 .streak-number {
   font-weight: 700;
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
   font-size: 15px;
 }
 
@@ -39,13 +39,13 @@
 }
 
 .streak-label {
-  color: #666;
+  color: var(--color-text-secondary, #6b6b6b);
   font-size: 12px;
 }
 
 .streak-multiplier {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  color: #000;
+  background: linear-gradient(135deg, var(--color-accent, #2563eb), #1d4ed8);
+  color: #ffffff;
   font-size: 10px;
   font-weight: 700;
   padding: 1px 6px;

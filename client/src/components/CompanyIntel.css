@@ -6,7 +6,7 @@
 .company-intel-empty {
   text-align: center;
   padding: 48px;
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
 }
 
 .intel-layout {
@@ -22,13 +22,13 @@
 .intel-section-title {
   font-size: 18px;
   font-weight: 600;
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
   margin: 0 0 16px 0;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .intel-description {
-  color: #b0b0b0;
+  color: var(--color-text-secondary, #6b6b6b);
   line-height: 1.6;
   margin-bottom: 16px;
 }
@@ -40,12 +40,12 @@
 }
 
 .intel-label {
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
   font-size: 14px;
 }
 
 .intel-value {
-  color: #fff;
+  color: var(--color-text-primary, #1a1a1a);
   font-size: 14px;
 }
 
@@ -57,29 +57,30 @@
 }
 
 .founder-card {
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 8px;
   padding: 16px;
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
 }
 
 .founder-name {
   font-size: 16px;
   font-weight: 600;
-  color: #fff;
+  color: var(--color-text-primary, #1a1a1a);
   margin-bottom: 8px;
 }
 
 .founder-background {
   font-size: 13px;
-  color: #b0b0b0;
+  color: var(--color-text-secondary, #6b6b6b);
   line-height: 1.5;
   margin-bottom: 8px;
 }
 
 .founder-linkedin {
   font-size: 12px;
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
   text-decoration: none;
 }
 
@@ -95,10 +96,11 @@
 }
 
 .funding-round {
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 8px;
   padding: 16px;
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
 }
 
 .round-header {
@@ -111,23 +113,23 @@
 .round-type {
   font-size: 14px;
   font-weight: 600;
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
 }
 
 .round-amount {
   font-size: 14px;
-  color: #fff;
+  color: var(--color-text-primary, #1a1a1a);
 }
 
 .round-date {
   font-size: 12px;
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
   margin-bottom: 4px;
 }
 
 .round-investors {
   font-size: 12px;
-  color: #b0b0b0;
+  color: var(--color-text-secondary, #6b6b6b);
 }
 
 /* Values */
@@ -139,11 +141,11 @@
 
 .value-tag {
   padding: 6px 12px;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 6px;
   font-size: 13px;
-  color: #fff;
+  color: var(--color-text-primary, #1a1a1a);
 }
 
 /* Tech Stack */
@@ -155,8 +157,8 @@
 
 .tech-badge {
   padding: 8px 16px;
-  background: linear-gradient(135deg, #f59e0b 0%, #fb923c 100%);
-  color: #0a0a0a;
+  background: linear-gradient(135deg, var(--color-accent, #2563eb) 0%, #3b82f6 100%);
+  color: #ffffff;
   border-radius: 6px;
   font-size: 13px;
   font-weight: 600;
@@ -171,15 +173,15 @@
 
 .focus-area-item {
   padding: 12px;
-  background: #1a1a1a;
-  border-left: 3px solid #f59e0b;
+  background: var(--color-bg-surface, #f8f7f5);
+  border-left: 3px solid var(--color-accent, #2563eb);
   border-radius: 4px;
   font-size: 13px;
-  color: #b0b0b0;
+  color: var(--color-text-secondary, #6b6b6b);
 }
 
 .intel-empty {
-  color: #666;
+  color: var(--color-text-secondary, #6b6b6b);
   font-size: 13px;
   font-style: italic;
 }
@@ -189,5 +191,3 @@
     grid-template-columns: 1fr;
   }
 }
-
-

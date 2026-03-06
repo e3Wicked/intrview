@@ -124,7 +124,7 @@ function LoginModal({ isOpen, onClose, onSuccess, mode = 'signin' }) {
 
             {mode === 'signup' && (
               <div className="login-input-group">
-                <label>Name <span style={{ color: '#666', fontWeight: 'normal' }}>(optional)</span></label>
+                <label>Name <span style={{ color: '#999', fontWeight: 'normal' }}>(optional)</span></label>
                 <input
                   type="text"
                   value={name}
@@ -141,9 +141,9 @@ function LoginModal({ isOpen, onClose, onSuccess, mode = 'signin' }) {
           </form>
         ) : (
           <form onSubmit={handleVerifyCode} className="login-form">
-            <p style={{ marginBottom: '20px', color: '#888', fontSize: '14px', textAlign: 'center' }}>
+            <p style={{ marginBottom: '20px', color: '#6b6b6b', fontSize: '14px', textAlign: 'center' }}>
               We sent a 6-digit code to<br />
-              <strong style={{ color: '#fff' }}>{email}</strong>
+              <strong style={{ color: '#1a1a1a' }}>{email}</strong>
             </p>
 
             <div className="login-input-group">
@@ -185,11 +185,11 @@ function LoginModal({ isOpen, onClose, onSuccess, mode = 'signin' }) {
                 setCode('')
                 setError(null)
               }}
-              style={{ 
-                marginTop: '16px', 
-                background: 'none', 
-                border: 'none', 
-                color: '#888',
+              style={{
+                marginTop: '16px',
+                background: 'none',
+                border: 'none',
+                color: '#6b6b6b',
                 cursor: 'pointer',
                 fontSize: '14px',
                 textDecoration: 'underline'

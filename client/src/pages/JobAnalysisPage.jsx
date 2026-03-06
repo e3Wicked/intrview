@@ -8,15 +8,18 @@ import './JobAnalysisPage.css'
 function JobAnalysisPage({ result, companyName, progress, user }) {
   const { jobId } = useParams()
   const navigate = useNavigate()
-  const [showFullResearch, setShowFullResearch] = useState(false)
+  const [activeTab, setActiveTab] = useState('company')
   const [research, setResearch] = useState(null)
   const [researchLoading, setResearchLoading] = useState(false)
-  const [expandedTopic, setExpandedTopic] = useState(null)
   const [serverProgress, setServerProgress] = useState(null)
   const [lastSession, setLastSession] = useState(null)
 
-  // Load company research
+  // Load company research (use result.companyResearch first, fetch as fallback)
   useEffect(() => {
+    if (result?.companyResearch) {
+      setResearch(result.companyResearch)
+      return
+    }
     const name = result?.companyInfo?.name || companyName
     if (!name || name === 'Company' || name === 'UNKNOWN') return
     setResearchLoading(true)
@@ -31,7 +34,7 @@ function JobAnalysisPage({ result, companyName, progress, user }) {
       })
       .catch(() => {})
       .finally(() => setResearchLoading(false))
-  }, [result?.companyInfo?.name, companyName])
+  }, [result?.companyInfo?.name, result?.companyResearch, companyName])
 
   // Load server progress for this job
   useEffect(() => {
@@ -67,7 +70,7 @@ function JobAnalysisPage({ result, companyName, progress, user }) {
 
   if (!result) {
     return (
-      <div style={{ padding: '64px', textAlign: 'center', color: '#888' }}>
+      <div style={{ padding: '64px', textAlign: 'center', color: '#6b6b6b' }}>
         <p>No job analysis found. Please analyze a job posting first.</p>
         <button
           onClick={() => navigate('/dashboard')}
@@ -98,67 +101,53 @@ function JobAnalysisPage({ result, companyName, progress, user }) {
     } catch (e) {}
   }
 
-  // Key intel bullets
-  const keyIntelBullets = []
-  if (research?.techStack?.length > 0) {
-    keyIntelBullets.push(`Tech stack: ${research.techStack.slice(0, 5).join(', ')}`)
-  }
-  if (research?.teamSize) {
-    keyIntelBullets.push(`Team: ${research.teamSize}`)
-  }
-  if (research?.uniqueAspects?.length > 0) {
-    keyIntelBullets.push(research.uniqueAspects[0])
-  }
-  if (research?.culture) {
-    keyIntelBullets.push(research.culture.length > 120 ? research.culture.substring(0, 120) + '...' : research.culture)
-  }
-
-  // Resume CTA state
-  let resumeLabel = null
-  if (lastSession) {
-    const modeLabel = lastSession.mode === 'voice' ? 'Voice'
-      : lastSession.mode === 'flashcards' ? 'Flashcards'
-      : lastSession.mode === 'focus' ? 'Coach'
-      : 'Quiz'
-    const attempted = lastSession.questions_attempted || 0
-    resumeLabel = `Resume ${modeLabel}${attempted > 0 ? ` \u2014 ${attempted} done` : ''}`
-  }
+  // Company info for About card
+  const companyInfo = result.companyInfo || {}
+  const companyWebsite = companyInfo.website || companyInfo.url || result.url || null
 
   return (
     <div className="job-brief">
       {/* Back */}
       <button className="jb-nav-back" onClick={() => navigate('/dashboard')}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M19 12H5M12 19l-7-7 7-7"/>
         </svg>
-        Back to Dashboard
+        Dashboard
       </button>
 
-      {/* Header with progress ring */}
+      {/* Header */}
       <div className="jb-header">
         <div className="jb-header-left">
           <div className="jb-logo">
             {domain ? (
-              <LogoWithFallbacks domain={domain} name={displayCompany} logoUrl={result.companyInfo?.logoUrl} />
+              <LogoWithFallbacks domain={domain} name={displayCompany} logoUrl={companyInfo.logoUrl} />
             ) : (
               <div className="logo-placeholder">{displayCompany.charAt(0).toUpperCase()}</div>
             )}
           </div>
           <div className="jb-header-info">
-            <h1 className="jb-company-name">{displayCompany}</h1>
+            <h1 className="jb-company-name">
+              <a
+                href={`/company/${encodeURIComponent(displayCompany)}`}
+                onClick={(e) => { e.preventDefault(); navigate(`/company/${encodeURIComponent(displayCompany)}`) }}
+                className="jb-company-link"
+              >
+                {displayCompany}
+              </a>
+            </h1>
             <p className="jb-role-title">{roleTitle}</p>
           </div>
         </div>
         <div className="jb-progress-ring-wrapper">
-          <svg className="jb-progress-ring" width="64" height="64" viewBox="0 0 64 64">
-            <circle cx="32" cy="32" r="28" fill="none" stroke="#2a2a2a" strokeWidth="4" />
+          <svg className="jb-progress-ring" width="48" height="48" viewBox="0 0 48 48">
+            <circle cx="24" cy="24" r="20" fill="none" stroke="#e6e3de" strokeWidth="3" />
             <circle
-              cx="32" cy="32" r="28"
-              fill="none" stroke="#f59e0b" strokeWidth="4"
-              strokeDasharray={`${2 * Math.PI * 28}`}
-              strokeDashoffset={`${2 * Math.PI * 28 * (1 - progressPercent / 100)}`}
+              cx="24" cy="24" r="20"
+              fill="none" stroke="#f59e0b" strokeWidth="3"
+              strokeDasharray={`${2 * Math.PI * 20}`}
+              strokeDashoffset={`${2 * Math.PI * 20 * (1 - progressPercent / 100)}`}
               strokeLinecap="round"
-              transform="rotate(-90 32 32)"
+              transform="rotate(-90 24 24)"
               style={{ transition: 'stroke-dashoffset 0.5s ease' }}
             />
           </svg>
@@ -166,138 +155,270 @@ function JobAnalysisPage({ result, companyName, progress, user }) {
         </div>
       </div>
 
-      {/* Key Intel */}
-      <section className="jb-section">
-        <h2 className="jb-section-title">Key Intel</h2>
-        {researchLoading && keyIntelBullets.length === 0 ? (
-          <p className="jb-loading-text">Loading company research...</p>
-        ) : keyIntelBullets.length > 0 ? (
-          <>
-            <ul className="jb-intel-list">
-              {keyIntelBullets.slice(0, 4).map((bullet, i) => (
-                <li key={i} className="jb-intel-item">{bullet}</li>
-              ))}
-            </ul>
-            <button
-              className="jb-expand-btn"
-              onClick={() => setShowFullResearch(!showFullResearch)}
-            >
-              {showFullResearch ? 'Hide full research' : 'See full research \u2192'}
-            </button>
-          </>
-        ) : (
-          <p className="jb-empty-text">No company research available yet.</p>
-        )}
+      {/* Tabs */}
+      <div className="jb-tabs">
+        <button
+          className={`jb-tab ${activeTab === 'company' ? 'active' : ''}`}
+          onClick={() => setActiveTab('company')}
+        >
+          Company Intel
+        </button>
+        <button
+          className={`jb-tab ${activeTab === 'prepare' ? 'active' : ''}`}
+          onClick={() => setActiveTab('prepare')}
+        >
+          Prepare
+        </button>
+      </div>
 
-        {/* Full research expandable */}
-        {showFullResearch && research && (
-          <div className="jb-full-research">
-            {research.recentNews?.length > 0 && (
-              <div className="jb-research-block">
-                <h4>Recent News</h4>
-                <ul>{research.recentNews.map((n, i) => <li key={i}>{n}</li>)}</ul>
-              </div>
-            )}
-            {research.culture && (
-              <div className="jb-research-block">
-                <h4>Company Culture</h4>
-                <p>{research.culture}</p>
-              </div>
-            )}
-            {research.techStack?.length > 0 && (
-              <div className="jb-research-block">
-                <h4>Tech Stack</h4>
-                <div className="jb-tech-tags">
-                  {research.techStack.map((t, i) => <span key={i} className="jb-tech-tag">{t}</span>)}
-                </div>
-              </div>
-            )}
-            {research.values?.length > 0 && (
-              <div className="jb-research-block">
-                <h4>Company Values</h4>
-                <div className="jb-tech-tags">
-                  {research.values.map((v, i) => <span key={i} className="jb-value-tag">{v}</span>)}
-                </div>
-              </div>
-            )}
-            {research.interviewTips?.length > 0 && (
-              <div className="jb-research-block">
-                <h4>Interview Tips</h4>
-                <ul>{research.interviewTips.map((t, i) => <li key={i}>{t}</li>)}</ul>
-              </div>
-            )}
-            {research.uniqueAspects?.length > 0 && (
-              <div className="jb-research-block">
-                <h4>What Makes Them Unique</h4>
-                <ul>{research.uniqueAspects.map((a, i) => <li key={i}>{a}</li>)}</ul>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* Study Plan as compact checklist */}
-      {topics.length > 0 && (
-        <section className="jb-section">
-          <h2 className="jb-section-title">Your Study Plan</h2>
-          {studyPlanData?.summary && (
-            <p className="jb-summary">{studyPlanData.summary}</p>
-          )}
-          <div className="jb-topic-list">
-            {topics.map((topic, idx) => {
-              const topicName = topic.topic || topic.name || topic
-              const isStudied = topicsStudied.has(topicName)
-              const isExpanded = expandedTopic === idx
-
-              return (
-                <div key={idx} className={`jb-topic-item ${isStudied ? 'studied' : ''}`}>
-                  <div
-                    className="jb-topic-row"
-                    onClick={() => setExpandedTopic(isExpanded ? null : idx)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => e.key === 'Enter' && setExpandedTopic(isExpanded ? null : idx)}
-                  >
-                    <span className={`jb-topic-check ${isStudied ? 'checked' : ''}`}>
-                      {isStudied ? (
-                        <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
-                          <path d="M6 10l3 3 5-6" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      ) : (
-                        <span className="jb-topic-bullet" />
-                      )}
+      {/* Company Intel Tab */}
+      {activeTab === 'company' && (
+        <div className="jb-tab-content">
+          {researchLoading && !research ? (
+            <p className="jb-loading-text">Loading company research...</p>
+          ) : (
+            <div className="jb-intel-grid">
+              {/* About Card - full width */}
+              <div className="jb-card jb-card-full">
+                <h3 className="jb-card-title">About</h3>
+                {companyInfo.description && (
+                  <p className="jb-card-text">{companyInfo.description}</p>
+                )}
+                {research?.culture && !companyInfo.description && (
+                  <p className="jb-card-text">{research.culture}</p>
+                )}
+                <div className="jb-about-meta">
+                  {companyInfo.founded && (
+                    <span className="jb-meta-item">
+                      <span className="jb-meta-label">Founded</span>
+                      <span className="jb-meta-value">{companyInfo.founded}</span>
                     </span>
-                    <span className="jb-topic-name">{topicName}</span>
-                    <span className="jb-topic-expand">{isExpanded ? '\u25BC' : '\u25B6'}</span>
+                  )}
+                  {research?.teamSize && (
+                    <span className="jb-meta-item">
+                      <span className="jb-meta-label">Team</span>
+                      <span className="jb-meta-value">{research.teamSize}</span>
+                    </span>
+                  )}
+                  {companyWebsite && (
+                    <a
+                      href={companyWebsite}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="jb-website-link"
+                    >
+                      Visit website
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* Founders Card */}
+              {companyInfo.founders?.length > 0 && (
+                <div className="jb-card">
+                  <h3 className="jb-card-title">Founders</h3>
+                  <div className="jb-founders-list">
+                    {companyInfo.founders.map((founder, i) => (
+                      <div key={i} className="jb-founder-row">
+                        <div className="jb-founder-info">
+                          <span className="jb-founder-name">{founder.name}</span>
+                          {founder.background && (
+                            <span className="jb-founder-bg">{founder.background}</span>
+                          )}
+                        </div>
+                        {founder.linkedin && (
+                          <a
+                            href={founder.linkedin}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="jb-linkedin-link"
+                          >
+                            LinkedIn
+                          </a>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  {isExpanded && topic.keyPoints && (
-                    <div className="jb-topic-detail">
-                      <ul className="jb-topic-points">
-                        {(topic.keyPoints || []).slice(0, 3).map((pt, pi) => (
-                          <li key={pi}>{pt}</li>
-                        ))}
-                      </ul>
-                      {topic.description && (
-                        <p className="jb-topic-desc">{topic.description}</p>
-                      )}
+                </div>
+              )}
+
+              {/* Funding Rounds Card - full width */}
+              {companyInfo.fundingRounds?.length > 0 && (
+                <div className="jb-card jb-card-full">
+                  <h3 className="jb-card-title">Funding</h3>
+                  <div className="jb-funding-timeline">
+                    {companyInfo.fundingRounds.map((round, i) => (
+                      <div key={i} className="jb-funding-item">
+                        <div className="jb-funding-dot" />
+                        {i < companyInfo.fundingRounds.length - 1 && (
+                          <div className="jb-funding-line" />
+                        )}
+                        <div className="jb-funding-content">
+                          <div className="jb-funding-header">
+                            <span className="jb-funding-type">{round.type || round.round || 'Round'}</span>
+                            {round.year && <span className="jb-funding-year">{round.year}</span>}
+                          </div>
+                          {round.amount && (
+                            <span className="jb-funding-amount">{round.amount}</span>
+                          )}
+                          {round.leadInvestors && (
+                            <span className="jb-funding-investors">
+                              {Array.isArray(round.leadInvestors)
+                                ? round.leadInvestors.join(', ')
+                                : round.leadInvestors}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Culture & Values Card */}
+              {(research?.culture || research?.values?.length > 0) && (
+                <div className="jb-card">
+                  <h3 className="jb-card-title">Culture & Values</h3>
+                  {research.culture && companyInfo.description && (
+                    <p className="jb-card-text">{research.culture}</p>
+                  )}
+                  {research.values?.length > 0 && (
+                    <div className="jb-pills">
+                      {research.values.map((v, i) => (
+                        <span key={i} className="jb-pill jb-pill-green">{v}</span>
+                      ))}
                     </div>
                   )}
                 </div>
-              )
-            })}
-          </div>
-        </section>
+              )}
+
+              {/* Tech Stack Card */}
+              {research?.techStack?.length > 0 && (
+                <div className="jb-card">
+                  <h3 className="jb-card-title">Tech Stack</h3>
+                  <div className="jb-pills">
+                    {research.techStack.map((t, i) => (
+                      <span key={i} className="jb-pill jb-pill-blue">{t}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Interview Tips Card */}
+              {research?.interviewTips?.length > 0 && (
+                <div className="jb-card">
+                  <h3 className="jb-card-title">Interview Tips</h3>
+                  <ul className="jb-card-list">
+                    {research.interviewTips.map((tip, i) => (
+                      <li key={i}>{tip}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Recent News Card */}
+              {research?.recentNews?.length > 0 && (
+                <div className="jb-card">
+                  <h3 className="jb-card-title">Recent News</h3>
+                  <ul className="jb-card-list">
+                    {research.recentNews.map((item, i) => (
+                      <li key={i}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Unique Aspects Card */}
+              {research?.uniqueAspects?.length > 0 && (
+                <div className="jb-card">
+                  <h3 className="jb-card-title">What Makes Them Unique</h3>
+                  <ul className="jb-card-list">
+                    {research.uniqueAspects.map((a, i) => (
+                      <li key={i}>{a}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Empty state */}
+              {!research && !researchLoading && (
+                <div className="jb-card jb-card-full">
+                  <p className="jb-empty-text">No company research available yet.</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Start Training CTA */}
-      <div className="jb-cta-section">
-        <button
-          className="jb-cta-primary"
-          onClick={() => navigate(`/job/${jobId}/train`)}
-        >
-          {resumeLabel || 'Start Training \u2192'}
-        </button>
-      </div>
+      {/* Prepare Tab */}
+      {activeTab === 'prepare' && (
+        <div className="jb-tab-content">
+          {studyPlanData?.summary && (
+            <p className="jb-prepare-summary">{studyPlanData.summary}</p>
+          )}
+
+          {topics.length > 0 ? (
+            <div className="jb-topic-grid">
+              {topics.map((topic, idx) => {
+                const topicName = topic.topic || topic.name || topic
+                const isStudied = topicsStudied.has(topicName)
+
+                return (
+                  <div key={idx} className={`jb-topic-card ${isStudied ? 'studied' : ''}`}>
+                    <div className="jb-topic-card-header">
+                      <span className={`jb-topic-status ${isStudied ? 'done' : ''}`}>
+                        {isStudied ? (
+                          <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                            <path d="M6 10l3 3 5-6" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        ) : (
+                          <span className="jb-status-dot" />
+                        )}
+                      </span>
+                      <span className="jb-topic-card-name">{topicName}</span>
+                    </div>
+                    {topic.description && (
+                      <p className="jb-topic-card-desc">{topic.description}</p>
+                    )}
+                    {topic.keyPoints?.length > 0 && (
+                      <ul className="jb-topic-card-points">
+                        {topic.keyPoints.slice(0, 3).map((pt, pi) => (
+                          <li key={pi}>{pt}</li>
+                        ))}
+                      </ul>
+                    )}
+                    <button
+                      className="jb-topic-practice-btn"
+                      onClick={() => navigate(`/focus-chat?skill=${encodeURIComponent(topicName)}`)}
+                    >
+                      Practice
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="jb-empty-text">No study plan available yet.</p>
+          )}
+
+          {/* CTA Buttons */}
+          <div className="jb-cta-section">
+            <button
+              className="jb-cta-primary"
+              onClick={() => navigate('/study/drills')}
+            >
+              Practice Drills
+            </button>
+            <button
+              className="jb-cta-secondary"
+              onClick={() => navigate(`/focus-chat?skill=${encodeURIComponent(`${roleTitle || 'Role'} at ${displayCompany}`)}`)}
+            >
+              Study with Chat
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

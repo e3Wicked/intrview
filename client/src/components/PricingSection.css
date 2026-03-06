@@ -11,18 +11,18 @@
 }
 
 .pricing-header h2 {
-  color: #fff;
+  color: var(--color-text-primary, #1a1a1a);
   font-size: 32px;
   font-weight: 600;
   margin: 0 0 12px 0;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .pricing-header p {
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
   font-size: 16px;
   margin: 0;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .pricing-cards {
@@ -33,23 +33,24 @@
 }
 
 .pricing-card {
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 12px;
   padding: 32px;
   position: relative;
   transition: transform 0.2s, border-color 0.2s;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
 }
 
 .pricing-card:hover {
   transform: translateY(-4px);
-  border-color: #3a3a3a;
+  border-color: #d0cdc7;
 }
 
 .pricing-card.popular {
-  border-color: #f59e0b;
-  background: linear-gradient(135deg, #1a1a1a 0%, #1a1a2a 100%);
+  border-color: var(--color-accent, #2563eb);
+  background: var(--color-bg-card, #ffffff);
 }
 
 .pricing-badge {
@@ -57,8 +58,8 @@
   top: -12px;
   left: 50%;
   transform: translateX(-50%);
-  background: #f59e0b;
-  color: #0a0a0a;
+  background: var(--color-accent, #2563eb);
+  color: #ffffff;
   padding: 6px 16px;
   border-radius: 20px;
   font-size: 12px;
@@ -70,7 +71,7 @@
 }
 
 .pricing-card-header h3 {
-  color: #fff;
+  color: var(--color-text-primary, #1a1a1a);
   font-size: 24px;
   font-weight: 600;
   margin: 0 0 16px 0;
@@ -83,25 +84,25 @@
 }
 
 .pricing-amount {
-  color: #fff;
+  color: var(--color-text-primary, #1a1a1a);
   font-size: 36px;
   font-weight: 600;
 }
 
 .pricing-period {
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
   font-size: 16px;
 }
 
 .pricing-details {
   margin-bottom: 24px;
   padding-bottom: 24px;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--color-border, #e6e3de);
 }
 
 .pricing-credits,
 .pricing-analyses {
-  color: #b0b0b0;
+  color: var(--color-text-secondary, #6b6b6b);
   font-size: 14px;
   margin-bottom: 12px;
   display: flex;
@@ -111,14 +112,14 @@
 
 .pricing-credits strong,
 .pricing-analyses strong {
-  color: #fff;
+  color: var(--color-text-primary, #1a1a1a);
   font-size: 18px;
   margin-right: 4px;
 }
 
 .pricing-tooltip {
   cursor: help;
-  color: #666;
+  color: #999;
   font-size: 12px;
   margin-left: 4px;
 }
@@ -130,7 +131,7 @@
 }
 
 .pricing-features li {
-  color: #b0b0b0;
+  color: var(--color-text-secondary, #6b6b6b);
   font-size: 14px;
   margin-bottom: 12px;
   display: flex;
@@ -139,15 +140,15 @@
 }
 
 .feature-check {
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
   font-weight: 600;
   flex-shrink: 0;
 }
 
 .pricing-badge-small {
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
-  color: #888;
+  background: var(--color-bg-secondary, #f4f2ee);
+  border: 1px solid var(--color-border, #e6e3de);
+  color: var(--color-text-secondary, #6b6b6b);
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 12px;
@@ -157,12 +158,12 @@
 
 .pricing-cta {
   width: 100%;
-  background: #fff;
-  color: #0a0a0a;
+  background: var(--color-text-primary, #1a1a1a);
+  color: #ffffff;
   border: none;
   border-radius: 6px;
   padding: 14px 24px;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -174,25 +175,24 @@
 }
 
 .pricing-card.popular .pricing-cta {
-  background: #f59e0b;
-  color: #0a0a0a;
+  background: var(--color-accent, #2563eb);
+  color: #ffffff;
 }
 
 .pricing-footer {
   text-align: center;
-  color: #666;
+  color: #999;
   font-size: 14px;
   line-height: 1.6;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 @media (max-width: 768px) {
   .pricing-cards {
     grid-template-columns: 1fr;
   }
-  
+
   .pricing-section {
     padding: 0 16px;
   }
 }
-

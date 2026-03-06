@@ -1,7 +1,7 @@
 .dashboard-tabs {
   display: flex;
   gap: 8px;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--color-border, #e6e3de);
   margin-bottom: 24px;
   padding-bottom: 0;
 }
@@ -11,21 +11,19 @@
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
   cursor: pointer;
   transition: all 0.2s;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 14px;
   font-weight: 500;
 }
 
 .dashboard-tab:hover {
-  color: #fff;
+  color: var(--color-text-primary, #1a1a1a);
 }
 
 .dashboard-tab.active {
-  color: #f59e0b;
-  border-bottom-color: #f59e0b;
+  color: var(--color-accent, #2563eb);
+  border-bottom-color: var(--color-accent, #2563eb);
 }
-
-

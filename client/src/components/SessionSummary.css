@@ -1,7 +1,7 @@
 .session-summary-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -10,19 +10,20 @@
 }
 
 .session-summary-modal {
-  background: #111;
-  border: 1px solid #222;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 16px;
   padding: 32px;
   max-width: 440px;
   width: 90%;
   text-align: center;
   animation: summarySlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.06);
 }
 
 .session-summary-title {
   font-size: 24px;
-  color: #fff;
+  color: var(--color-text-primary, #1a1a1a);
   margin-bottom: 24px;
 }
 
@@ -35,20 +36,20 @@
 
 .session-stat {
   padding: 12px;
-  background: #0a0a0a;
+  background: var(--color-bg-surface, #f8f7f5);
   border-radius: 10px;
-  border: 1px solid #1a1a1a;
+  border: 1px solid var(--color-border, #e6e3de);
 }
 
 .session-stat-value {
   font-size: 28px;
   font-weight: 700;
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
 }
 
 .session-stat-label {
   font-size: 11px;
-  color: #666;
+  color: var(--color-text-secondary, #6b6b6b);
   margin-top: 4px;
 }
 
@@ -71,8 +72,8 @@
 .session-xp-amount {
   font-size: 28px;
   font-weight: 700;
-  color: #f59e0b;
-  text-shadow: 0 0 12px rgba(245, 158, 11, 0.3);
+  color: var(--color-accent, #2563eb);
+  text-shadow: none;
 }
 
 .session-level-bar {
@@ -83,20 +84,20 @@
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
   margin-bottom: 4px;
 }
 
 .session-level-track {
   height: 6px;
-  background: #1a1a1a;
+  background: var(--color-bg-secondary, #f4f2ee);
   border-radius: 3px;
   overflow: hidden;
 }
 
 .session-level-fill {
   height: 100%;
-  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  background: linear-gradient(90deg, var(--color-accent, #2563eb), #3b82f6);
   border-radius: 3px;
   transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -108,7 +109,7 @@
 
 .session-achievements h3 {
   font-size: 14px;
-  color: #e5e5e5;
+  color: var(--color-text-primary, #1a1a1a);
   margin-bottom: 10px;
   text-align: center;
 }
@@ -118,8 +119,8 @@
   align-items: center;
   gap: 10px;
   padding: 10px;
-  background: #1a1510;
-  border: 1px solid #f59e0b22;
+  background: #eff6ff;
+  border: 1px solid rgba(37, 99, 235, 0.15);
   border-radius: 8px;
   margin-bottom: 6px;
 }
@@ -131,30 +132,30 @@
 .session-ach-name {
   font-size: 13px;
   font-weight: 600;
-  color: #e5e5e5;
+  color: var(--color-text-primary, #1a1a1a);
 }
 
 .session-ach-desc {
   font-size: 11px;
-  color: #666;
+  color: var(--color-text-secondary, #6b6b6b);
 }
 
 .session-ach-xp {
   font-size: 13px;
   font-weight: 600;
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
   margin-left: auto;
 }
 
 .session-streak {
   font-size: 16px;
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
   margin-bottom: 20px;
 }
 
 .session-streak-mult {
   font-size: 13px;
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
 }
 
 .session-summary-actions {
@@ -165,10 +166,10 @@
 .session-btn-continue {
   flex: 1;
   padding: 12px;
-  background: linear-gradient(135deg, #f59e0b, #d97706);
+  background: linear-gradient(135deg, var(--color-accent, #2563eb), #1d4ed8);
   border: none;
   border-radius: 8px;
-  color: #000;
+  color: #ffffff;
   font-weight: 700;
   font-size: 14px;
   cursor: pointer;
@@ -182,10 +183,10 @@
 .session-btn-end {
   flex: 1;
   padding: 12px;
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 8px;
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
@@ -193,8 +194,8 @@
 }
 
 .session-btn-end:hover {
-  background: #222;
-  color: #e5e5e5;
+  background: var(--color-bg-hover, #f0eeea);
+  color: var(--color-text-primary, #1a1a1a);
 }
 
 @keyframes summarySlideUp {

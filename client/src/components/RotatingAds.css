@@ -295,7 +295,7 @@
   border: none;
   color: #888;
   font-size: 12px;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
   cursor: pointer;
   text-decoration: underline;
   transition: color 0.2s;
@@ -415,7 +415,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     width: 100%;
-    font-family: 'Inconsolata', 'Courier New', monospace;
+    font-family: 'Inter', -apple-system, sans-serif;
     padding: 0 2px;
   }
 

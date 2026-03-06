@@ -1,15 +1,15 @@
 .company-research-container {
-  background: #111111;
+  background: var(--color-bg-surface, #f8f7f5);
   border-radius: 12px;
   padding: 32px;
-  border: 1px solid #1a1a1a;
+  border: 1px solid var(--color-border, #e6e3de);
   margin-bottom: 32px;
 }
 
 .company-research-container h2 {
   font-size: 24px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--color-text-primary, #1a1a1a);
   margin: 0 0 24px 0;
 }
 
@@ -17,18 +17,18 @@
 .research-error {
   text-align: center;
   padding: 24px;
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
   font-size: 14px;
 }
 
 .research-error {
-  color: #ff6b6b;
+  color: #dc2626;
 }
 
 .research-section {
   margin-bottom: 32px;
   padding-bottom: 24px;
-  border-bottom: 1px solid #1a1a1a;
+  border-bottom: 1px solid var(--color-border, #e6e3de);
 }
 
 .research-section:last-child {
@@ -40,12 +40,12 @@
 .research-section h3 {
   font-size: 16px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--color-text-primary, #1a1a1a);
   margin-bottom: 16px;
 }
 
 .research-text {
-  color: #b0b0b0;
+  color: var(--color-text-secondary, #6b6b6b);
   line-height: 1.7;
   font-size: 14px;
   margin: 0;
@@ -61,20 +61,20 @@
   padding: 8px 0;
   padding-left: 20px;
   position: relative;
-  color: #b0b0b0;
+  color: var(--color-text-secondary, #6b6b6b);
   line-height: 1.6;
   font-size: 14px;
 }
 
 .research-list li:before {
-  content: "•";
+  content: "\2022";
   position: absolute;
   left: 0;
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
 }
 
 .research-list.tips li:before {
-  content: "💡";
+  content: "\1F4A1";
 }
 
 .tech-tags,
@@ -87,21 +87,20 @@
 .tech-tag,
 .value-tag {
   padding: 6px 12px;
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 6px;
-  color: #b0b0b0;
+  color: var(--color-text-secondary, #6b6b6b);
   font-size: 12px;
   font-weight: 500;
 }
 
 .tech-tag {
-  color: #f59e0b;
-  border-color: #2a4a5a;
+  color: var(--color-accent, #2563eb);
+  border-color: #bfdbfe;
 }
 
 .value-tag {
-  color: #f59e0b;
-  border-color: #5a4a2a;
+  color: #b45309;
+  border-color: #fde68a;
 }
-

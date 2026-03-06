@@ -1,13 +1,14 @@
 /* Focus Chat Container */
 .focus-chat-container {
-  background: #111111;
+  background: var(--color-bg-card, #ffffff);
   border-radius: 12px;
-  border: 1px solid #1a1a1a;
+  border: 1px solid var(--color-border, #e6e3de);
   display: flex;
   flex-direction: column;
   height: calc(100vh - 120px);
   min-height: 500px;
   overflow: hidden;
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
 }
 
 /* Header */
@@ -16,7 +17,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 20px;
-  border-bottom: 1px solid #1a1a1a;
+  border-bottom: 1px solid var(--color-border, #e6e3de);
   flex-shrink: 0;
 }
 
@@ -30,9 +31,9 @@
   width: 32px;
   height: 32px;
   background: transparent;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 6px;
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -41,25 +42,25 @@
 }
 
 .focus-nav-back:hover {
-  color: #f59e0b;
-  border-color: #f59e0b;
+  color: var(--color-accent, #2563eb);
+  border-color: var(--color-accent, #2563eb);
 }
 
 .focus-skill-badge {
   padding: 4px 14px;
-  background: rgba(74, 222, 128, 0.1);
-  border: 1px solid rgba(74, 222, 128, 0.25);
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.2);
   border-radius: 14px;
-  color: #4ade80;
+  color: #16a34a;
   font-size: 13px;
   font-weight: 600;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .focus-exchange-count {
   font-size: 12px;
-  color: #555;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: #b0ada6;
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .focus-header-right {
@@ -69,27 +70,27 @@
 }
 
 .focus-xp-counter {
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
   font-size: 13px;
   font-weight: 600;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .focus-end-btn {
   padding: 6px 14px;
   background: transparent;
-  border: 1px solid #3a3a3a;
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 6px;
-  color: #888;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 12px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .focus-end-btn:hover {
-  border-color: #ef4444;
-  color: #ef4444;
+  border-color: #dc2626;
+  color: #dc2626;
 }
 
 /* Messages */
@@ -126,50 +127,50 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #1a1a1a;
+  background: var(--color-bg-surface, #f8f7f5);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: #666;
+  color: var(--color-text-secondary, #6b6b6b);
 }
 
 .focus-message.coach .focus-message-avatar {
-  color: #4ade80;
-  background: rgba(74, 222, 128, 0.1);
+  color: #16a34a;
+  background: rgba(34, 197, 94, 0.08);
 }
 
 .focus-message-content {
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 12px;
   padding: 12px 16px;
   min-width: 60px;
 }
 
 .focus-message.user .focus-message-content {
-  background: #1a2a1a;
-  border-color: #2a3a2a;
+  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.15);
 }
 
 .focus-message.system .focus-message-content {
-  background: #2a1a1a;
-  border-color: #3a2a2a;
+  background: #fef2f2;
+  border-color: rgba(220, 38, 38, 0.15);
   text-align: center;
 }
 
 .focus-message-role {
   font-size: 11px;
   font-weight: 600;
-  color: #555;
+  color: #b0ada6;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 4px;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .focus-message-text {
-  color: #e0e0e0;
+  color: var(--color-text-primary, #1a1a1a);
   font-size: 14px;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -177,7 +178,7 @@
 }
 
 .focus-message.system .focus-message-text {
-  color: #ff6b6b;
+  color: #dc2626;
   font-size: 13px;
 }
 
@@ -185,7 +186,7 @@
 .focus-message.coach.streaming .focus-message-text::after {
   content: '\2588';
   animation: focusBlink 0.7s step-end infinite;
-  color: #4ade80;
+  color: #16a34a;
   margin-left: 1px;
 }
 
@@ -197,7 +198,7 @@
 .focus-evaluation {
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid #2a2a2a;
+  border-top: 1px solid var(--color-border, #e6e3de);
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -206,28 +207,28 @@
 
 .focus-eval-score {
   font-size: 13px;
-  color: #f59e0b;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: var(--color-accent, #2563eb);
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .focus-eval-score strong {
-  color: #ffffff;
+  color: var(--color-text-primary, #1a1a1a);
 }
 
 .focus-eval-feedback {
   font-size: 13px;
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
   line-height: 1.5;
 }
 
 /* Error banner */
 .focus-error-banner {
   padding: 10px 20px;
-  background: rgba(239, 68, 68, 0.1);
-  border-top: 1px solid rgba(239, 68, 68, 0.2);
-  color: #ef4444;
+  background: #fef2f2;
+  border-top: 1px solid rgba(220, 38, 38, 0.15);
+  color: #dc2626;
   font-size: 13px;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
   text-align: center;
   flex-shrink: 0;
 }
@@ -237,7 +238,7 @@
   display: flex;
   gap: 8px;
   padding: 16px 20px;
-  border-top: 1px solid #1a1a1a;
+  border-top: 1px solid var(--color-border, #e6e3de);
   align-items: flex-end;
   flex-shrink: 0;
 }
@@ -245,11 +246,11 @@
 .focus-input {
   flex: 1;
   padding: 12px 16px;
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 8px;
-  color: #ffffff;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 14px;
   line-height: 1.4;
   resize: none;
@@ -259,11 +260,11 @@
 }
 
 .focus-input:focus {
-  border-color: #4ade80;
+  border-color: #16a34a;
 }
 
 .focus-input::placeholder {
-  color: #555;
+  color: #b0ada6;
 }
 
 .focus-input:disabled {
@@ -273,10 +274,10 @@
 .focus-send-btn {
   width: 44px;
   height: 44px;
-  background: #4ade80;
+  background: #22c55e;
   border: none;
   border-radius: 8px;
-  color: #0a0a0a;
+  color: #ffffff;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -286,7 +287,7 @@
 }
 
 .focus-send-btn:hover:not(:disabled) {
-  background: #22c55e;
+  background: #16a34a;
 }
 
 .focus-send-btn:disabled {
@@ -296,25 +297,26 @@
 
 /* End Summary */
 .focus-chat-summary {
-  background: #111111;
+  background: var(--color-bg-card, #ffffff);
   border-radius: 12px;
   padding: 48px 32px;
-  border: 1px solid #1a1a1a;
+  border: 1px solid var(--color-border, #e6e3de);
   text-align: center;
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
 }
 
 .focus-summary-header h3 {
   font-size: 22px;
   font-weight: 600;
-  color: #4ade80;
+  color: #16a34a;
   margin: 0 0 8px 0;
 }
 
 .focus-summary-header p {
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
   font-size: 14px;
   margin: 0 0 32px 0;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .focus-summary-stats {
@@ -334,18 +336,18 @@
 .focus-stat-value {
   font-size: 32px;
   font-weight: 700;
-  color: #ffffff;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .focus-stat-value.xp-value {
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
 }
 
 .focus-stat-label {
   font-size: 13px;
-  color: #888;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .focus-summary-actions {
@@ -357,10 +359,10 @@
 .focus-back-btn {
   padding: 12px 32px;
   background: transparent;
-  border: 1px solid #3a3a3a;
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 8px;
-  color: #888;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -368,17 +370,17 @@
 }
 
 .focus-back-btn:hover {
-  border-color: #888;
-  color: #fff;
+  border-color: #d0cdc7;
+  color: var(--color-text-primary, #1a1a1a);
 }
 
 .focus-restart-btn {
   padding: 12px 32px;
-  background: #4ade80;
+  background: #22c55e;
   border: none;
   border-radius: 8px;
-  color: #0a0a0a;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  color: #ffffff;
+  font-family: 'Inter', -apple-system, sans-serif;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -386,7 +388,7 @@
 }
 
 .focus-restart-btn:hover {
-  background: #22c55e;
+  background: #16a34a;
 }
 
 /* Scrollbar */
@@ -399,12 +401,12 @@
 }
 
 .focus-messages::-webkit-scrollbar-thumb {
-  background: #2a2a2a;
+  background: #d8d5ce;
   border-radius: 3px;
 }
 
 .focus-messages::-webkit-scrollbar-thumb:hover {
-  background: #3a3a3a;
+  background: #c0bdb6;
 }
 
 /* Responsive */

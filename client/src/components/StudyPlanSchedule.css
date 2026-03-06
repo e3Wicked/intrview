@@ -5,7 +5,7 @@
 .study-plan-empty {
   text-align: center;
   padding: 48px;
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
 }
 
 .schedule-header {
@@ -15,13 +15,13 @@
 .schedule-header h3 {
   font-size: 20px;
   font-weight: 600;
-  color: #fff;
+  color: var(--color-text-primary, #1a1a1a);
   margin: 0 0 8px 0;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .schedule-subtitle {
-  color: #888;
+  color: var(--color-text-secondary, #6b6b6b);
   font-size: 14px;
   margin: 0;
 }
@@ -33,24 +33,25 @@
 }
 
 .week-card {
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 12px;
   padding: 24px;
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
 }
 
 .week-header {
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--color-border, #e6e3de);
 }
 
 .week-title {
   font-size: 18px;
   font-weight: 600;
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
   margin: 0;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .week-topics {
@@ -64,27 +65,27 @@
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: #0a0a0a;
-  border: 1px solid #2a2a2a;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 6px;
   transition: all 0.2s;
 }
 
 .topic-item:hover {
-  border-color: #3a3a3a;
+  border-color: #d0cdc7;
 }
 
 .topic-item.completed {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 146, 60, 0.1) 100%);
-  border-color: #f59e0b;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.06) 0%, rgba(59, 130, 246, 0.06) 100%);
+  border-color: var(--color-accent, #2563eb);
 }
 
 .topic-check {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #f59e0b;
-  color: #0a0a0a;
+  background: var(--color-accent, #2563eb);
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -94,12 +95,10 @@
 }
 
 .topic-name {
-  color: #fff;
+  color: var(--color-text-primary, #1a1a1a);
   font-size: 14px;
 }
 
 .topic-item.completed .topic-name {
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
 }
-
-

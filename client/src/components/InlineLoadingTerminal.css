@@ -1,10 +1,11 @@
 .inline-loading-terminal {
   margin-top: 20px;
-  background: #0a0a0a;
-  border: 1px solid #1a1a1a;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
   border-radius: 10px;
   padding: 20px 24px 16px;
   animation: iltFadeIn 0.3s ease;
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
 }
 
 @keyframes iltFadeIn {
@@ -12,14 +13,14 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Header ── */
+/* -- Header -- */
 .ilt-header {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #1a1a1a;
+  border-bottom: 1px solid var(--color-border, #e6e3de);
 }
 
 .ilt-indicator {
@@ -31,7 +32,7 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #2a2a2a;
+  background: #d8d5ce;
 }
 
 .ilt-dot:nth-child(1) { background: #ff5f57; }
@@ -41,11 +42,11 @@
 .ilt-label {
   font-family: 'Inconsolata', 'Courier New', monospace;
   font-size: 12px;
-  color: #555;
+  color: #b0ada6;
   letter-spacing: 0.05em;
 }
 
-/* ── Steps ── */
+/* -- Steps -- */
 .ilt-steps {
   display: flex;
   flex-direction: column;
@@ -73,12 +74,12 @@
 }
 
 .ilt-check {
-  color: #4ade80;
+  color: #16a34a;
   font-size: 13px;
 }
 
 .ilt-spinner {
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
   font-size: 16px;
   font-weight: bold;
   animation: iltBlink 0.8s ease-in-out infinite;
@@ -89,20 +90,20 @@
   50%      { opacity: 0.2; }
 }
 
-.ilt-pending { color: #333; }
+.ilt-pending { color: #d8d5ce; }
 
-.ilt-text { color: #e5e5e5; }
-.ilt-line.done .ilt-text   { color: #555; }
-.ilt-line.active .ilt-text { color: #f59e0b; }
+.ilt-text { color: var(--color-text-primary, #1a1a1a); }
+.ilt-line.done .ilt-text   { color: #b0ada6; }
+.ilt-line.active .ilt-text { color: var(--color-accent, #2563eb); }
 
 .ilt-dots {
-  color: #f59e0b;
+  color: var(--color-accent, #2563eb);
   letter-spacing: 1px;
   display: inline-block;
   width: 20px;
 }
 
-/* ── Progress bar ── */
+/* -- Progress bar -- */
 .ilt-footer {
   display: flex;
   align-items: center;
@@ -113,14 +114,14 @@
 .ilt-bar-container {
   flex: 1;
   height: 3px;
-  background: #1a1a1a;
+  background: var(--color-bg-secondary, #f4f2ee);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .ilt-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #f59e0b, #fb923c);
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
   border-radius: 2px;
   transition: width 0.6s ease;
 }
@@ -128,16 +129,16 @@
 .ilt-pct {
   font-family: 'Inconsolata', 'Courier New', monospace;
   font-size: 12px;
-  color: #555;
+  color: #b0ada6;
   width: 32px;
   text-align: right;
   flex-shrink: 0;
 }
 
-/* ── Footer note ── */
+/* -- Footer note -- */
 .ilt-note {
   font-size: 12px;
-  color: #333;
+  color: #c0bdb6;
   margin: 0;
   text-align: center;
   font-family: 'Inconsolata', 'Courier New', monospace;

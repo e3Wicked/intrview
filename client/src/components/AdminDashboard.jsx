@@ -194,7 +194,7 @@ function UserDashboard({ onSelectAnalysis, onClose, showAnalyzeButton = true }) 
             <button 
               className="admin-refresh-btn" 
               onClick={onClose}
-              style={{ background: '#2a2a2a' }}
+              style={{ background: '#f0eeea' }}
             >
               Back to Home
             </button>
