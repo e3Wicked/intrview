@@ -163,6 +163,15 @@ function MissionDashboard({ user, onAnalyzeClick }) {
       .slice(0, 5)
   }, [topicScores])
 
+  // Topic progress pills: top 4 most-practiced topics with scores
+  const topicPills = useMemo(() => {
+    const practiced = topicScores.filter(t => t.attempts > 0)
+    if (practiced.length === 0) return []
+    return [...practiced]
+      .sort((a, b) => b.attempts - a.attempts)
+      .slice(0, 4)
+  }, [topicScores])
+
   const formatDate = (dateStr) => {
     if (!dateStr) return ''
     const d = new Date(dateStr)
@@ -216,6 +225,30 @@ function MissionDashboard({ user, onAnalyzeClick }) {
           <span className="dash-stat-label">Jobs Tracked</span>
         </div>
       </div>
+
+      {/* Topic Progress Pills */}
+      {topicPills.length > 0 && (
+        <div className="dash-topic-pills">
+          {topicPills.map((topic) => {
+            const score = topic.score || 0
+            const colorClass = score >= 80 ? 'pill-mastered' : score >= 50 ? 'pill-progress' : 'pill-weak'
+            return (
+              <button
+                key={topic.id}
+                className={`dash-topic-pill ${colorClass}`}
+                onClick={() => navigate(`/focus-chat?skill=${encodeURIComponent(topic.topic_name)}&from=/dashboard`)}
+                title={`${topic.topic_name} — ${score}% mastery, ${topic.attempts} drills`}
+              >
+                <span className="pill-name">{topic.topic_name}</span>
+                <span className="pill-score">{score}%</span>
+                <div className="pill-bar">
+                  <div className="pill-bar-fill" style={{ width: `${Math.min(score, 100)}%` }} />
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Main two-column layout */}
       <div className="dash-columns">

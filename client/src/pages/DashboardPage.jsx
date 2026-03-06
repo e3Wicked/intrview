@@ -22,30 +22,20 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
       }))
     }
 
-    // Save to JD history
-    const savedHistory = localStorage.getItem('jd_history')
-    const existingHistory = savedHistory ? JSON.parse(savedHistory) : []
-
     if (analysisResult && analysisResult.companyInfo) {
       const jdEntry = {
         id: Date.now().toString(),
         url: localUrl,
         companyName: analysisResult.companyInfo?.name || 'Unknown Company',
         roleTitle: analysisResult.companyInfo?.roleTitle || analysisResult.roleTitle || 'Unknown Role',
-        result: analysisResult,
         timestamp: new Date().toISOString()
       }
 
-      const currentHistory = existingHistory || []
-      const updatedHistory = [jdEntry, ...currentHistory.filter(jd => jd.url !== localUrl)].slice(0, 10)
-      localStorage.setItem('jd_history', JSON.stringify(updatedHistory))
-      localStorage.setItem('selected_jd_id', jdEntry.id)
-
+      // Cache in sessionStorage for immediate navigation
       sessionStorage.setItem(`job_analysis_${jdEntry.id}`, JSON.stringify(analysisResult))
 
       if (setResult) setResult(analysisResult)
       if (setSelectedJdId) setSelectedJdId(jdEntry.id)
-      if (setJdHistory) setJdHistory(updatedHistory)
 
       navigate(`/job/${jdEntry.id}`)
     } else {

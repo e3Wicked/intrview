@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;500;600;700&display=swap');
-
 /* Design system tokens - Light warm theme */
 :root {
   /* Backgrounds */
@@ -495,16 +493,16 @@
 /* Main Content */
 .main-content {
   flex: 1;
-  padding: 20px 24px;
+  padding: 16px 20px;
   min-width: 0;
   position: relative;
   width: 100%;
   max-width: none;
   background: var(--color-bg-primary);
-  border-radius: 20px;
-  margin: 12px 12px 12px 0;
+  border-radius: 16px;
+  margin: 10px 10px 10px 0;
   overflow-y: auto;
-  height: calc(100vh - 24px);
+  height: calc(100vh - 20px);
 }
 
 /* Full-width content (homepage, no sidebar) */

@@ -1,27 +1,27 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom'
 import axios from 'axios'
 import './App.css'
 import HomePage from './pages/HomePage'
-import DashboardPage from './pages/DashboardPage'
-import JobAnalysisPage from './pages/JobAnalysisPage'
-import CompanyPage from './pages/CompanyPage'
-
-import LoadingOverlay from './components/LoadingOverlay'
-import LoginModal from './components/LoginModal'
-import UpgradeModal from './components/UpgradeModal'
 import SignInPrompt from './components/SignInPrompt'
-import AdminPage from './pages/AdminPage'
-import TrainingPage from './pages/TrainingPage'
-import ProgressPage from './pages/ProgressPage'
-import FocusChatPage from './pages/FocusChatPage'
-import MockInterviewPage from './pages/MockInterviewPage'
-import DrillsPage from './pages/DrillsPage'
 import Sidebar from './components/Sidebar'
-import { preloadedExamples } from './data/preloadedExamples'
 import { GamificationProvider } from './contexts/GamificationContext'
-import AchievementToast from './components/AchievementToast'
 import { api } from './utils/api'
+
+// Lazy-loaded pages (not needed on initial homepage load)
+const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+const JobAnalysisPage = lazy(() => import('./pages/JobAnalysisPage'))
+const CompanyPage = lazy(() => import('./pages/CompanyPage'))
+const AdminPage = lazy(() => import('./pages/AdminPage'))
+const TrainingPage = lazy(() => import('./pages/TrainingPage'))
+const ProgressPage = lazy(() => import('./pages/ProgressPage'))
+const FocusChatPage = lazy(() => import('./pages/FocusChatPage'))
+const MockInterviewPage = lazy(() => import('./pages/MockInterviewPage'))
+const DrillsPage = lazy(() => import('./pages/DrillsPage'))
+const LoadingOverlay = lazy(() => import('./components/LoadingOverlay'))
+const LoginModal = lazy(() => import('./components/LoginModal'))
+const UpgradeModal = lazy(() => import('./components/UpgradeModal'))
+const AchievementToast = lazy(() => import('./components/AchievementToast'))
 
 // Layout component with header and sidebars
 function Layout({ children, user, setUser, showLoginModal, setShowLoginModal, loginModalMode, setLoginModalMode, showUpgradeModal, setShowUpgradeModal, handleSelectPlan, handleLoginSuccess, handleLogout }) {
@@ -50,20 +50,22 @@ function Layout({ children, user, setUser, showLoginModal, setShowLoginModal, lo
         </div>
       )}
 
-      <LoginModal
-        isOpen={showLoginModal}
-        mode={loginModalMode}
-        onClose={() => setShowLoginModal(false)}
-        onSuccess={handleLoginSuccess}
-      />
+      <Suspense fallback={null}>
+        <LoginModal
+          isOpen={showLoginModal}
+          mode={loginModalMode}
+          onClose={() => setShowLoginModal(false)}
+          onSuccess={handleLoginSuccess}
+        />
 
-      <UpgradeModal
-        isOpen={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        user={user}
-        onSelectPlan={handleSelectPlan}
-        onLoginRequired={() => setShowLoginModal(true)}
-      />
+        <UpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          user={user}
+          onSelectPlan={handleSelectPlan}
+          onLoginRequired={() => setShowLoginModal(true)}
+        />
+      </Suspense>
     </div>
   )
 }
@@ -119,17 +121,7 @@ function App() {
 
 
   useEffect(() => {
-    if (user) {
-      const savedHistory = localStorage.getItem('jd_history')
-      if (savedHistory) {
-        try {
-          const history = JSON.parse(savedHistory)
-          setJdHistory(history)
-        } catch (e) {
-          console.error('Error loading JD history:', e)
-        }
-      }
-    } else {
+    if (!user) {
       setJdHistory([])
       setSelectedJdId(null)
       setResult(null)
@@ -171,8 +163,6 @@ function App() {
       setJdHistory([])
       setSelectedJdId(null)
       localStorage.removeItem('session_token')
-      localStorage.removeItem('jd_history')
-      localStorage.removeItem('selected_jd_id')
       delete axios.defaults.headers.common['Authorization']
       await axios.post('/api/auth/logout').catch(err => {
         console.error('Logout API error (non-critical):', err)
@@ -220,17 +210,14 @@ function App() {
           url: url,
           companyName: analysisResult.companyInfo?.name || 'Unknown Company',
           roleTitle: analysisResult.companyInfo?.roleTitle || analysisResult.roleTitle || 'Unknown Role',
-          result: analysisResult,
           timestamp: new Date().toISOString()
         }
-        
+
         const updatedHistory = [jdEntry, ...jdHistory.filter(jd => jd.url !== url)].slice(0, 10)
         setJdHistory(updatedHistory)
         setSelectedJdId(jdEntry.id)
-        localStorage.setItem('jd_history', JSON.stringify(updatedHistory))
-        localStorage.setItem('selected_jd_id', jdEntry.id)
 
-        // Store result in sessionStorage as backup for page reloads
+        // Store result in sessionStorage (temporary, for immediate navigation)
         sessionStorage.setItem(`job_analysis_${jdEntry.id}`, JSON.stringify(analysisResult))
 
         // Navigate to job analysis page
@@ -253,7 +240,6 @@ function App() {
     if (exampleData && exampleData.result) {
       setResult(exampleData.result)
       setUrl(exampleData.url)
-      // Save to sessionStorage so the job page can load it even without auth
       sessionStorage.setItem(`job_analysis_${exampleData.id}`, JSON.stringify(exampleData.result))
       if (user && exampleData.result.companyInfo) {
         const jdEntry = {
@@ -261,14 +247,11 @@ function App() {
           url: exampleData.url,
           companyName: exampleData.companyName,
           roleTitle: exampleData.roleTitle,
-          result: exampleData.result,
           timestamp: exampleData.timestamp
         }
         const updatedHistory = [jdEntry, ...jdHistory.filter(jd => jd.id !== exampleData.id)].slice(0, 10)
         setJdHistory(updatedHistory)
         setSelectedJdId(jdEntry.id)
-        localStorage.setItem('jd_history', JSON.stringify(updatedHistory))
-        localStorage.setItem('selected_jd_id', jdEntry.id)
       }
       navigate(`/job/${exampleData.id}`)
     }
@@ -281,27 +264,9 @@ function App() {
   }
 
   const calculateProgress = () => {
-    if (!result?.studyPlan?.studyPlan?.topics) return null
-    
-    const saved = localStorage.getItem('interviewPrepperProgress')
-    if (!saved) return 0
-    
-    try {
-      const progress = JSON.parse(saved)
-      const topicsStudied = new Set(progress.topicsStudied || [])
-      const totalTopics = result.studyPlan.studyPlan.topics.length
-      
-      if (totalTopics === 0) return 0
-      
-      const currentTopicNames = new Set(result.studyPlan.studyPlan.topics.map(t => t.topic))
-      const validStudied = Array.from(topicsStudied).filter(topic => currentTopicNames.has(topic))
-      
-      const progressPercent = (validStudied.length / totalTopics) * 100
-      return Math.min(100, Math.round(progressPercent))
-    } catch (error) {
-      console.error('Error calculating progress:', error)
-      return 0
-    }
+    // Progress is now tracked server-side per job via /api/progress/:hash
+    // This is a fallback for the UI prop — actual progress shown in MissionDashboard
+    return 0
   }
 
   const companyName = result?.companyInfo?.name || result?.company?.name
@@ -312,7 +277,7 @@ function App() {
     if (location.pathname.startsWith('/job/')) {
       const jobId = location.pathname.split('/job/')[1]
       if (jobId) {
-        // First try to get from sessionStorage (most recent)
+        // Try sessionStorage first (temporary cache from recent navigation)
         const sessionData = sessionStorage.getItem(`job_analysis_${jobId}`)
         if (sessionData) {
           try {
@@ -326,36 +291,7 @@ function App() {
           }
         }
 
-        // Fallback to jdHistory
-        if (jdHistory.length > 0) {
-          const job = jdHistory.find(jd => jd.id === jobId)
-          if (job && job.result) {
-            setResult(job.result)
-            setUrl(job.url)
-            setSelectedJdId(job.id)
-            return
-          }
-        }
-
-        // If not found, try loading from localStorage
-        const savedHistory = localStorage.getItem('jd_history')
-        if (savedHistory) {
-          try {
-            const history = JSON.parse(savedHistory)
-            const job = history.find(jd => jd.id === jobId)
-            if (job && job.result) {
-              setResult(job.result)
-              setUrl(job.url)
-              setSelectedJdId(job.id)
-              setJdHistory(history)
-              return
-            }
-          } catch (e) {
-            console.error('Error loading from localStorage:', e)
-          }
-        }
-
-        // Server fallback: fetch by database ID (for MissionDashboard navigation + page refreshes)
+        // Fetch from server (primary source of truth)
         const token = localStorage.getItem('session_token')
         if (token && /^\d+$/.test(jobId)) {
           axios.get(`/api/user/analysis/${jobId}`)
@@ -372,37 +308,16 @@ function App() {
         }
       }
     }
-  }, [location.pathname, jdHistory])
+  }, [location.pathname])
 
-  // Migrate localStorage progress to server on first login
+  // Clean up legacy localStorage keys from previous versions
   useEffect(() => {
     if (!user) return
-    const hasMigrated = localStorage.getItem('progressMigrated')
-    const hasOldProgress = localStorage.getItem('interviewPrepperProgress')
-    const hasOldConfidence = localStorage.getItem('interviewPrepperConfidence')
-    if (hasMigrated || (!hasOldProgress && !hasOldConfidence)) return
-
-    const migrate = async () => {
-      try {
-        const savedHistory = localStorage.getItem('jd_history')
-        const history = savedHistory ? JSON.parse(savedHistory) : []
-        const recentJob = history[0]
-        const hash = recentJob?.result?.jobDescriptionHash
-        if (hash) {
-          await api.progress.migrate({
-            localStorage: {
-              interviewPrepperProgress: hasOldProgress || '{}',
-              interviewPrepperConfidence: hasOldConfidence || '{}',
-            },
-            jobDescriptionHash: hash,
-          })
-        }
-        localStorage.setItem('progressMigrated', 'true')
-      } catch (err) {
-        console.error('Progress migration error (non-critical):', err)
-      }
-    }
-    migrate()
+    localStorage.removeItem('jd_history')
+    localStorage.removeItem('selected_jd_id')
+    localStorage.removeItem('interviewPrepperProgress')
+    localStorage.removeItem('interviewPrepperConfidence')
+    localStorage.removeItem('progressMigrated')
   }, [user])
 
   return (
@@ -420,12 +335,15 @@ function App() {
       handleLoginSuccess={handleLoginSuccess}
       handleLogout={handleLogout}
     >
-      <AchievementToast />
-      <LoadingOverlay loading={loading} />
+      <Suspense fallback={null}>
+        <AchievementToast />
+        <LoadingOverlay loading={loading} />
+      </Suspense>
 
+      <Suspense fallback={<div style={{ padding: '64px', textAlign: 'center', color: '#6b6b6b' }}>Loading...</div>}>
       <Routes>
-        <Route 
-          path="/" 
+        <Route
+          path="/"
           element={
             <HomePage
               user={user}
@@ -573,6 +491,7 @@ function App() {
           }
         />
       </Routes>
+      </Suspense>
     </Layout>
     </GamificationProvider>
   )
