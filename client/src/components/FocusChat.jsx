@@ -24,6 +24,23 @@ function clearChatSession(skill) {
   try { sessionStorage.removeItem(STORAGE_KEY(skill)) } catch {}
 }
 
+const LAST_SESSION_KEY = (skill) => `drill_completed_${skill}`
+
+function saveCompletedSession(skill, { exchangeCount, scores, sessionXp }) {
+  try {
+    const avgScore = scores.length > 0
+      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+      : null
+    localStorage.setItem(LAST_SESSION_KEY(skill), JSON.stringify({
+      answers: exchangeCount,
+      avgScore,
+      scores,
+      xp: sessionXp,
+      completedAt: new Date().toISOString(),
+    }))
+  } catch { /* non-critical */ }
+}
+
 function FocusChat({ skill, user }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -248,6 +265,7 @@ function FocusChat({ skill, user }) {
     if (sessionIdRef.current) {
       api.practice.endSession({ sessionId: sessionIdRef.current }).catch(() => {})
     }
+    saveCompletedSession(skill, { exchangeCount, scores, sessionXp })
     clearChatSession(skill)
     setShowEndSummary(true)
   }

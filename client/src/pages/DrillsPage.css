@@ -348,6 +348,29 @@
   color: var(--color-text-secondary, #6b6b6b);
 }
 
+.drills-last-session {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.drills-last-session-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.drills-last-session-stats {
+  font-size: 11px;
+  color: var(--color-text-tertiary, #999);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.drills-last-session-stats .score-good { color: #22c55e; }
+.drills-last-session-stats .score-mid { color: #f59e0b; }
+.drills-last-session-stats .score-low { color: #ef4444; }
+
 .drills-col-action {
   display: flex;
   justify-content: flex-end;

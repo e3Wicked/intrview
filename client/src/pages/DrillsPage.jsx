@@ -26,6 +26,14 @@ function getSavedSession(topicName) {
   } catch { return null }
 }
 
+function getLastCompleted(topicName) {
+  try {
+    const raw = localStorage.getItem(`drill_completed_${topicName}`)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch { return null }
+}
+
 function DrillsPage({ user }) {
   const navigate = useNavigate()
   const [topics, setTopics] = useState([])
@@ -220,6 +228,7 @@ function DrillsPage({ user }) {
               const isMastered = score >= 80
               const lastPracticed = timeAgo(topic.last_practiced_at)
               const session = getSavedSession(topic.topic_name)
+              const lastCompleted = !session ? getLastCompleted(topic.topic_name) : null
               const sessionAvg = session?.scores?.length > 0
                 ? Math.round(session.scores.reduce((a, b) => a + b, 0) / session.scores.length)
                 : null
@@ -265,6 +274,16 @@ function DrillsPage({ user }) {
                   <div className="drills-col-last">
                     {session ? (
                       <span className="drills-row-active-tag">In progress</span>
+                    ) : lastCompleted ? (
+                      <div className="drills-last-session">
+                        <span className="drills-last-session-label">Last session</span>
+                        <span className="drills-last-session-stats">
+                          {lastCompleted.answers} {lastCompleted.answers === 1 ? 'answer' : 'answers'}
+                          {lastCompleted.avgScore !== null && (
+                            <> &middot; <strong className={lastCompleted.avgScore >= 70 ? 'score-good' : lastCompleted.avgScore >= 40 ? 'score-mid' : 'score-low'}>{lastCompleted.avgScore}%</strong></>
+                          )}
+                        </span>
+                      </div>
                     ) : (
                       <span className={`drills-row-last ${lastPracticed ? 'has-date' : ''}`}>
                         {lastPracticed || 'Not started'}
