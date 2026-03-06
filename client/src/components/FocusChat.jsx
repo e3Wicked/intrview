@@ -24,7 +24,7 @@ function clearChatSession(skill) {
   try { sessionStorage.removeItem(STORAGE_KEY(skill)) } catch {}
 }
 
-const LAST_SESSION_KEY = (skill) => `drill_completed_${skill}`
+const LAST_SESSION_KEY = (skill) => `drill_completed_${skill.toLowerCase().trim()}`
 
 function saveCompletedSession(skill, { exchangeCount, scores, sessionXp }) {
   try {
@@ -65,6 +65,9 @@ function FocusChat({ skill, user }) {
   const startedRef = useRef(!!saved.current)
   const sessionIdRef = useRef(saved.current?.sessionId || null)
   const messagesRef = useRef(saved.current?.messages || [])
+  const scoresRef = useRef(saved.current?.scores || [])
+  const exchangeCountRef = useRef(saved.current?.exchangeCount || 0)
+  const sessionXpRef = useRef(saved.current?.sessionXp || 0)
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -80,10 +83,11 @@ function FocusChat({ skill, user }) {
     }
   }, [streaming])
 
-  // Keep ref in sync with state
-  useEffect(() => {
-    messagesRef.current = messages
-  }, [messages])
+  // Keep refs in sync with state
+  useEffect(() => { messagesRef.current = messages }, [messages])
+  useEffect(() => { scoresRef.current = scores }, [scores])
+  useEffect(() => { exchangeCountRef.current = exchangeCount }, [exchangeCount])
+  useEffect(() => { sessionXpRef.current = sessionXp }, [sessionXp])
 
   // Save chat state to sessionStorage whenever it changes
   useEffect(() => {
@@ -265,7 +269,12 @@ function FocusChat({ skill, user }) {
     if (sessionIdRef.current) {
       api.practice.endSession({ sessionId: sessionIdRef.current }).catch(() => {})
     }
-    saveCompletedSession(skill, { exchangeCount, scores, sessionXp })
+    // Use refs to ensure we get the latest values (not stale closure)
+    saveCompletedSession(skill, {
+      exchangeCount: exchangeCountRef.current,
+      scores: scoresRef.current,
+      sessionXp: sessionXpRef.current,
+    })
     clearChatSession(skill)
     setShowEndSummary(true)
   }

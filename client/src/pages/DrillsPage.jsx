@@ -28,7 +28,7 @@ function getSavedSession(topicName) {
 
 function getLastCompleted(topicName) {
   try {
-    const raw = localStorage.getItem(`drill_completed_${topicName}`)
+    const raw = localStorage.getItem(`drill_completed_${topicName.toLowerCase().trim()}`)
     if (!raw) return null
     return JSON.parse(raw)
   } catch { return null }
