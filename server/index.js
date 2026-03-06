@@ -34,7 +34,10 @@ import {
   updateUserTopicScore,
   getTopicsForJob,
   getSharedTopicsAcrossJobs,
-  getAllUserTopics
+  getAllUserTopics,
+  saveDrillSession,
+  getDrillSessions,
+  getAllDrillSessions
 } from './db.js';
 import { 
   createUser,
@@ -3519,6 +3522,48 @@ app.get('/api/topics/job/:hash', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Error getting topics for job:', error);
     res.status(500).json({ error: 'Failed to get topics for job' });
+  }
+});
+
+// Drill sessions API
+app.post('/api/drills/sessions', requireAuth, async (req, res) => {
+  try {
+    const { skill, answers, avgScore, scores, xpEarned } = req.body;
+    if (!skill) return res.status(400).json({ error: 'skill is required' });
+
+    const topic = await getOrCreateTopic(skill);
+    if (!topic) return res.status(404).json({ error: 'Topic not found' });
+
+    const session = await saveDrillSession(req.user.id, topic.id, {
+      answers: answers || 0,
+      avgScore: avgScore || null,
+      scores: scores || [],
+      xpEarned: xpEarned || 0,
+    });
+    res.json(session);
+  } catch (error) {
+    console.error('Error saving drill session:', error);
+    res.status(500).json({ error: 'Failed to save drill session' });
+  }
+});
+
+app.get('/api/drills/sessions', requireAuth, async (req, res) => {
+  try {
+    const sessions = await getAllDrillSessions(req.user.id);
+    res.json(sessions);
+  } catch (error) {
+    console.error('Error getting drill sessions:', error);
+    res.status(500).json({ error: 'Failed to get drill sessions' });
+  }
+});
+
+app.get('/api/drills/sessions/:topicId', requireAuth, async (req, res) => {
+  try {
+    const sessions = await getDrillSessions(req.user.id, parseInt(req.params.topicId));
+    res.json(sessions);
+  } catch (error) {
+    console.error('Error getting drill sessions:', error);
+    res.status(500).json({ error: 'Failed to get drill sessions' });
   }
 });
 

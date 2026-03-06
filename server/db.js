@@ -928,6 +928,57 @@ async function getSharedTopicsAcrossJobs(userId) {
   }
 }
 
+// Save a completed drill session
+async function saveDrillSession(userId, topicId, { answers, avgScore, scores, xpEarned }) {
+  try {
+    const result = await pool.query(
+      `INSERT INTO drill_sessions (user_id, topic_id, answers, avg_score, scores, xp_earned)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [userId, topicId, answers, avgScore, JSON.stringify(scores || []), xpEarned || 0]
+    )
+    return result.rows[0]
+  } catch (error) {
+    console.error('Error in saveDrillSession:', error.message)
+    throw error
+  }
+}
+
+// Get drill session history for a user's topic
+async function getDrillSessions(userId, topicId) {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM drill_sessions
+       WHERE user_id = $1 AND topic_id = $2
+       ORDER BY completed_at DESC
+       LIMIT 20`,
+      [userId, topicId]
+    )
+    return result.rows
+  } catch (error) {
+    console.error('Error in getDrillSessions:', error.message)
+    return []
+  }
+}
+
+// Get all drill sessions for a user (for the drills page overview)
+async function getAllDrillSessions(userId) {
+  try {
+    const result = await pool.query(
+      `SELECT ds.*, t.name as topic_name, t.normalized_name
+       FROM drill_sessions ds
+       JOIN topics t ON t.id = ds.topic_id
+       WHERE ds.user_id = $1
+       ORDER BY ds.completed_at DESC`,
+      [userId]
+    )
+    return result.rows
+  } catch (error) {
+    console.error('Error in getAllDrillSessions:', error.message)
+    return []
+  }
+}
+
 export {
   pool,
   getOrCreateCompany,
@@ -959,6 +1010,9 @@ export {
   getTopicsForJob,
   getSharedTopicsAcrossJobs,
   normalizeTopicName,
-  getAllUserTopics
+  getAllUserTopics,
+  saveDrillSession,
+  getDrillSessions,
+  getAllDrillSessions
 };
 

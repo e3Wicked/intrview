@@ -24,21 +24,18 @@ function clearChatSession(skill) {
   try { sessionStorage.removeItem(STORAGE_KEY(skill)) } catch {}
 }
 
-const LAST_SESSION_KEY = (skill) => `drill_completed_${skill.toLowerCase().trim()}`
-
 function saveCompletedSession(skill, { exchangeCount, scores, sessionXp }) {
-  try {
-    const avgScore = scores.length > 0
-      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-      : null
-    localStorage.setItem(LAST_SESSION_KEY(skill), JSON.stringify({
-      answers: exchangeCount,
-      avgScore,
-      scores,
-      xp: sessionXp,
-      completedAt: new Date().toISOString(),
-    }))
-  } catch { /* non-critical */ }
+  const avgScore = scores.length > 0
+    ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+    : null
+  // Save to DB (primary)
+  api.drills.saveDrillSession({
+    skill,
+    answers: exchangeCount,
+    avgScore,
+    scores,
+    xpEarned: sessionXp,
+  }).catch(err => console.error('[Drill] Failed to save session to DB:', err))
 }
 
 function FocusChat({ skill, user }) {

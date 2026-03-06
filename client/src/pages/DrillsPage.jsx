@@ -26,33 +26,30 @@ function getSavedSession(topicName) {
   } catch { return null }
 }
 
-function getLastCompleted(topicName) {
-  try {
-    const raw = localStorage.getItem(`drill_completed_${topicName.toLowerCase().trim()}`)
-    if (!raw) return null
-    return JSON.parse(raw)
-  } catch { return null }
-}
-
 function DrillsPage({ user }) {
   const navigate = useNavigate()
   const [topics, setTopics] = useState([])
+  const [drillSessions, setDrillSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [backfilling, setBackfilling] = useState(false)
   const [filter, setFilter] = useState('all')
+  const [expandedTopic, setExpandedTopic] = useState(null)
 
-  const fetchTopics = async () => {
+  const fetchData = async () => {
     try {
-      let res = await api.topics.getAllTopics()
-      let data = res.data || []
+      let [topicsRes, sessionsRes] = await Promise.all([
+        api.topics.getAllTopics(),
+        api.drills.getAllSessions().catch(() => ({ data: [] })),
+      ])
+      let data = topicsRes.data || []
 
       if (data.length === 0) {
         setBackfilling(true)
         try {
           const backfillRes = await api.topics.backfill()
           if (backfillRes.data?.totalTopics > 0) {
-            res = await api.topics.getAllTopics()
-            data = res.data || []
+            topicsRes = await api.topics.getAllTopics()
+            data = topicsRes.data || []
           }
         } catch (backfillErr) {
           console.error('Backfill failed:', backfillErr)
@@ -61,17 +58,33 @@ function DrillsPage({ user }) {
       }
 
       setTopics(data)
+      setDrillSessions(sessionsRes.data || [])
     } catch (err) {
-      console.error('Error fetching topics:', err)
+      console.error('Error fetching data:', err)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    if (user) fetchTopics()
+    if (user) fetchData()
     else setLoading(false)
   }, [user])
+
+  // Group drill sessions by topic name (normalized)
+  const sessionsByTopic = useMemo(() => {
+    const map = {}
+    for (const s of drillSessions) {
+      const key = (s.topic_name || '').toLowerCase().trim()
+      if (!map[key]) map[key] = []
+      map[key].push(s)
+    }
+    return map
+  }, [drillSessions])
+
+  const getTopicSessions = (topicName) => {
+    return sessionsByTopic[(topicName || '').toLowerCase().trim()] || []
+  }
 
   const summary = useMemo(() => {
     const total = topics.length
@@ -103,7 +116,6 @@ function DrillsPage({ user }) {
     else if (filter === 'mastered') filtered = topics.filter(t => Number(t.score) >= 80)
     else filtered = topics.filter(t => t.category === filter)
 
-    // Sort: active sessions first, then recently practiced, then by name
     return [...filtered].sort((a, b) => {
       const aActive = getSavedSession(a.topic_name) ? 1 : 0
       const bActive = getSavedSession(b.topic_name) ? 1 : 0
@@ -117,6 +129,11 @@ function DrillsPage({ user }) {
 
   const handlePractice = (topicName) => {
     navigate(`/focus-chat?skill=${encodeURIComponent(topicName)}&from=/study/drills`)
+  }
+
+  const toggleExpand = (topicId, e) => {
+    e.stopPropagation()
+    setExpandedTopic(prev => prev === topicId ? null : topicId)
   }
 
   if (loading) {
@@ -228,76 +245,165 @@ function DrillsPage({ user }) {
               const isMastered = score >= 80
               const lastPracticed = timeAgo(topic.last_practiced_at)
               const session = getSavedSession(topic.topic_name)
-              const lastCompleted = !session ? getLastCompleted(topic.topic_name) : null
+              const history = getTopicSessions(topic.topic_name)
+              const lastSession = history.length > 0 ? history[0] : null // already sorted DESC
+              const isExpanded = expandedTopic === topic.id
               const sessionAvg = session?.scores?.length > 0
                 ? Math.round(session.scores.reduce((a, b) => a + b, 0) / session.scores.length)
                 : null
 
               return (
-                <div
-                  key={topic.id}
-                  className={`drills-list-row ${isMastered ? 'mastered' : ''} ${session ? 'has-session' : ''}`}
-                  onClick={() => handlePractice(topic.topic_name)}
-                >
-                  <div className="drills-col-name">
-                    <div className="drills-row-name-line">
-                      {session && <span className="drills-active-dot" title="Active session" />}
-                      <span className="drills-row-name">{topic.topic_name}</span>
-                    </div>
-                    {topic.category && (
-                      <span className="drills-row-category">{topic.category.replace('_', ' ')}</span>
-                    )}
-                    {session && (
-                      <span className="drills-session-info">
-                        {session.exchangeCount} {session.exchangeCount === 1 ? 'answer' : 'answers'}
-                        {sessionAvg !== null && (
-                          <> &middot; avg <strong className={sessionAvg >= 70 ? 'score-good' : sessionAvg >= 40 ? 'score-mid' : 'score-low'}>{sessionAvg}%</strong></>
-                        )}
-                        {session.sessionXp > 0 && (
-                          <> &middot; +{session.sessionXp} XP</>
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  <div className="drills-col-stat">
-                    <div className="drills-row-bar">
-                      <div
-                        className={`drills-row-bar-fill ${score >= 80 ? 'high' : score >= 40 ? 'mid' : 'low'}`}
-                        style={{ width: `${Math.min(100, Math.max(attempts > 0 ? 3 : 0, score))}%` }}
-                      />
-                    </div>
-                    <span className="drills-row-score">{attempts > 0 ? `${score}%` : '--'}</span>
-                  </div>
-                  <div className="drills-col-drills">
-                    <span className="drills-row-value">{attempts > 0 ? attempts : '--'}</span>
-                  </div>
-                  <div className="drills-col-last">
-                    {session ? (
-                      <span className="drills-row-active-tag">In progress</span>
-                    ) : lastCompleted ? (
-                      <div className="drills-last-session">
-                        <span className="drills-last-session-label">Last session</span>
-                        <span className="drills-last-session-stats">
-                          {lastCompleted.answers} {lastCompleted.answers === 1 ? 'answer' : 'answers'}
-                          {lastCompleted.avgScore !== null && (
-                            <> &middot; <strong className={lastCompleted.avgScore >= 70 ? 'score-good' : lastCompleted.avgScore >= 40 ? 'score-mid' : 'score-low'}>{lastCompleted.avgScore}%</strong></>
+                <div key={topic.id} className={`drills-topic-group ${isExpanded ? 'expanded' : ''}`}>
+                  <div
+                    className={`drills-list-row ${isMastered ? 'mastered' : ''} ${session ? 'has-session' : ''}`}
+                    onClick={() => handlePractice(topic.topic_name)}
+                  >
+                    <div className="drills-col-name">
+                      <div className="drills-row-name-line">
+                        {session && <span className="drills-active-dot" title="Active session" />}
+                        <span className="drills-row-name">{topic.topic_name}</span>
+                      </div>
+                      {topic.category && (
+                        <span className="drills-row-category">{topic.category.replace('_', ' ')}</span>
+                      )}
+                      {session && (
+                        <span className="drills-session-info">
+                          {session.exchangeCount} {session.exchangeCount === 1 ? 'answer' : 'answers'}
+                          {sessionAvg !== null && (
+                            <> &middot; avg <strong className={sessionAvg >= 70 ? 'score-good' : sessionAvg >= 40 ? 'score-mid' : 'score-low'}>{sessionAvg}%</strong></>
+                          )}
+                          {session.sessionXp > 0 && (
+                            <> &middot; +{session.sessionXp} XP</>
                           )}
                         </span>
+                      )}
+                    </div>
+                    <div className="drills-col-stat">
+                      <div className="drills-row-bar">
+                        <div
+                          className={`drills-row-bar-fill ${score >= 80 ? 'high' : score >= 40 ? 'mid' : 'low'}`}
+                          style={{ width: `${Math.min(100, Math.max(attempts > 0 ? 3 : 0, score))}%` }}
+                        />
                       </div>
-                    ) : (
-                      <span className={`drills-row-last ${lastPracticed ? 'has-date' : ''}`}>
-                        {lastPracticed || 'Not started'}
-                      </span>
-                    )}
+                      <span className="drills-row-score">{attempts > 0 ? `${score}%` : '--'}</span>
+                    </div>
+                    <div className="drills-col-drills">
+                      <span className="drills-row-value">{attempts > 0 ? attempts : '--'}</span>
+                    </div>
+                    <div className="drills-col-last">
+                      {session ? (
+                        <span className="drills-row-active-tag">In progress</span>
+                      ) : lastSession ? (
+                        <div className="drills-last-session">
+                          <span className="drills-last-session-label">
+                            {lastSession.avg_score !== null && (
+                              <strong className={lastSession.avg_score >= 70 ? 'score-good' : lastSession.avg_score >= 40 ? 'score-mid' : 'score-low'}>
+                                {Math.round(lastSession.avg_score)}%
+                              </strong>
+                            )}
+                            {' '}{timeAgo(lastSession.completed_at) || ''}
+                          </span>
+                          {history.length > 1 && (
+                            <span className="drills-history-count">{history.length} sessions</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className={`drills-row-last ${lastPracticed ? 'has-date' : ''}`}>
+                          {lastPracticed || 'Not started'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="drills-col-action">
+                      {(history.length > 0 || attempts > 0) && (
+                        <button
+                          className="drills-expand-btn"
+                          onClick={(e) => toggleExpand(topic.id, e)}
+                          title="View history"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                            style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                        </button>
+                      )}
+                      <button
+                        className={`drills-practice-btn ${session ? 'resume' : attempts > 0 ? 'continue' : ''}`}
+                        onClick={(e) => { e.stopPropagation(); handlePractice(topic.topic_name) }}
+                      >
+                        {session ? 'Resume' : attempts > 0 ? 'Continue' : 'Start'}
+                      </button>
+                    </div>
                   </div>
-                  <div className="drills-col-action">
-                    <button
-                      className={`drills-practice-btn ${session ? 'resume' : attempts > 0 ? 'continue' : ''}`}
-                      onClick={(e) => { e.stopPropagation(); handlePractice(topic.topic_name) }}
-                    >
-                      {session ? 'Resume' : attempts > 0 ? 'Continue' : 'Start'}
-                    </button>
-                  </div>
+
+                  {/* Expanded detail panel */}
+                  {isExpanded && (
+                    <div className="drills-detail-panel" onClick={(e) => e.stopPropagation()}>
+                      <div className="drills-detail-stats">
+                        <div className="drills-detail-stat">
+                          <span className="drills-detail-stat-value">{attempts}</span>
+                          <span className="drills-detail-stat-label">Total Drills</span>
+                        </div>
+                        <div className="drills-detail-stat">
+                          <span className={`drills-detail-stat-value ${score >= 80 ? 'high' : score >= 40 ? 'mid' : 'low'}`}>
+                            {attempts > 0 ? `${score}%` : '--'}
+                          </span>
+                          <span className="drills-detail-stat-label">Mastery</span>
+                        </div>
+                        <div className="drills-detail-stat">
+                          <span className="drills-detail-stat-value">{history.length}</span>
+                          <span className="drills-detail-stat-label">Sessions</span>
+                        </div>
+                        {lastPracticed && (
+                          <div className="drills-detail-stat">
+                            <span className="drills-detail-stat-value">{lastPracticed}</span>
+                            <span className="drills-detail-stat-label">Last Practiced</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {history.length > 0 && (
+                        <div className="drills-detail-history">
+                          <h4>Session History</h4>
+                          <div className="drills-history-list">
+                            {history.map((s, i) => {
+                              const sScores = Array.isArray(s.scores) ? s.scores : []
+                              const sAvg = s.avg_score !== null ? Math.round(s.avg_score) : null
+                              return (
+                                <div key={s.id || i} className="drills-history-row">
+                                  <span className="drills-history-date">{timeAgo(s.completed_at) || 'Unknown'}</span>
+                                  <span className="drills-history-answers">{s.answers} {s.answers === 1 ? 'answer' : 'answers'}</span>
+                                  {sAvg !== null && (
+                                    <span className={`drills-history-score ${sAvg >= 70 ? 'high' : sAvg >= 40 ? 'mid' : 'low'}`}>
+                                      {sAvg}%
+                                    </span>
+                                  )}
+                                  {s.xp_earned > 0 && <span className="drills-history-xp">+{s.xp_earned} XP</span>}
+                                  {sScores.length > 0 && (
+                                    <div className="drills-history-bars">
+                                      {sScores.map((sc, j) => (
+                                        <div
+                                          key={j}
+                                          className={`drills-history-bar ${sc >= 70 ? 'high' : sc >= 40 ? 'mid' : 'low'}`}
+                                          style={{ height: `${Math.max(4, sc * 0.2)}px` }}
+                                          title={`Q${j + 1}: ${sc}%`}
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {history.length === 0 && attempts > 0 && (
+                        <p className="drills-detail-note">
+                          Session history will appear here after your next completed drill.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })}

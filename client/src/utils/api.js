@@ -30,6 +30,11 @@ export const api = {
     getAllTopics: () => axios.get('/api/user/all-topics'),
     backfill: () => axios.post('/api/topics/backfill'),
   },
+  drills: {
+    saveDrillSession: (data) => axios.post('/api/drills/sessions', data),
+    getAllSessions: () => axios.get('/api/drills/sessions'),
+    getTopicSessions: (topicId) => axios.get(`/api/drills/sessions/${topicId}`),
+  },
   user: {
     getAnalyses: (limit = 50, offset = 0) => axios.get(`/api/user/analyses?limit=${limit}&offset=${offset}`),
     deleteAllAnalyses: () => axios.delete('/api/user/analyses'),
