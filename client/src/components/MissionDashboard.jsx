@@ -189,13 +189,23 @@ function MissionDashboard({ user, onAnalyzeClick }) {
   const levelInfo = gamStats ? getLevelForXp(gamStats.totalXp) : null
   const streak = gamStats?.streak || { current: 0, multiplier: 1.0 }
 
+  // All topics for full-width display (practiced first, then unpracticed)
+  const allTopicsSorted = useMemo(() => {
+    const practiced = topicScores.filter(t => t.attempts > 0)
+    const practicedIds = new Set(practiced.map(t => t.topic_id || t.id))
+    const unpracticed = allTopics
+      .filter(t => !practicedIds.has(t.id))
+      .map(t => ({ ...t, topic_name: t.topic_name || t.name, score: 0, attempts: 0 }))
+    return [...practiced, ...unpracticed]
+  }, [topicScores, allTopics])
+
   return (
     <div className="mission-dashboard">
       {/* Dashboard Header */}
       <div className="dash-header">
         <div className="dash-header-text">
           <h1 className="dash-title">Dashboard</h1>
-          <p className="dash-subtitle">Track your interview preparation progress</p>
+          <p className="dash-subtitle">Your interview prep at a glance</p>
         </div>
         <button className="analyze-cta-btn" onClick={onAnalyzeClick}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -209,160 +219,162 @@ function MissionDashboard({ user, onAnalyzeClick }) {
       {/* Stat Cards Row */}
       <div className="dash-stats-row">
         <div className="dash-stat-card">
-          <span className="dash-stat-value">{streak.current}</span>
-          <span className="dash-stat-label">Day Streak</span>
+          <span className="dash-stat-icon">🔥</span>
+          <div className="dash-stat-info">
+            <span className="dash-stat-value">{streak.current}</span>
+            <span className="dash-stat-label">Day Streak</span>
+          </div>
         </div>
         <div className="dash-stat-card">
-          <span className="dash-stat-value">{gamStats?.totalXp || 0}</span>
-          <span className="dash-stat-label">Total XP</span>
+          <span className="dash-stat-icon">⚡</span>
+          <div className="dash-stat-info">
+            <span className="dash-stat-value">{gamStats?.totalXp || 0}</span>
+            <span className="dash-stat-label">Total XP</span>
+          </div>
         </div>
         <div className="dash-stat-card">
-          <span className="dash-stat-value">{levelInfo?.title || 'Applicant'}</span>
-          <span className="dash-stat-label">Current Level</span>
+          <span className="dash-stat-icon">🎯</span>
+          <div className="dash-stat-info">
+            <span className="dash-stat-value">{studyOverview.totalDrills}</span>
+            <span className="dash-stat-label">Drills Done</span>
+          </div>
         </div>
         <div className="dash-stat-card">
-          <span className="dash-stat-value">{jobsWithProgress.length}</span>
-          <span className="dash-stat-label">Jobs Tracked</span>
+          <span className="dash-stat-icon">📊</span>
+          <div className="dash-stat-info">
+            <span className="dash-stat-value">{studyOverview.avgMastery}%</span>
+            <span className="dash-stat-label">Avg Mastery</span>
+          </div>
         </div>
       </div>
 
-      {/* Topic Progress Pills */}
-      {topicPills.length > 0 && (
-        <div className="dash-topic-pills">
-          {topicPills.map((topic) => {
-            const score = topic.score || 0
-            const colorClass = score >= 80 ? 'pill-mastered' : score >= 50 ? 'pill-progress' : 'pill-weak'
-            return (
-              <button
-                key={topic.id}
-                className={`dash-topic-pill ${colorClass}`}
-                onClick={() => navigate(`/focus-chat?skill=${encodeURIComponent(topic.topic_name)}&from=/dashboard`)}
-                title={`${topic.topic_name} — ${score}% mastery, ${topic.attempts} drills`}
-              >
-                <span className="pill-name">{topic.topic_name}</span>
-                <span className="pill-score">{score}%</span>
-                <div className="pill-bar">
-                  <div className="pill-bar-fill" style={{ width: `${Math.min(score, 100)}%` }} />
+      {/* Full-width Topics Section */}
+      {allTopicsSorted.length > 0 && (
+        <div className="dash-card dash-topics-card">
+          <div className="dash-card-header">
+            <h2 className="dash-card-title">Your Topics</h2>
+            <button className="dash-view-all" onClick={() => navigate('/study/drills')}>
+              All drills →
+            </button>
+          </div>
+          <div className="dash-topics-list">
+            {allTopicsSorted.map((topic) => {
+              const score = Math.round(Number(topic.score) || 0)
+              const attempts = Number(topic.attempts) || 0
+              const statusClass = attempts === 0 ? 'not-started' : score >= 80 ? 'mastered' : score >= 40 ? 'progress' : 'weak'
+              return (
+                <div
+                  key={topic.id || topic.topic_id}
+                  className={`dash-topic-row ${statusClass}`}
+                  onClick={() => navigate(`/focus-chat?skill=${encodeURIComponent(topic.topic_name)}&from=/dashboard`)}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="dash-topic-name">
+                    <span className="dash-topic-label">{topic.topic_name}</span>
+                    {topic.category && <span className="dash-topic-category">{topic.category.replace('_', ' ')}</span>}
+                  </div>
+                  <div className="dash-topic-bar-wrap">
+                    <div className="dash-topic-bar">
+                      <div className="dash-topic-bar-fill" style={{ width: `${Math.min(100, Math.max(attempts > 0 ? 3 : 0, score))}%` }} />
+                    </div>
+                  </div>
+                  <span className="dash-topic-score">{attempts > 0 ? `${score}%` : '—'}</span>
+                  <span className="dash-topic-drills">{attempts > 0 ? `${attempts} drill${attempts !== 1 ? 's' : ''}` : 'Not started'}</span>
+                  <button
+                    className={`dash-topic-action ${attempts > 0 ? 'continue' : ''}`}
+                    onClick={(e) => { e.stopPropagation(); navigate(`/focus-chat?skill=${encodeURIComponent(topic.topic_name)}&from=/dashboard`) }}
+                  >
+                    {attempts > 0 ? 'Continue' : 'Start'}
+                  </button>
                 </div>
-              </button>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       )}
 
-      {/* Main two-column layout */}
-      <div className="dash-columns">
-        {/* Left column: Jobs grouped by company */}
-        <div className="dash-col-left">
-          <div className="dash-card">
-            <div className="dash-card-header">
-              <h2 className="dash-card-title">Your Jobs</h2>
-              <span className="dash-card-count">{jobsWithProgress.length}</span>
-            </div>
-
-            {companiesWithJobs.length === 0 ? (
-              <div className="empty-state-inline">
-                <p>No jobs yet. Start by analyzing a job posting.</p>
-                <button className="empty-state-cta" onClick={onAnalyzeClick}>
-                  Analyze Your First Job
-                </button>
-              </div>
-            ) : (
-              <div className="jobs-list">
-                {companiesWithJobs.map((company) => (
-                  <div key={company.companyName} className="jobs-company-group">
-                    <div className="jobs-company-header">
-                      <div className="jobs-company-logo">
-                        <LogoWithFallbacks
-                          domain={company.domain}
-                          name={company.companyName}
-                          logoUrl={company.logoUrl}
-                        />
-                      </div>
-                      <span className="jobs-company-name">{company.companyName}</span>
-                      {company.jobs.length > 1 && (
-                        <span className="jobs-company-count">
-                          {company.jobs.length} roles
-                        </span>
-                      )}
-                    </div>
-
-                    {company.jobs.map((job) => (
-                      <div
-                        key={job.id}
-                        className="jobs-list-item"
-                        onClick={() => navigate(`/job/${job.id}`)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => e.key === 'Enter' && navigate(`/job/${job.id}`)}
-                      >
-                        <div className="jobs-list-item-info">
-                          <span className="jobs-list-item-role">{job.roleTitle}</span>
-                          {job.createdAt && (
-                            <span className="jobs-list-item-date">{formatDate(job.createdAt)}</span>
-                          )}
-                        </div>
-                        <div className="jobs-list-item-progress">
-                          <div className="jobs-list-progress-bar">
-                            <div
-                              className="jobs-list-progress-fill"
-                              style={{ width: `${job.progressPercent}%` }}
-                            />
-                          </div>
-                          <span className="jobs-list-progress-text">{job.progressPercent}%</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
+      {/* Bottom row: Jobs + Weakness nudge */}
+      <div className="dash-bottom-row">
+        {/* Jobs card */}
+        <div className="dash-card">
+          <div className="dash-card-header">
+            <h2 className="dash-card-title">Your Jobs</h2>
+            <span className="dash-card-count">{jobsWithProgress.length}</span>
           </div>
+
+          {companiesWithJobs.length === 0 ? (
+            <div className="empty-state-inline">
+              <p>No jobs yet. Analyze a job posting to get started.</p>
+              <button className="empty-state-cta" onClick={onAnalyzeClick}>
+                Analyze Your First Job
+              </button>
+            </div>
+          ) : (
+            <div className="jobs-list">
+              {companiesWithJobs.map((company) => (
+                <div key={company.companyName} className="jobs-company-group">
+                  <div className="jobs-company-header">
+                    <div className="jobs-company-logo">
+                      <LogoWithFallbacks
+                        domain={company.domain}
+                        name={company.companyName}
+                        logoUrl={company.logoUrl}
+                      />
+                    </div>
+                    <span className="jobs-company-name">{company.companyName}</span>
+                    {company.jobs.length > 1 && (
+                      <span className="jobs-company-count">{company.jobs.length} roles</span>
+                    )}
+                  </div>
+
+                  {company.jobs.map((job) => (
+                    <div
+                      key={job.id}
+                      className="jobs-list-item"
+                      onClick={() => navigate(`/job/${job.id}`)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && navigate(`/job/${job.id}`)}
+                    >
+                      <div className="jobs-list-item-info">
+                        <span className="jobs-list-item-role">{job.roleTitle}</span>
+                        {job.createdAt && (
+                          <span className="jobs-list-item-date">{formatDate(job.createdAt)}</span>
+                        )}
+                      </div>
+                      <div className="jobs-list-item-progress">
+                        <div className="jobs-list-progress-bar">
+                          <div className="jobs-list-progress-fill" style={{ width: `${job.progressPercent}%` }} />
+                        </div>
+                        <span className="jobs-list-progress-text">{job.progressPercent}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Right column: Study stats + weakness nudge + top skills */}
-        <div className="dash-col-right">
-          {/* Study Overview */}
-          <div className="dash-card">
-            <h2 className="dash-card-title">Study Overview</h2>
-            <div className="study-overview-grid">
-              <div className="study-overview-stat">
-                <span className="study-overview-value">{studyOverview.totalTopics}</span>
-                <span className="study-overview-label">Total Topics</span>
-              </div>
-              <div className="study-overview-stat">
-                <span className="study-overview-value">{studyOverview.avgMastery}%</span>
-                <span className="study-overview-label">Avg Mastery</span>
-              </div>
-              <div className="study-overview-stat">
-                <span className="study-overview-value">{studyOverview.totalDrills}</span>
-                <span className="study-overview-label">Drills Done</span>
-              </div>
-              <div className="study-overview-stat">
-                <span className="study-overview-value">{studyOverview.mastered}</span>
-                <span className="study-overview-label">Mastered</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Weakness Nudge */}
-          {weaknessNudge && (
-            <div className="dash-card dash-card-nudge">
-              <div className="nudge-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                  <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        {/* Weakness nudge */}
+        {weaknessNudge && (
+          <div className="dash-card dash-card-nudge">
+            <h2 className="dash-card-title">Focus Area</h2>
+            <div className="nudge-body">
+              <div className="nudge-topic-name">{weaknessNudge.category}</div>
+              <div className="nudge-score-ring">
+                <svg viewBox="0 0 36 36" className="nudge-ring-svg">
+                  <path className="nudge-ring-bg" d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path className="nudge-ring-fill" strokeDasharray={`${weaknessNudge.mastery}, 100`} d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831" />
                 </svg>
+                <span className="nudge-ring-value">
+                  {weaknessNudge.mastery > 0 ? `${Math.round(weaknessNudge.mastery)}%` : '0%'}
+                </span>
               </div>
-              <div className="nudge-content">
-                <p className="nudge-label">Weakest area</p>
-                <p className="nudge-topic">{weaknessNudge.category}</p>
-                <p className="nudge-score">
-                  {weaknessNudge.mastery > 0
-                    ? `Current score: ${Math.round(weaknessNudge.mastery)}%`
-                    : 'Not yet practiced'}
-                </p>
-              </div>
+              <p className="nudge-hint">
+                {weaknessNudge.mastery > 0 ? 'Keep practicing to improve' : 'Start practicing this topic'}
+              </p>
               <button
                 className="nudge-cta"
                 onClick={() => navigate(`/focus-chat?skill=${encodeURIComponent(weaknessNudge.category)}`)}
@@ -370,36 +382,8 @@ function MissionDashboard({ user, onAnalyzeClick }) {
                 Practice Now
               </button>
             </div>
-          )}
-
-          {/* Top Skills */}
-          {topSkills.length > 0 && (
-            <div className="dash-card">
-              <div className="dash-card-header">
-                <h2 className="dash-card-title">Top Skills</h2>
-                <button className="dash-view-all" onClick={() => navigate('/study/drills')}>
-                  View all
-                </button>
-              </div>
-              <div className="top-skills-list">
-                {topSkills.map((topic) => (
-                  <div key={topic.id} className="top-skill-row">
-                    <span className="top-skill-name">{topic.topic_name}</span>
-                    <div className="top-skill-bar-wrap">
-                      <div className="top-skill-bar">
-                        <div
-                          className="top-skill-bar-fill"
-                          style={{ width: `${Math.min(topic.score, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                    <span className="top-skill-score">{topic.score}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -3540,6 +3540,7 @@ app.post('/api/drills/sessions', requireAuth, async (req, res) => {
       scores: scores || [],
       xpEarned: xpEarned || 0,
     });
+    // Note: user_topic_scores is already updated per-answer in the /api/chat/focus endpoint
     res.json(session);
   } catch (error) {
     console.error('Error saving drill session:', error);

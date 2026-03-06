@@ -97,27 +97,12 @@ function App() {
     }
   }, [user, location.pathname, navigate])
 
-  // Also redirect immediately after checkAuth completes
+  // Redirect unauthenticated users away from protected routes back to homepage
   useEffect(() => {
-    const redirectIfLoggedIn = async () => {
-      const sessionToken = localStorage.getItem('session_token')
-      if (sessionToken && !user) {
-        // Check if user is logged in but state not loaded yet
-        try {
-          const response = await axios.get('/api/auth/me', {
-            headers: { Authorization: `Bearer ${sessionToken}` }
-          })
-          if (response.data.user && location.pathname === '/') {
-            setUser(response.data.user)
-            navigate('/dashboard', { replace: true })
-          }
-        } catch (e) {
-          // Not logged in
-        }
-      }
+    if (!user && location.pathname !== '/' && !localStorage.getItem('session_token')) {
+      navigate('/', { replace: true })
     }
-    redirectIfLoggedIn()
-  }, [location.pathname, navigate])
+  }, [user, location.pathname, navigate])
 
 
   useEffect(() => {
@@ -146,6 +131,10 @@ function App() {
       console.log('Not authenticated')
       localStorage.removeItem('session_token')
       delete axios.defaults.headers.common['Authorization']
+      // If on a protected route, redirect to homepage
+      if (location.pathname !== '/') {
+        navigate('/', { replace: true })
+      }
     }
   }
 
