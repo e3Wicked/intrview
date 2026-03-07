@@ -355,7 +355,7 @@ export async function getUserFromSession(sessionToken) {
       `SELECT u.*, s.plan, s.credits_remaining, s.credits_monthly_allowance,
               s.job_analyses_remaining, s.job_analyses_monthly_allowance,
               s.training_credits_remaining, s.training_credits_monthly_allowance,
-              s.is_lifetime_plan,
+              s.is_lifetime_plan, s.credits_reset_at,
               s.stripe_customer_id, s.stripe_subscription_id, s.status as subscription_status
        FROM user_sessions us
        JOIN users u ON us.user_id = u.id
@@ -402,6 +402,7 @@ export async function getUserFromSession(sessionToken) {
       isLifetimePlan: user.is_lifetime_plan || false,
       stripeCustomerId: user.stripe_customer_id,
       stripeSubscriptionId: user.stripe_subscription_id,
+      creditsResetAt: user.credits_reset_at || null,
       subscriptionStatus: user.subscription_status,
       isAdmin: isAdmin
     };

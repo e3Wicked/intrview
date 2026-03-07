@@ -65,7 +65,8 @@ import {
   checkTrainingCredits,
   deductTrainingCredits,
   requireJobAnalysis,
-  requireTrainingCredits
+  requireTrainingCredits,
+  createNewSubscription
 } from './auth.js';
 import { sendVerificationCode } from './email.js';
 import Stripe from 'stripe';
@@ -576,7 +577,15 @@ async function validateJobContent(text) {
       messages: [
         {
           role: 'system',
-          content: 'You classify web page content. Respond with JSON only: { "isJobPosting": boolean, "confidence": "high"|"medium"|"low", "contentType": "single_job"|"multiple_jobs"|"error_page"|"company_page"|"other", "reason": "brief explanation" }'
+          content: `You classify web page content. Your job is to determine if this text is a SINGLE, specific job posting.
+
+Rules:
+- A single job posting page commonly includes navigation, headers, footers, "similar jobs", "recommended", or "people also viewed" sections — this is STILL a single job posting. Focus on whether the page contains ONE primary job with details like title, company, and responsibilities.
+- Classify as "multiple_jobs" ONLY if the page is purely a job search results page or job feed — a flat list of equal job cards with NO single featured/primary job.
+- If the text is mostly login prompts or empty app shell with no job details at all, classify as "error_page"
+- When in doubt, classify as "single_job" — downstream checks will catch bad content
+
+Respond with JSON: { "isJobPosting": boolean, "confidence": "high"|"medium"|"low", "contentType": "single_job"|"multiple_jobs"|"error_page"|"company_page"|"other", "reason": "brief explanation" }`
         },
         {
           role: 'user',
@@ -592,6 +601,37 @@ async function validateJobContent(text) {
     console.log('Job content validation failed (non-critical):', err.message);
     return { isJobPosting: true, confidence: 'low', contentType: 'unknown', reason: 'validation unavailable' };
   }
+}
+
+// Blocklist of known false-positive company/role names from UI elements
+const COMPANY_NAME_BLOCKLIST = new Set([
+  'email', 'apply', 'share', 'sign in', 'sign up', 'linkedin', 'indeed',
+  'glassdoor', 'save', 'report', 'show more', 'join', 'log in', 'home',
+  'jobs', 'join now', 'similar jobs', 'people also viewed', 'unknown',
+  'report this job', 'save job', 'apply now', 'easy apply'
+]);
+
+function validateCompanyName(name) {
+  if (!name || name.length < 2) return null;
+  const cleaned = name.replace(/^["']|["']$/g, '').trim();
+  if (COMPANY_NAME_BLOCKLIST.has(cleaned.toLowerCase())) return null;
+  return cleaned;
+}
+
+function cleanJobContent(text) {
+  const noisePatterns = [
+    /^(Email|Share|Save|Apply|Sign In|Sign Up|Report|Log In|Join Now|Home|Jobs|Similar Jobs|People Also Viewed|Show More|Show Less|Easy Apply|Apply Now|Report This Job|Save Job|Cookie|Accept|Decline|Privacy|Skip to main content)\s*$/gim,
+    /^(Like|Comment|Repost|Send|Copy link|Share via)\s*$/gim,
+    /^\d+\s*(applicants?|views?|clicks?)\s*$/gim,
+    /^(Posted|Reposted)\s+\d+\s+(days?|weeks?|months?|hours?)\s+ago\s*$/gim,
+  ];
+  let cleaned = text;
+  for (const pattern of noisePatterns) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+  // Collapse multiple blank lines
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
+  return cleaned;
 }
 
 // Function to scrape job description from URL
@@ -1042,6 +1082,41 @@ async function scrapeJobDescription(url) {
       }
     }
     
+    // Extract JSON-LD structured data before removing scripts
+    let structuredCompanyName = null;
+    let structuredRoleTitle = null;
+    let structuredCompanyUrl = null;
+    try {
+      $('script[type="application/ld+json"]').each((i, elem) => {
+        try {
+          const data = JSON.parse($(elem).html());
+          // Handle both direct objects and arrays
+          const items = Array.isArray(data) ? data : [data];
+          for (const item of items) {
+            if (item['@type'] === 'JobPosting') {
+              if (item.hiringOrganization?.name) {
+                structuredCompanyName = item.hiringOrganization.name;
+              }
+              if (item.hiringOrganization?.url) {
+                structuredCompanyUrl = item.hiringOrganization.url;
+              }
+              if (item.title) {
+                structuredRoleTitle = item.title;
+              }
+              if (structuredCompanyName) return false; // break .each()
+            }
+          }
+        } catch (parseErr) {
+          // Invalid JSON-LD, skip
+        }
+      });
+      if (structuredCompanyName) {
+        console.log(`📋 JSON-LD found: company="${structuredCompanyName}", role="${structuredRoleTitle}"`);
+      }
+    } catch (e) {
+      // JSON-LD extraction failed, no problem
+    }
+
     // Remove script and style elements
     $('script, style').remove();
     
@@ -1088,7 +1163,7 @@ async function scrapeJobDescription(url) {
       jobDescription = jinaText;
     }
 
-    return { jobDescription, logo, companyWebsite, linkedinCompanyUrl };
+    return { jobDescription, logo, companyWebsite, linkedinCompanyUrl, structuredCompanyName, structuredRoleTitle, structuredCompanyUrl };
   } catch (error) {
     console.error('Error scraping URL:', error.message);
     throw new Error(`Failed to scrape URL: ${error.message}`);
@@ -1477,6 +1552,22 @@ app.post('/api/analyze', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'URL or pasted job description is required' });
   }
 
+  // Reject known multi-job/search/feed URLs before any scraping
+  if (url) {
+    const multiJobPatterns = [
+      /linkedin\.com\/jobs\/(collections|search)/i,
+      /indeed\.com\/jobs\?/i,
+      /glassdoor\.com\/Job\/jobs/i,
+      /ziprecruiter\.com\/jobs\/search/i,
+      /monster\.com\/jobs\/search/i,
+    ];
+    if (multiJobPatterns.some(p => p.test(url))) {
+      return res.status(400).json({
+        error: 'This looks like a job search/feed page with multiple listings. Please link to a specific job posting, or paste the job description instead.'
+      });
+    }
+  }
+
   // Job analysis check BEFORE SSE starts (so we can return JSON 402)
   const analysisCheck = await checkJobAnalyses(user.id);
   if (!analysisCheck.hasAnalyses) {
@@ -1517,6 +1608,7 @@ app.post('/api/analyze', requireAuth, async (req, res) => {
     sendStep(0, 'Fetching job posting');
 
     let jobDescription, jobLogo = null, companyWebsite = null, linkedinCompanyUrl = null;
+    let structuredCompanyName = null, structuredRoleTitle = null, structuredCompanyUrl = null;
     let cachedUrlData = null, cachedLogo = null, cachedRoleTitle = null, cachedCompanyName = null;
     let shouldRefetchLogo = false;
 
@@ -1545,24 +1637,46 @@ app.post('/api/analyze', requireAuth, async (req, res) => {
       jobLogo = scrapeResult.logo;
       companyWebsite = scrapeResult.companyWebsite;
       linkedinCompanyUrl = scrapeResult.linkedinCompanyUrl;
+      structuredCompanyName = scrapeResult.structuredCompanyName;
+      structuredRoleTitle = scrapeResult.structuredRoleTitle;
+      structuredCompanyUrl = scrapeResult.structuredCompanyUrl;
 
       if (!jobDescription || jobDescription.length < 100) {
         return sendError('Could not extract meaningful content from the URL. Try pasting the job description instead.');
       }
     }
 
+    // Known single-job URL patterns — skip LLM validation for these
+    const singleJobPatterns = [
+      /linkedin\.com\/jobs\/view\/\d+/i,
+      /boards\.greenhouse\.io\/[\w-]+\/jobs\/\d+/i,
+      /jobs\.greenhouse\.io\/[\w-]+\/jobs\/\d+/i,
+      /jobs\.lever\.co\/[\w-]+\/[\w-]+/i,
+      /\.myworkdayjobs\.com\/.+\/job\//i,
+      /jobs\.ashbyhq\.com\/[\w-]+\/[\w-]+/i,
+      /indeed\.com\/viewjob/i,
+      /glassdoor\.com\/job-listing\//i,
+      /careers\.[\w-]+\.com\/.*job/i,
+    ];
+    const skipValidation = url && singleJobPatterns.some(p => p.test(url));
+
     // Step 1: Validating job content
     sendStep(1, 'Validating job content');
-    const validation = await validateJobContent(jobDescription);
-    if (!validation.isJobPosting && validation.confidence === 'high') {
-      const errorMessages = {
-        multiple_jobs: 'This URL contains multiple job listings. Please link to a specific job posting, or paste the job description instead.',
-        error_page: "The page couldn't load properly. Try pasting the job description instead.",
-      };
-      return sendError(errorMessages[validation.contentType] || "This URL doesn't appear to contain a job posting. Try pasting the job description instead.");
-    }
-    if (validation.confidence === 'medium' && !validation.isJobPosting) {
-      console.log(`⚠️ Content validation uncertain: ${validation.reason}`);
+    if (skipValidation) {
+      console.log(`✅ URL matches known single-job pattern — skipping LLM validation: ${url}`);
+    } else {
+      const validation = await validateJobContent(jobDescription);
+      if (!validation.isJobPosting && validation.confidence === 'high' &&
+          (validation.contentType === 'multiple_jobs' || validation.contentType === 'error_page')) {
+        const errorMessages = {
+          multiple_jobs: 'This URL contains multiple job listings. Please link to a specific job posting, or paste the job description instead.',
+          error_page: "The page couldn't load properly. Try pasting the job description instead.",
+        };
+        return sendError(errorMessages[validation.contentType]);
+      }
+      if (!validation.isJobPosting) {
+        console.log(`⚠️ Content validation uncertain (${validation.confidence} ${validation.contentType}): ${validation.reason} — proceeding anyway`);
+      }
     }
 
     // Step 2: Parsing description
@@ -1725,73 +1839,135 @@ app.post('/api/analyze', requireAuth, async (req, res) => {
     // Step 3: Identifying company & role
     sendStep(3, 'Identifying company & role');
 
-    // First, try to extract company name using OpenAI (more reliable than regex)
+    // --- Priority cascade for company name and role title ---
+    // Tier 1: Cache
     let companyName = cachedCompanyName || null;
-    try {
-      const openai = getOpenAIClient();
-      const namePrompt = `Extract the company name from this job description. Return ONLY the company name, nothing else. If you cannot find a clear company name, return "UNKNOWN".
+    let roleTitle = cachedRoleTitle || null;
 
-Job Description:
-${jobDescription.substring(0, 2000)}
-
-Company name:`;
-
-      const nameCompletion = await openai.chat.completions.create({
-        model: "gpt-4o-mini", // Use cheaper model for simple extraction
-        messages: [
-          {
-            role: "system",
-            content: "You are a text extraction tool. Extract only the company name from job descriptions. Return just the company name, nothing else."
-          },
-          {
-            role: "user",
-            content: namePrompt
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 50,
-      });
-
-      const extractedName = nameCompletion.choices[0].message.content.trim();
-      if (extractedName && extractedName !== "UNKNOWN" && extractedName.length > 2) {
-        companyName = extractedName.replace(/^["']|["']$/g, ''); // Remove quotes if present
-        console.log('Extracted company name using OpenAI:', companyName);
+    // Tier 2: JSON-LD structured data
+    if (!companyName && structuredCompanyName) {
+      const validated = validateCompanyName(structuredCompanyName);
+      if (validated) {
+        companyName = validated;
+        console.log('✅ Company name from JSON-LD:', companyName);
       }
-    } catch (error) {
-      console.log('OpenAI name extraction failed, using fallback:', error.message);
+    }
+    if (!roleTitle && structuredRoleTitle) {
+      roleTitle = structuredRoleTitle.trim();
+      console.log('✅ Role title from JSON-LD:', roleTitle);
+    }
+    // Use structured company URL if we don't have one yet
+    if (!companyWebsite && structuredCompanyUrl) {
+      companyWebsite = structuredCompanyUrl;
+      console.log('✅ Company website from JSON-LD:', companyWebsite);
     }
 
-    // Fallback to regex extraction if OpenAI didn't work
+    // Tier 3: Combined LLM call on cleaned text (only if we still need company or role)
+    if (!companyName || !roleTitle) {
+      try {
+        const openai = getOpenAIClient();
+        const cleanedText = cleanJobContent(jobDescription);
+        const extractionPrompt = `Extract the company name and job title from this job posting.
+
+IMPORTANT:
+- "Company name" means the company that is HIRING for this role, not a job board or platform.
+- IGNORE UI elements and navigation text like "Email", "Share", "Save", "Apply", "Sign In", "LinkedIn", "Indeed", "Glassdoor".
+- If unsure, return "UNKNOWN" for that field.
+
+Job Posting:
+${cleanedText.substring(0, 4000)}
+
+Return JSON: {"companyName": "...", "roleTitle": "..."}`;
+
+        const extraction = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: "You extract structured data from job postings. Return valid JSON with companyName and roleTitle fields. Ignore navigation, buttons, and UI text — focus only on the actual job posting content."
+            },
+            { role: "user", content: extractionPrompt }
+          ],
+          temperature: 0.1,
+          max_tokens: 100,
+          response_format: { type: "json_object" },
+        });
+
+        const parsed = JSON.parse(extraction.choices[0].message.content);
+        if (!companyName && parsed.companyName) {
+          const validated = validateCompanyName(parsed.companyName);
+          if (validated) {
+            companyName = validated;
+            console.log('✅ Company name from LLM:', companyName);
+          }
+        }
+        if (!roleTitle && parsed.roleTitle && parsed.roleTitle !== 'UNKNOWN' && parsed.roleTitle.length > 2) {
+          roleTitle = parsed.roleTitle.replace(/^["']|["']$/g, '').trim();
+          console.log('✅ Role title from LLM:', roleTitle);
+        }
+      } catch (error) {
+        console.log('LLM extraction failed, using fallbacks:', error.message);
+      }
+    }
+
+    // Tier 4: LinkedIn company slug fallback for company name
+    if (!companyName && linkedinCompanyUrl) {
+      try {
+        const slug = linkedinCompanyUrl.match(/linkedin\.com\/company\/([\w-]+)/)?.[1];
+        if (slug) {
+          companyName = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+          console.log('✅ Company name from LinkedIn slug:', companyName);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // Tier 5: Regex fallback
     if (!companyName) {
       companyName = extractCompanyName(jobDescription, url);
-      console.log('Extracted company name using regex:', companyName);
+      console.log('Extracted company name using regex fallback:', companyName);
     }
-    
+    if (!roleTitle) {
+      const rolePatterns = [
+        /(?:position|role|job|hiring|seeking|looking for)[:\s]+([A-Z][a-zA-Z\s&]+(?:Engineer|Developer|Manager|Designer|Analyst|Specialist|Lead|Director|Architect))/i,
+        /(?:we are|we're|are) (?:hiring|seeking|looking for) (?:a |an )?([A-Z][a-zA-Z\s&]+(?:Engineer|Developer|Manager|Designer|Analyst|Specialist|Lead|Director|Architect))/i,
+        /^([A-Z][a-zA-Z\s&]+(?:Engineer|Developer|Manager|Designer|Analyst|Specialist|Lead|Director|Architect))/m
+      ];
+      for (const pattern of rolePatterns) {
+        const match = jobDescription.match(pattern);
+        if (match && match[1]) {
+          roleTitle = match[1].trim();
+          console.log('Extracted role title using regex fallback:', roleTitle);
+          break;
+        }
+      }
+    }
+
     // Now try logo.dev with extracted company name if we still don't have a logo
     if (!finalLogo && companyName && !companyWebsite) {
       try {
-        // Try to construct domain from company name (e.g., "Keyrock" -> "keyrock.com")
         const cleanName = companyName.toLowerCase().replace(/[^a-z0-9]/g, '');
         const possibleDomains = [
           `${cleanName}.com`,
           `${cleanName}.io`,
           `${cleanName}.co`
         ];
-        
+
         console.log(`🔄 Trying logo.dev with company name "${companyName}" -> domains:`, possibleDomains);
-        
+
         for (const domain of possibleDomains) {
           try {
             const logoApiUrl = `https://logo.dev/${domain}`;
             const agent = await getHttpsAgent();
-            const logoResponse = await axios.get(logoApiUrl, { 
-              timeout: 3000, 
+            const logoResponse = await axios.get(logoApiUrl, {
+              timeout: 3000,
               validateStatus: (status) => status < 500,
               responseType: 'arraybuffer',
               maxContentLength: 5000000,
               httpsAgent: agent
             });
-            
+
             if (logoResponse.status === 200 && logoResponse.data && logoResponse.data.length > 0) {
               const contentType = logoResponse.headers['content-type'] || '';
               if (contentType.startsWith('image/')) {
@@ -1801,7 +1977,6 @@ Company name:`;
               }
             }
           } catch (e) {
-            // Try next domain
             continue;
           }
         }
@@ -1809,64 +1984,11 @@ Company name:`;
         // Ignore errors
       }
     }
-    
+
     // If we found a logo, update the cache
     if (finalLogo && shouldRefetchLogo) {
       console.log('💾 Updating cache with newly found logo');
-      await saveJobUrlCache(url, finalLogo, cachedRoleTitle, cachedCompanyName);
-    }
-
-    // Extract role title from job description (use cache if available)
-    let roleTitle = cachedRoleTitle || null;
-    if (!roleTitle) {
-      try {
-        const openai = getOpenAIClient();
-        const rolePrompt = `Extract the job title/role title from this job description. Return ONLY the job title (e.g., "Senior Software Engineer", "Product Manager", "Frontend Developer"), nothing else. If you cannot find a clear job title, return "UNKNOWN".
-
-Job Description:
-${jobDescription.substring(0, 2000)}
-
-Job title:`;
-
-        const roleCompletion = await openai.chat.completions.create({
-          model: "gpt-4o-mini", // Use cheaper model for simple extraction
-          messages: [
-            {
-              role: "system",
-              content: "You are a text extraction tool. Extract only the job title from job descriptions. Return just the job title, nothing else."
-            },
-            {
-              role: "user",
-              content: rolePrompt
-            }
-          ],
-          temperature: 0.1,
-          max_tokens: 50,
-        });
-
-        const extractedRole = roleCompletion.choices[0].message.content.trim();
-        if (extractedRole && extractedRole !== "UNKNOWN" && extractedRole.length > 2) {
-          roleTitle = extractedRole.replace(/^["']|["']$/g, ''); // Remove quotes if present
-          console.log('Extracted role title using OpenAI:', roleTitle);
-        }
-      } catch (error) {
-        console.log('OpenAI role extraction failed, using fallback:', error.message);
-        // Fallback: try to extract from common patterns
-        const rolePatterns = [
-          /(?:position|role|job|hiring|seeking|looking for)[:\s]+([A-Z][a-zA-Z\s&]+(?:Engineer|Developer|Manager|Designer|Analyst|Specialist|Lead|Director|Architect))/i,
-          /(?:we are|we're|are) (?:hiring|seeking|looking for) (?:a |an )?([A-Z][a-zA-Z\s&]+(?:Engineer|Developer|Manager|Designer|Analyst|Specialist|Lead|Director|Architect))/i,
-          /^([A-Z][a-zA-Z\s&]+(?:Engineer|Developer|Manager|Designer|Analyst|Specialist|Lead|Director|Architect))/m
-        ];
-        
-        for (const pattern of rolePatterns) {
-          const match = jobDescription.match(pattern);
-          if (match && match[1]) {
-            roleTitle = match[1].trim();
-            console.log('Extracted role title using regex:', roleTitle);
-            break;
-          }
-        }
-      }
+      await saveJobUrlCache(url, finalLogo, roleTitle, companyName);
     }
 
     // Save to cache for future requests (saves API calls)
@@ -1965,9 +2087,9 @@ Job title:`;
       };
     }
 
-    // Quality gate: require at least a role or a real company name
-    if (!companyInfo.roleTitle && (!companyInfo.name || companyInfo.name === 'Company')) {
-      return sendError('Could not identify a role or company from this content. Try pasting the full job description instead.');
+    // Quality gate: require BOTH a role title and a real company name
+    if (!companyInfo.roleTitle || !companyInfo.name || companyInfo.name === 'Company') {
+      return sendError('Could not identify a clear role and company from this content. Try pasting the full job description instead.');
     }
 
     console.log('Final companyInfo being sent:', {
@@ -2030,7 +2152,8 @@ Job title:`;
     }
 
     // Refresh user to get updated credits after deduction
-    const updatedUser = await getUserFromSession(req.headers.authorization?.replace('Bearer ', ''));
+    const sessionToken = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.session_token;
+    const updatedUser = await getUserFromSession(sessionToken);
     
     // Log what we're sending
     console.log('=== SENDING RESPONSE ===');
@@ -2048,7 +2171,10 @@ Job title:`;
       url: url || null, // Include URL for reference
       user: {
         creditsRemaining: updatedUser?.creditsRemaining || user.creditsRemaining,
-        plan: updatedUser?.plan || user.plan
+        jobAnalysesRemaining: updatedUser?.jobAnalysesRemaining ?? user.jobAnalysesRemaining,
+        trainingCreditsRemaining: updatedUser?.trainingCreditsRemaining ?? user.trainingCreditsRemaining,
+        plan: updatedUser?.plan || user.plan,
+        creditsResetAt: updatedUser?.creditsResetAt || user.creditsResetAt || null
       }
     };
     
@@ -3265,14 +3391,20 @@ app.post('/api/admin/create-test-user', async (req, res) => {
         [passwordHash, name || null, userId]
       );
       
-      // Update subscription to have unlimited credits
+      // Update subscription to elite with two-bucket model
+      const elitePlan = PLANS.elite;
       await pool.query(
-        `UPDATE subscriptions 
-         SET credits_remaining = 999999, 
+        `UPDATE subscriptions
+         SET plan = 'elite',
+             credits_remaining = 999999,
              credits_monthly_allowance = 999999,
-             plan = 'elite'
+             job_analyses_remaining = CASE WHEN $2 = -1 THEN 999999 ELSE $2 END,
+             job_analyses_monthly_allowance = $2,
+             training_credits_remaining = $3,
+             training_credits_monthly_allowance = $3,
+             is_lifetime_plan = false
          WHERE user_id = $1`,
-        [userId]
+        [userId, elitePlan.monthlyJobAnalyses, elitePlan.monthlyTrainingCredits]
       );
       
       return res.json({ 
@@ -3293,12 +3425,8 @@ app.post('/api/admin/create-test-user', async (req, res) => {
     
     const newUser = userResult.rows[0];
     
-    // Create subscription with unlimited credits
-    await pool.query(
-      `INSERT INTO subscriptions (user_id, plan, credits_remaining, credits_monthly_allowance, credits_reset_at)
-       VALUES ($1, 'elite', 999999, 999999, CURRENT_TIMESTAMP + INTERVAL '365 days')`,
-      [newUser.id]
-    );
+    // Create subscription with two-bucket model
+    await createNewSubscription(newUser.id, 'elite');
     
     res.json({ 
       success: true, 
