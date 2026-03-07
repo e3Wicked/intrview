@@ -38,12 +38,14 @@ Full-stack: React (Vite) frontend + Express backend + PostgreSQL via Docker.
 
 **Credits & plans:** Plans (`free`, `starter`, `pro`, `elite`) and per-action credit costs (`CREDIT_COSTS`) are defined in `server/auth.js`. Use `requireCredits(action)` middleware to gate and deduct credits. Stripe handles checkout/webhooks/portal via `server/stripe.js`.
 
-**Gamification:** XP, levels, streaks, and achievements are tracked per user. Logic in `server/utils/gamification.js` and `server/utils/achievements.js`. Routes in `server/routes/gamification.js`. Client state in `GamificationContext.jsx`.
-
-**Route registration:** Most routes are defined inline in `server/index.js`. Only `gamification.js` and `advertisers.js` use Express Router and are imported as sub-routers.
+**Route registration:** Most routes are defined inline in `server/index.js`. Only `practice.js` and `advertisers.js` use Express Router and are imported as sub-routers.
 
 **Caching:** Study plans and company research are cached in the DB by hashing the job description or by company+role lookup, avoiding redundant OpenAI calls.
 
 **ESM throughout:** Both `server/` and `client/` use `"type": "module"`. Exception: `server/routes/advertisers.js` uses CommonJS `require()`.
 
 **Components:** Every component in `client/src/components/` has a paired `.css` file with the same name.
+
+**Client routing:** All routes defined in `client/src/App.jsx`. Key routes: `/` (homepage/landing), `/dashboard`, `/job/:jobId` (job analysis view), `/company/:companyName`, `/progress`, `/focus-chat`, `/study/drills`, `/study/mock-interview`, `/admin` (admin-only). App.jsx owns global state (`user`, `result`, `jdHistory`) and passes it down. Job analysis results are temporarily cached in `sessionStorage` keyed by job ID, with the DB as the primary source of truth.
+
+**Dev email:** Without SMTP configured, OTP codes are printed to the server console instead of being emailed. Check server logs to get the code during local development.

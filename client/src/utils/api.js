@@ -12,16 +12,10 @@ export const api = {
     endSession: (data) => axios.post('/api/practice/end-session', data),
     getHistory: (params) => axios.get('/api/practice/history', { params }),
     getSmartOrder: (data) => axios.post('/api/practice/smart-order', data),
-    flashcardXp: (data) => axios.post('/api/practice/flashcard-xp', data),
+    flashcardAttempt: (data) => axios.post('/api/practice/flashcard-attempt', data),
   },
   chat: {
     practice: (data) => axios.post('/api/chat/practice', data),
-  },
-  gamification: {
-    getStats: () => axios.get('/api/gamification/stats'),
-    getSkillStats: () => axios.get('/api/gamification/skill-stats'),
-    getWeaknessReport: () => axios.get('/api/gamification/weakness-report'),
-    checkAchievements: (context) => axios.post('/api/gamification/check-achievements', { context }),
   },
   topics: {
     getUserScores: () => axios.get('/api/user/topic-scores'),
@@ -35,8 +29,12 @@ export const api = {
     getAllSessions: () => axios.get('/api/drills/sessions'),
     getTopicSessions: (topicId) => axios.get(`/api/drills/sessions/${topicId}`),
   },
+  activity: {
+    getSummary: () => axios.get('/api/user/activity-summary'),
+  },
   user: {
     getAnalyses: (limit = 50, offset = 0) => axios.get(`/api/user/analyses?limit=${limit}&offset=${offset}`),
     deleteAllAnalyses: () => axios.delete('/api/user/analyses'),
+    updateProfile: (data) => axios.put('/api/user/profile', data),
   },
 }

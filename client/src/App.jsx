@@ -5,7 +5,6 @@ import './App.css'
 import HomePage from './pages/HomePage'
 import SignInPrompt from './components/SignInPrompt'
 import Sidebar from './components/Sidebar'
-import { GamificationProvider } from './contexts/GamificationContext'
 import { api } from './utils/api'
 
 // Lazy-loaded pages (not needed on initial homepage load)
@@ -18,10 +17,10 @@ const ProgressPage = lazy(() => import('./pages/ProgressPage'))
 const FocusChatPage = lazy(() => import('./pages/FocusChatPage'))
 const MockInterviewPage = lazy(() => import('./pages/MockInterviewPage'))
 const DrillsPage = lazy(() => import('./pages/DrillsPage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const LoadingOverlay = lazy(() => import('./components/LoadingOverlay'))
 const LoginModal = lazy(() => import('./components/LoginModal'))
 const UpgradeModal = lazy(() => import('./components/UpgradeModal'))
-const AchievementToast = lazy(() => import('./components/AchievementToast'))
 
 // Layout component with header and sidebars
 function Layout({ children, user, setUser, showLoginModal, setShowLoginModal, loginModalMode, setLoginModalMode, showUpgradeModal, setShowUpgradeModal, handleSelectPlan, handleLoginSuccess, handleLogout }) {
@@ -310,7 +309,6 @@ function App() {
   }, [user])
 
   return (
-    <GamificationProvider user={user}>
     <Layout
       user={user}
       setUser={setUser}
@@ -325,7 +323,6 @@ function App() {
       handleLogout={handleLogout}
     >
       <Suspense fallback={null}>
-        <AchievementToast />
         <LoadingOverlay loading={loading} />
       </Suspense>
 
@@ -479,10 +476,33 @@ function App() {
             )
           }
         />
+        <Route
+          path="/settings"
+          element={
+            user ? (
+              <SettingsPage
+                user={user}
+                setUser={setUser}
+                onUpgrade={() => setShowUpgradeModal(true)}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <SignInPrompt
+                onSignIn={() => {
+                  setLoginModalMode('signin')
+                  setShowLoginModal(true)
+                }}
+                onSignUp={() => {
+                  setLoginModalMode('signup')
+                  setShowLoginModal(true)
+                }}
+              />
+            )
+          }
+        />
       </Routes>
       </Suspense>
     </Layout>
-    </GamificationProvider>
   )
 }
 

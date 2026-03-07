@@ -1,14 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../utils/api'
-import { useGamification } from '../contexts/GamificationContext'
-import { getLevelForXp } from '../utils/gamification'
-import AchievementsBadgeGrid from '../components/AchievementsBadgeGrid'
 import './ProgressPage.css'
 
 function ProgressPage({ user }) {
   const navigate = useNavigate()
-  const { gamStats } = useGamification()
   const [topics, setTopics] = useState([])
   const [practiceHistory, setPracticeHistory] = useState([])
   const [loading, setLoading] = useState(true)
@@ -32,9 +28,6 @@ function ProgressPage({ user }) {
     if (user) loadData()
     else setLoading(false)
   }, [user])
-
-  const levelInfo = gamStats ? getLevelForXp(gamStats.totalXp) : null
-  const streak = gamStats?.streak || { current: 0, multiplier: 1.0 }
 
   const getMasteryColor = (mastery) => {
     if (mastery >= 80) return '#22c55e'
@@ -112,34 +105,19 @@ function ProgressPage({ user }) {
       {/* Stats Bar */}
       <div className="progress-stats-bar">
         <div className="progress-stat-block">
-          <span className="progress-stat-label">Level</span>
-          <span className="progress-stat-value">{levelInfo?.title || 'Applicant'}</span>
-        </div>
-        <div className="progress-stat-divider" />
-        <div className="progress-stat-block">
-          <span className="progress-stat-label">Total XP</span>
-          <span className="progress-stat-value progress-stat-xp">{gamStats?.totalXp || 0}</span>
-          {levelInfo && (
-            <div className="progress-stat-bar">
-              <div className="progress-stat-bar-fill" style={{ width: `${levelInfo.progressPercent || 0}%` }} />
-            </div>
-          )}
-        </div>
-        <div className="progress-stat-divider" />
-        <div className="progress-stat-block">
-          <span className="progress-stat-label">Streak</span>
-          <span className="progress-stat-value">
-            {streak.current > 0 ? '\uD83D\uDD25' : '\uD83D\uDCA4'} {streak.current} {streak.current === 1 ? 'day' : 'days'}
-          </span>
-          {streak.multiplier > 1.0 && (
-            <span className="progress-stat-multiplier">{streak.multiplier}x multiplier</span>
-          )}
-        </div>
-        <div className="progress-stat-divider" />
-        <div className="progress-stat-block">
           <span className="progress-stat-label">Topics</span>
           <span className="progress-stat-value">{stats.practiced}/{stats.total}</span>
           <span className="progress-stat-multiplier">{stats.mastered} mastered</span>
+        </div>
+        <div className="progress-stat-divider" />
+        <div className="progress-stat-block">
+          <span className="progress-stat-label">Avg Mastery</span>
+          <span className="progress-stat-value">{stats.avgMastery}%</span>
+        </div>
+        <div className="progress-stat-divider" />
+        <div className="progress-stat-block">
+          <span className="progress-stat-label">Total Drills</span>
+          <span className="progress-stat-value">{stats.totalDrills}</span>
         </div>
       </div>
 
@@ -304,9 +282,6 @@ function ProgressPage({ user }) {
                         <span className="activity-date">{new Date(session.ended_at || session.started_at).toLocaleDateString()}</span>
                       </div>
                       <div className="activity-stats">
-                        {session.total_xp_earned > 0 && (
-                          <span className="activity-xp">+{session.total_xp_earned} XP</span>
-                        )}
                         {scoreDisplay && (
                           <span className="activity-score">{scoreDisplay}</span>
                         )}
@@ -320,11 +295,6 @@ function ProgressPage({ user }) {
         </div>
       </div>
 
-      {/* Achievements */}
-      <section className="progress-section">
-        <h2 className="progress-section-title">Achievements</h2>
-        <AchievementsBadgeGrid />
-      </section>
     </div>
   )
 }

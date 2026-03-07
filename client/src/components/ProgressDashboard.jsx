@@ -1,8 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
 import { api } from '../utils/api'
-import XPBar from './XPBar'
-import StreakCounter from './StreakCounter'
-import AchievementsBadgeGrid from './AchievementsBadgeGrid'
 import './ProgressDashboard.css'
 
 function ProgressDashboard({ analyses, studyPlans }) {
@@ -79,11 +76,6 @@ function ProgressDashboard({ analyses, studyPlans }) {
 
   return (
     <div className="progress-dashboard">
-      <div className="progress-gamification-header" style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <XPBar compact={false} />
-        <StreakCounter />
-      </div>
-
       <div className="progress-overview">
         <div className="progress-ring-large">
           <svg className="progress-ring-svg-large" width="200" height="200">
@@ -173,9 +165,6 @@ function ProgressDashboard({ analyses, studyPlans }) {
         </div>
       )}
 
-      <div style={{ marginTop: '32px' }}>
-        <AchievementsBadgeGrid />
-      </div>
     </div>
   )
 }

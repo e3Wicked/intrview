@@ -26,15 +26,29 @@
 }
 
 /* ------------------------------------------------
-   Logo
+   Header (Logo + Collapse toggle)
    ------------------------------------------------ */
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.sidebar.collapsed .sidebar-header {
+  justify-content: center;
+}
+
+.sidebar.collapsed .sidebar-logo {
+  display: none;
+}
 
 .sidebar-logo {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  margin-bottom: 20px;
   background: none;
   border: none;
   cursor: pointer;
@@ -195,20 +209,27 @@
   padding: 4px 4px 0;
 }
 
-/* User card */
-.sidebar-user {
+/* User accordion trigger */
+.sidebar-user-trigger {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 8px;
-  margin-top: 4px;
+  background: none;
+  border: none;
   border-radius: 10px;
+  cursor: pointer;
+  width: 100%;
   transition: background 0.2s ease;
 }
 
-.sidebar-user.collapsed-user {
+.sidebar-user-trigger:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sidebar.collapsed .sidebar-user-trigger {
   justify-content: center;
-  padding: 10px 0;
+  padding: 10px;
 }
 
 .sidebar-user-avatar {
@@ -228,33 +249,38 @@
   transition: border-color 0.2s ease;
 }
 
-.sidebar-user:hover .sidebar-user-avatar {
+.sidebar-user-trigger:hover .sidebar-user-avatar {
   border-color: rgba(255, 255, 255, 0.3);
-}
-
-.sidebar-user-info {
-  min-width: 0;
-  flex: 1;
 }
 
 .sidebar-user-email {
   font-family: 'Inter', -apple-system, sans-serif;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.35);
-  display: block;
+  color: rgba(255, 255, 255, 0.45);
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: left;
 }
 
-/* Action buttons (Upgrade, Sign Out) */
-.sidebar-actions {
+.sidebar-user-chevron {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.3);
+  transition: transform 0.2s ease;
+}
+
+.sidebar-user-trigger.open .sidebar-user-chevron {
+  transform: rotate(180deg);
+}
+
+/* User accordion menu */
+.sidebar-user-menu {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 4px;
 }
 
 .sidebar-action-btn {
@@ -285,13 +311,24 @@
   opacity: 0.6;
 }
 
-/* Collapse button - small, bottom-right aligned */
+.sidebar-action-btn.upgrade {
+  color: rgba(37, 99, 235, 0.85);
+}
+
+.sidebar-action-btn.upgrade:hover {
+  color: rgba(37, 99, 235, 1);
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.sidebar-action-btn.upgrade svg {
+  opacity: 1;
+}
+
+/* Collapse button - top-right in header */
 .sidebar-collapse-btn {
-  align-self: flex-end;
   background: none;
   border: none;
   padding: 8px;
-  margin-top: 8px;
   cursor: pointer;
   color: rgba(255, 255, 255, 0.25);
   border-radius: 8px;
@@ -299,15 +336,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .sidebar-collapse-btn:hover {
   color: rgba(255, 255, 255, 0.6);
   background: rgba(255, 255, 255, 0.06);
-}
-
-.sidebar.collapsed .sidebar-collapse-btn {
-  align-self: center;
 }
 
 /* ------------------------------------------------

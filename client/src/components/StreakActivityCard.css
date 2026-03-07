@@ -1,0 +1,140 @@
+.streak-activity-card {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e5e5e5);
+  border-radius: 12px;
+  padding: 20px 28px;
+  margin-bottom: 20px;
+}
+
+/* ========== Streak Section ========== */
+.streak-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 100px;
+  flex-shrink: 0;
+}
+
+.streak-number {
+  font-size: 42px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--color-accent, #2563eb);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.streak-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  margin-top: 4px;
+}
+
+.streak-best {
+  font-size: 12px;
+  color: var(--color-text-secondary, #6b6b6b);
+  margin-top: 4px;
+}
+
+/* ========== Activity Chart ========== */
+.activity-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-chart {
+  width: 100%;
+}
+
+.activity-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 80px;
+}
+
+.activity-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+
+.activity-bar-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.activity-bar {
+  width: 100%;
+  max-width: 32px;
+  border-radius: 4px 4px 2px 2px;
+  background: var(--color-border, #e0e0e0);
+  transition: height 0.3s ease;
+}
+
+.activity-bar.active {
+  background: var(--color-text-secondary, #94a3b8);
+}
+
+.activity-bar.today {
+  background: var(--color-accent, #2563eb);
+}
+
+.activity-bar.today.active {
+  background: var(--color-accent, #2563eb);
+}
+
+.activity-day-label {
+  font-size: 11px;
+  color: var(--color-text-secondary, #6b6b6b);
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+.activity-day-label.today {
+  color: var(--color-accent, #2563eb);
+  font-weight: 700;
+}
+
+/* ========== Empty State ========== */
+.activity-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 80px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 14px;
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 600px) {
+  .streak-activity-card {
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px 20px;
+  }
+
+  .streak-section {
+    flex-direction: row;
+    gap: 12px;
+    min-width: unset;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .streak-number {
+    font-size: 32px;
+  }
+
+  .activity-bars {
+    height: 60px;
+  }
+}

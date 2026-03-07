@@ -33,12 +33,16 @@ function InlineLoadingTerminal({ steps, loading }) {
   return (
     <div className="inline-loading-terminal">
       <div className="ilt-header">
-        <div className="ilt-indicator">
-          <span className="ilt-dot" />
-          <span className="ilt-dot" />
-          <span className="ilt-dot" />
+        <div className="ilt-header-left">
+          <div className="ilt-icon-square">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          </div>
+          <span className="ilt-title">Analyzing Job Posting</span>
         </div>
-        <span className="ilt-label">analyzing job posting</span>
+        <span className="ilt-badge">{progress}%</span>
       </div>
 
       <div className="ilt-steps">
@@ -53,9 +57,16 @@ function InlineLoadingTerminal({ steps, loading }) {
               className={`ilt-line ${isDone ? 'done' : ''} ${isActive ? 'active' : ''} ${isPending ? 'pending' : ''}`}
             >
               <span className="ilt-prefix">
-                {isDone && <span className="ilt-check">✓</span>}
-                {isActive && <span className="ilt-spinner">›</span>}
-                {isPending && <span className="ilt-pending">·</span>}
+                {isDone && (
+                  <span className="ilt-check">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                      <circle cx="8" cy="8" r="8" fill="#16a34a" />
+                      <path d="M5 8.5L7 10.5L11 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                )}
+                {isActive && <span className="ilt-spinner" />}
+                {isPending && <span className="ilt-pending" />}
               </span>
               <span className="ilt-text">
                 {label}
@@ -70,10 +81,9 @@ function InlineLoadingTerminal({ steps, loading }) {
         <div className="ilt-bar-container">
           <div className="ilt-bar-fill" style={{ width: `${progress}%` }} />
         </div>
-        <span className="ilt-pct">{progress}%</span>
       </div>
 
-      <p className="ilt-note">This usually takes around 30–60 seconds</p>
+      <p className="ilt-note">This usually takes around 30-60 seconds</p>
     </div>
   )
 }

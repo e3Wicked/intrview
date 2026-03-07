@@ -4,10 +4,6 @@ import Flashcards from './Flashcards'
 import QuizMode from './QuizMode'
 import VoicePractice from './VoicePractice'
 import TopicChat from './TopicChat'
-import XPBar from './XPBar'
-import StreakCounter from './StreakCounter'
-import SessionSummary from './SessionSummary'
-import { useGamification } from '../contexts/GamificationContext'
 import { api } from '../utils/api'
 import './Practice.css'
 
@@ -18,15 +14,13 @@ function Practice({ questions, jobDescription, companyName, roleTitle, techStack
   const [generating, setGenerating] = useState(false)
   const [generateError, setGenerateError] = useState(null)
   const [sessionId, setSessionId] = useState(null)
-  const [sessionStats, setSessionStats] = useState({ questionsAnswered: 0, totalXp: 0 })
+  const [sessionStats, setSessionStats] = useState({ questionsAnswered: 0 })
   const [showSummary, setShowSummary] = useState(false)
   const [summaryData, setSummaryData] = useState(null)
   const [focusCategories, setFocusCategories] = useState(initialFocusCategories || [])
-  const [lastXpGain, setLastXpGain] = useState(0)
   const [autoGenerateAttempted, setAutoGenerateAttempted] = useState(false)
   const [questionsExhausted, setQuestionsExhausted] = useState(false)
   const sessionIdRef = useRef(null)
-  const { refreshStats, addXp } = useGamification() || {}
 
   // Map initialMode to the correct internal mode
   useEffect(() => {
@@ -100,17 +94,11 @@ function Practice({ questions, jobDescription, companyName, roleTitle, techStack
       })
     : allQuestions
 
-  const handleXpGained = useCallback((xpData) => {
-    if (!xpData) return
-    setLastXpGain(xpData.xpEarned || 0)
+  const handleAnswerRecorded = useCallback(() => {
     setSessionStats(prev => ({
       questionsAnswered: prev.questionsAnswered + 1,
-      totalXp: prev.totalXp + (xpData.xpEarned || 0),
     }))
-    if (addXp) {
-      addXp(xpData.xpEarned || 0, xpData.newAchievements, xpData.levelUp, xpData.levelTitle)
-    }
-  }, [addXp])
+  }, [])
 
   const handleEndSession = async () => {
     if (!sessionId) {
@@ -123,13 +111,9 @@ function Practice({ questions, jobDescription, companyName, roleTitle, techStack
         questionsAttempted: res.data.session?.questions_attempted || sessionStats.questionsAnswered,
         questionsCorrect: res.data.session?.questions_correct || 0,
         averageScore: res.data.session?.average_score || 0,
-        totalXpEarned: res.data.xpEarned || sessionStats.totalXp,
-        achievements: res.data.achievements || [],
-        streakUpdate: res.data.streakUpdate,
       })
       setShowSummary(true)
       sessionIdRef.current = null
-      if (refreshStats) refreshStats()
     } catch (err) {
       console.error('Failed to end session:', err)
       setShowSummary(false)
@@ -139,7 +123,7 @@ function Practice({ questions, jobDescription, companyName, roleTitle, techStack
   const handleContinuePractice = async () => {
     setShowSummary(false)
     setSummaryData(null)
-    setSessionStats({ questionsAnswered: 0, totalXp: 0 })
+    setSessionStats({ questionsAnswered: 0 })
     try {
       const res = await api.practice.startSession({
         jobDescriptionHash,
@@ -204,11 +188,20 @@ function Practice({ questions, jobDescription, companyName, roleTitle, techStack
   return (
     <div className="practice-container">
       {showSummary && summaryData && (
-        <SessionSummary
-          session={summaryData}
-          onContinue={handleContinuePractice}
-          onEnd={() => setShowSummary(false)}
-        />
+        <div className="practice-summary-overlay">
+          <div className="practice-summary-card">
+            <h3>Session Complete</h3>
+            <div className="practice-summary-stats">
+              <div><strong>{summaryData.questionsAttempted}</strong> questions</div>
+              <div><strong>{summaryData.questionsCorrect}</strong> correct</div>
+              {summaryData.averageScore > 0 && <div>Avg score: <strong>{Math.round(summaryData.averageScore)}%</strong></div>}
+            </div>
+            <div className="practice-summary-actions">
+              <button className="mode-btn" onClick={handleContinuePractice}>Continue Practice</button>
+              <button className="mode-btn" onClick={() => setShowSummary(false)} style={{ borderColor: '#555', color: '#aaa' }}>Close</button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="practice-header">
@@ -223,14 +216,9 @@ function Practice({ questions, jobDescription, companyName, roleTitle, techStack
             {sessionStats.questionsAnswered > 0 && (
               <span> &middot; {sessionStats.questionsAnswered} answered</span>
             )}
-            {sessionStats.totalXp > 0 && (
-              <span className="session-xp-count"> &middot; +{sessionStats.totalXp} XP</span>
-            )}
           </p>
         </div>
         <div className="practice-header-right">
-          <StreakCounter compact />
-          <XPBar xpGained={lastXpGain} compact />
           <button
             className="mode-btn"
             onClick={handleEndSession}
@@ -268,7 +256,7 @@ function Practice({ questions, jobDescription, companyName, roleTitle, techStack
             questions={displayQuestions}
             jobDescriptionHash={jobDescriptionHash}
             sessionId={sessionId}
-            onXpGained={handleXpGained}
+            onXpGained={handleAnswerRecorded}
             onGenerateMore={() => handleGenerateMore(false)}
             generating={generating}
             onQuestionsExhausted={handleQuestionsExhausted}
@@ -282,7 +270,7 @@ function Practice({ questions, jobDescription, companyName, roleTitle, techStack
                 jobDescription={jobDescription}
                 jobDescriptionHash={jobDescriptionHash}
                 sessionId={sessionId}
-                onXpGained={handleXpGained}
+                onXpGained={handleAnswerRecorded}
               />
             ) : (
               <QuizMode
@@ -290,7 +278,7 @@ function Practice({ questions, jobDescription, companyName, roleTitle, techStack
                 jobDescription={jobDescription}
                 jobDescriptionHash={jobDescriptionHash}
                 sessionId={sessionId}
-                onXpGained={handleXpGained}
+                onXpGained={handleAnswerRecorded}
               />
             )}
           </div>
@@ -303,7 +291,7 @@ function Practice({ questions, jobDescription, companyName, roleTitle, techStack
             techStack={techStack}
             jobDescriptionHash={jobDescriptionHash}
             sessionId={sessionId}
-            onXpGained={handleXpGained}
+            onXpGained={handleAnswerRecorded}
             studyTopics={studyTopics}
           />
         )}

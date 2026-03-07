@@ -9,9 +9,7 @@ function Flashcards({ questions, jobDescriptionHash, sessionId, onXpGained, onGe
   const [shuffled, setShuffled] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [focusWeak, setFocusWeak] = useState(false)
-  const [xpToast, setXpToast] = useState(null)
   const saveTimerRef = useRef(null)
-  const xpTimerRef = useRef(null)
 
   // Load flashcard progress from server
   useEffect(() => {
@@ -127,12 +125,6 @@ function Flashcards({ questions, jobDescriptionHash, sessionId, onXpGained, onGe
 
   const handleFlip = () => setIsFlipped(!isFlipped)
 
-  const showXpToast = (amount) => {
-    if (xpTimerRef.current) clearTimeout(xpTimerRef.current)
-    setXpToast(amount)
-    xpTimerRef.current = setTimeout(() => setXpToast(null), 1500)
-  }
-
   const handleMark = async (status) => {
     if (!currentQuestion) return
     const questionKey = getQuestionKey(currentQuestion, currentQuestion._origIdx)
@@ -149,19 +141,16 @@ function Flashcards({ questions, jobDescriptionHash, sessionId, onXpGained, onGe
     setProgress(newProgress)
     saveToServer(newProgress)
 
-    // Award XP
-    if (onXpGained && jobDescriptionHash) {
+    // Record attempt
+    if (jobDescriptionHash) {
       try {
-        const res = await api.practice.flashcardXp({
+        await api.practice.flashcardAttempt({
           jobDescriptionHash,
           questionText: (currentQuestion.question || '').substring(0, 200),
           mark: status,
           sessionId: sessionId || null,
         })
-        if (res.data.xpEarned) {
-          onXpGained({ xpEarned: res.data.xpEarned, totalXp: res.data.totalXp })
-          showXpToast(res.data.xpEarned)
-        }
+        if (onXpGained) onXpGained()
       } catch (err) {
         // Non-critical
       }
@@ -323,12 +312,6 @@ function Flashcards({ questions, jobDescriptionHash, sessionId, onXpGained, onGe
                 <div className="flashcard-hint">Click to flip</div>
               </div>
             </div>
-            {/* XP toast */}
-            {xpToast && (
-              <div className="xp-toast" key={Date.now()}>
-                +{xpToast} XP
-              </div>
-            )}
           </div>
 
           <div className="flashcards-controls">

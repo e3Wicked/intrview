@@ -159,8 +159,14 @@ async function handleCheckoutCompleted(session) {
   // Get subscription details
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   
+  const planDef = PLANS[plan];
+  const jobAnalyses = planDef.monthlyJobAnalyses === -1 ? 999999 : planDef.monthlyJobAnalyses;
+  const jobAllowance = planDef.monthlyJobAnalyses;
+  const trainingCredits = planDef.monthlyTrainingCredits;
+  const trainingAllowance = planDef.monthlyTrainingCredits;
+
   await pool.query(
-    `UPDATE subscriptions 
+    `UPDATE subscriptions
      SET plan = $1,
          stripe_subscription_id = $2,
          status = 'active',
@@ -169,14 +175,23 @@ async function handleCheckoutCompleted(session) {
          credits_remaining = $5,
          credits_monthly_allowance = $5,
          credits_reset_at = to_timestamp($4),
+         job_analyses_remaining = $6,
+         job_analyses_monthly_allowance = $7,
+         training_credits_remaining = $8,
+         training_credits_monthly_allowance = $9,
+         is_lifetime_plan = false,
          updated_at = CURRENT_TIMESTAMP
-     WHERE user_id = $6`,
+     WHERE user_id = $10`,
     [
       plan,
       subscriptionId,
       subscription.current_period_start,
       subscription.current_period_end,
-      PLANS[plan].monthlyCredits,
+      trainingCredits, // legacy credits = training credits
+      jobAnalyses,
+      jobAllowance,
+      trainingCredits,
+      trainingAllowance,
       userId
     ]
   );
@@ -194,22 +209,30 @@ async function handlePaymentSucceeded(invoice) {
   if (result.rows.length > 0) {
     const { user_id, plan } = result.rows[0];
     
-    // Reset credits to monthly allowance
+    const planDef = PLANS[plan];
+    const jobAnalyses = planDef.monthlyJobAnalyses === -1 ? 999999 : planDef.monthlyJobAnalyses;
+    const trainingCredits = planDef.monthlyTrainingCredits;
+
+    // Reset both buckets to monthly allowance (only for non-lifetime plans)
     await pool.query(
-      `UPDATE subscriptions 
+      `UPDATE subscriptions
        SET credits_remaining = $1,
            credits_monthly_allowance = $1,
            credits_reset_at = to_timestamp($2),
            current_period_start = to_timestamp($3),
            current_period_end = to_timestamp($4),
+           job_analyses_remaining = $5,
+           training_credits_remaining = $6,
            status = 'active',
            updated_at = CURRENT_TIMESTAMP
-       WHERE user_id = $5`,
+       WHERE user_id = $7 AND is_lifetime_plan = false`,
       [
-        PLANS[plan].monthlyCredits,
+        trainingCredits,
         subscription.current_period_end,
         subscription.current_period_start,
         subscription.current_period_end,
+        jobAnalyses,
+        trainingCredits,
         user_id
       ]
     );
@@ -229,15 +252,21 @@ async function handlePaymentFailed(invoice) {
 }
 
 async function handleSubscriptionDeleted(subscription) {
+  const freePlan = PLANS.free;
   await pool.query(
-    `UPDATE subscriptions 
+    `UPDATE subscriptions
      SET plan = 'free',
          status = 'canceled',
          credits_remaining = $1,
-         credits_monthly_allowance = $1,
+         credits_monthly_allowance = 0,
+         job_analyses_remaining = $2,
+         job_analyses_monthly_allowance = 0,
+         training_credits_remaining = $3,
+         training_credits_monthly_allowance = 0,
+         is_lifetime_plan = true,
          updated_at = CURRENT_TIMESTAMP
-     WHERE stripe_subscription_id = $2`,
-    [PLANS.free.monthlyCredits, subscription.id]
+     WHERE stripe_subscription_id = $4`,
+    [freePlan.lifetimeTrainingCredits, freePlan.lifetimeJobAnalyses, freePlan.lifetimeTrainingCredits, subscription.id]
   );
 }
 
