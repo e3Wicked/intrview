@@ -15,6 +15,7 @@ function HomePage({ user, onLoginSuccess }) {
   const [error, setError] = useState(null)
   const featuresRef = useRef(null)
   const pricingRef = useRef(null)
+  const googleBtnContainerRef = useRef(null)
 
   useEffect(() => {
     if (user) navigate('/dashboard', { replace: true })
@@ -43,6 +44,64 @@ function HomePage({ user, onLoginSuccess }) {
 
   const scrollTo = (ref) => {
     ref.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  // Initialize Google Sign-In when auth modal opens and render a hidden button.
+  // Clicking our custom button forwards to the hidden Google button, which is
+  // more reliable than prompt() (One Tap is silently suppressed in many contexts).
+  useEffect(() => {
+    if (!showAuth) return
+
+    const initGoogle = () => {
+      if (!window.google?.accounts?.id || !googleBtnContainerRef.current) return
+
+      window.google.accounts.id.initialize({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        callback: async ({ credential }) => {
+          try {
+            setLoading(true)
+            setError(null)
+            const res = await axios.post('/api/auth/google', { credential })
+            if (res.data.success && onLoginSuccess) {
+              onLoginSuccess(res.data.user, res.data.sessionToken)
+            }
+          } catch (err) {
+            const detail = err.response?.data?.detail
+            setError((err.response?.data?.error || 'Google sign-in failed') + (detail ? `: ${detail}` : ''))
+          } finally {
+            setLoading(false)
+          }
+        },
+      })
+
+      window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
+        type: 'standard',
+        size: 'large',
+        width: 1,
+      })
+    }
+
+    if (window.google?.accounts?.id) {
+      initGoogle()
+    } else {
+      // Script loads async — poll until ready
+      const interval = setInterval(() => {
+        if (window.google?.accounts?.id) {
+          clearInterval(interval)
+          initGoogle()
+        }
+      }, 100)
+      return () => clearInterval(interval)
+    }
+  }, [showAuth])
+
+  const handleGoogleSignIn = () => {
+    const btn = googleBtnContainerRef.current?.querySelector('[role=button]')
+    if (btn) {
+      btn.click()
+    } else {
+      setError('Google Sign-In is not available. Please try the email option.')
+    }
   }
 
   const handleRequestCode = async (e) => {
@@ -120,7 +179,7 @@ function HomePage({ user, onLoginSuccess }) {
         </svg>
       ),
       title: 'Progress Tracking',
-      desc: 'See your mastery across topics, track streaks, earn XP, and level up as you prepare.'
+      desc: 'See your mastery across topics and track improvement as you prepare.'
     },
     {
       icon: (
@@ -143,9 +202,9 @@ function HomePage({ user, onLoginSuccess }) {
   ]
 
   const plans = [
-    { name: 'Free', price: '$0', period: '/forever', features: ['3 job analyses', 'Basic study plans', 'Limited drills', 'Progress tracking'], cta: 'Get Started' },
-    { name: 'Starter', price: '$9', period: '/month', features: ['15 job analyses/mo', 'AI study chat', 'Unlimited drills', 'Company intel', 'XP & achievements'], cta: 'Start Free Trial', popular: true },
-    { name: 'Pro', price: '$19', period: '/month', features: ['Unlimited analyses', 'Priority AI models', 'Mock interviews', 'Weakness coaching', 'Export study plans'], cta: 'Start Free Trial' },
+    { name: 'Free', price: '$0', period: '/forever', features: ['3 job analyses', '15 training credits', 'Study plans & flashcards', 'Progress tracking'], cta: 'Get Started' },
+    { name: 'Starter', price: '$9', period: '/month', features: ['10 job analyses/mo', '150 training credits/mo', 'AI study chat', 'Company research', 'Smart practice ordering'], cta: 'Start Free Trial', popular: true },
+    { name: 'Pro', price: '$19', period: '/month', features: ['30 job analyses/mo', '400 training credits/mo', 'Voice practice', 'Priority AI speed', 'PDF export'], cta: 'Start Free Trial' },
   ]
 
   return (
@@ -328,9 +387,13 @@ function HomePage({ user, onLoginSuccess }) {
             </div>
             <h2>{mode === 'signin' ? 'Welcome back' : 'Create your account'}</h2>
 
+            {/* Hidden container for Google's rendered button — click is forwarded from our custom button */}
+            <div ref={googleBtnContainerRef} style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', height: 0, overflow: 'hidden' }} aria-hidden="true" />
+
             <button
               className="homepage-google-btn"
-              onClick={() => setError('Google sign-in requires GOOGLE_CLIENT_ID to be configured.')}
+              onClick={handleGoogleSignIn}
+              disabled={loading}
             >
               <svg width="18" height="18" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>

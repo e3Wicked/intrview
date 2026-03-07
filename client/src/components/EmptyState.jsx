@@ -134,12 +134,12 @@ function EmptyState({ url, setUrl, handleSubmit, loading, user, onSelectPlan, on
               type="submit" 
               disabled={loading || !url}
               className="empty-generate-btn"
-              title={user ? `This will use 5 credits. You have ${user?.creditsRemaining || 0} credits remaining.` : 'Generate study plan'}
+              title={user ? `This will use 1 job analysis. You have ${user?.jobAnalysesRemaining ?? user?.creditsRemaining ?? 0} remaining.` : 'Generate study plan'}
             >
               {loading ? 'Analyzing...' : (
                 <>
                   Generate Study Plan
-                  {user && <span className="credit-cost-badge">5 credits</span>}
+                  {user && <span className="credit-cost-badge">1 analysis</span>}
                 </>
               )}
             </button>

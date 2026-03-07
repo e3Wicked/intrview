@@ -9,8 +9,11 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
   const [localUrl, setLocalUrl] = useState('')
   const [localLoading, setLocalLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [creditGate, setCreditGate] = useState(null)
   const [showAnalyzeForm, setShowAnalyzeForm] = useState(false)
   const [progressSteps, setProgressSteps] = useState([])
+  const [inputMode, setInputMode] = useState('url') // 'url' | 'text'
+  const [pastedText, setPastedText] = useState('')
   const abortControllerRef = useRef(null)
 
   const processAnalysisResult = (analysisResult) => {
@@ -25,7 +28,7 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
     if (analysisResult && analysisResult.companyInfo) {
       const jdEntry = {
         id: Date.now().toString(),
-        url: localUrl,
+        url: localUrl || 'pasted-text',
         companyName: analysisResult.companyInfo?.name || 'Unknown Company',
         roleTitle: analysisResult.companyInfo?.roleTitle || analysisResult.roleTitle || 'Unknown Role',
         timestamp: new Date().toISOString()
@@ -47,13 +50,18 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
     if (e && e.preventDefault) {
       e.preventDefault()
     }
-    if (!localUrl || localUrl.trim() === '') {
+    if (inputMode === 'url' && (!localUrl || localUrl.trim() === '')) {
       setError('Please enter a job post URL')
+      return
+    }
+    if (inputMode === 'text' && (!pastedText || pastedText.trim().length < 200)) {
+      setError('Please paste at least 200 characters of the job description')
       return
     }
 
     setLocalLoading(true)
     setError(null)
+    setCreditGate(null)
     setProgressSteps([])
 
     const controller = new AbortController()
@@ -67,7 +75,7 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ url: localUrl }),
+        body: JSON.stringify(inputMode === 'url' ? { url: localUrl } : { text: pastedText }),
         signal: controller.signal,
       })
 
@@ -79,7 +87,11 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
           if (response.status === 401) {
             setError('Session expired. Please sign out and sign in again.')
           } else if (response.status === 402 || response.status === 403) {
-            setError('Insufficient credits. Please upgrade your plan.')
+            setCreditGate({
+              remaining: errData.remaining ?? 0,
+              required: errData.required ?? 1,
+              resourceType: errData.resourceType || 'jobAnalyses'
+            })
           } else {
             setError(errData.error || 'An error occurred. Please try again.')
           }
@@ -160,31 +172,104 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
             )}
             <h2>Analyze a Job Posting</h2>
             <form onSubmit={handleAnalyze} className="dashboard-analyze-form">
-              <div className="dashboard-url-input-wrapper">
-                <input
-                  type="url"
-                  value={localUrl}
-                  onChange={(e) => setLocalUrl(e.target.value)}
-                  placeholder="Paste job post URL here..."
-                  required
-                  disabled={localLoading}
-                  className="dashboard-url-input"
-                  autoFocus
-                />
+              {inputMode === 'url' ? (
+                <div className="dashboard-url-input-wrapper">
+                  <input
+                    type="url"
+                    value={localUrl}
+                    onChange={(e) => setLocalUrl(e.target.value)}
+                    placeholder="Paste job post URL here..."
+                    required
+                    disabled={localLoading}
+                    className="dashboard-url-input"
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    disabled={localLoading || !localUrl}
+                    className="dashboard-analyze-btn"
+                  >
+                    {localLoading ? 'Analyzing...' : (
+                      <>
+                        Analyze Job Posting
+                        {user && <span className="credit-badge">1 analysis</span>}
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <div className="dashboard-text-input-wrapper">
+                  <textarea
+                    value={pastedText}
+                    onChange={(e) => setPastedText(e.target.value)}
+                    placeholder="Paste the full job description here (minimum 200 characters)..."
+                    disabled={localLoading}
+                    className="dashboard-text-input"
+                    rows={8}
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    disabled={localLoading || pastedText.trim().length < 200}
+                    className="dashboard-analyze-btn dashboard-analyze-btn-full"
+                  >
+                    {localLoading ? 'Analyzing...' : (
+                      <>
+                        Analyze Job Description
+                        {user && <span className="credit-badge">1 analysis</span>}
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+              {!localLoading && (
                 <button
-                  type="submit"
-                  disabled={localLoading || !localUrl}
-                  className="dashboard-analyze-btn"
+                  type="button"
+                  className="input-mode-toggle"
+                  onClick={() => { setInputMode(inputMode === 'url' ? 'text' : 'url'); setError(null) }}
                 >
-                  {localLoading ? 'Analyzing...' : (
-                    <>
-                      Analyze Job Posting
-                      {user && <span className="credit-badge">5 credits</span>}
-                    </>
-                  )}
+                  {inputMode === 'url' ? "Can't use a URL? Paste the job description instead" : 'Use a URL instead'}
                 </button>
-              </div>
-              {error && <div className="dashboard-error">{error}</div>}
+              )}
+              {error && (
+                <div className="dashboard-error">
+                  {error}
+                  {inputMode === 'url' && error.toLowerCase().includes('paste') && (
+                    <button
+                      type="button"
+                      className="error-paste-btn"
+                      onClick={() => { setInputMode('text'); setError(null) }}
+                    >
+                      Paste job description instead
+                    </button>
+                  )}
+                </div>
+              )}
+              {creditGate && (
+                <div className="credit-gate">
+                  <div className="credit-gate-header">
+                    {creditGate.resourceType === 'jobAnalyses'
+                      ? "You've used all your job analyses"
+                      : "You've run out of training credits"}
+                  </div>
+                  <p className="credit-gate-detail">
+                    {creditGate.resourceType === 'jobAnalyses'
+                      ? <>You have <strong>{creditGate.remaining}</strong> job analys{creditGate.remaining !== 1 ? 'es' : 'is'} remaining.</>
+                      : <>You have <strong>{creditGate.remaining}</strong> training credit{creditGate.remaining !== 1 ? 's' : ''} remaining. This requires <strong>{creditGate.required}</strong>.</>}
+                  </p>
+                  <p className="credit-gate-encouragement">
+                    Upgrade your plan to unlock more and keep your prep momentum going.
+                  </p>
+                  <div className="credit-gate-actions">
+                    <button className="credit-gate-upgrade" onClick={() => { setCreditGate(null); onSelectPlan(); }}>
+                      Upgrade Plan
+                    </button>
+                    <button className="credit-gate-dismiss" onClick={() => setCreditGate(null)}>
+                      Maybe later
+                    </button>
+                  </div>
+                </div>
+              )}
             </form>
             <InlineLoadingTerminal steps={progressSteps} loading={localLoading} />
           </div>

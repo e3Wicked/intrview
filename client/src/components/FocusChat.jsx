@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../utils/api'
-import { useGamification } from '../contexts/GamificationContext'
 import './FocusChat.css'
 
 const STORAGE_KEY = (skill) => `focus_chat_${skill}`
@@ -24,7 +23,7 @@ function clearChatSession(skill) {
   try { sessionStorage.removeItem(STORAGE_KEY(skill)) } catch {}
 }
 
-function saveCompletedSession(skill, { exchangeCount, scores, sessionXp }) {
+function saveCompletedSession(skill, { exchangeCount, scores }) {
   const avgScore = scores.length > 0
     ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
     : null
@@ -34,7 +33,6 @@ function saveCompletedSession(skill, { exchangeCount, scores, sessionXp }) {
     answers: exchangeCount,
     avgScore,
     scores,
-    xpEarned: sessionXp,
   }).catch(err => console.error('[Drill] Failed to save session to DB:', err))
 }
 
@@ -42,15 +40,12 @@ function FocusChat({ skill, user }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const returnTo = searchParams.get('from') || '/dashboard'
-  const { refreshStats } = useGamification()
-
   // Try to restore a saved session for this skill
   const saved = useRef(loadSavedSession(skill))
 
   const [messages, setMessages] = useState(saved.current?.messages || [])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
-  const [sessionXp, setSessionXp] = useState(saved.current?.sessionXp || 0)
   const [exchangeCount, setExchangeCount] = useState(saved.current?.exchangeCount || 0)
   const [scores, setScores] = useState(saved.current?.scores || [])
   const [sessionId, setSessionId] = useState(saved.current?.sessionId || null)
@@ -64,7 +59,6 @@ function FocusChat({ skill, user }) {
   const messagesRef = useRef(saved.current?.messages || [])
   const scoresRef = useRef(saved.current?.scores || [])
   const exchangeCountRef = useRef(saved.current?.exchangeCount || 0)
-  const sessionXpRef = useRef(saved.current?.sessionXp || 0)
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -84,20 +78,18 @@ function FocusChat({ skill, user }) {
   useEffect(() => { messagesRef.current = messages }, [messages])
   useEffect(() => { scoresRef.current = scores }, [scores])
   useEffect(() => { exchangeCountRef.current = exchangeCount }, [exchangeCount])
-  useEffect(() => { sessionXpRef.current = sessionXp }, [sessionXp])
 
   // Save chat state to sessionStorage whenever it changes
   useEffect(() => {
     if (messages.length > 0 && !showEndSummary) {
       saveChatSession(skill, {
         messages: messages.filter(m => m.content), // skip empty streaming messages
-        sessionXp,
         exchangeCount,
         scores,
         sessionId: sessionIdRef.current,
       })
     }
-  }, [messages, sessionXp, exchangeCount, scores, skill, showEndSummary])
+  }, [messages, exchangeCount, scores, skill, showEndSummary])
 
   // Start session and first message on mount (only if no saved session)
   useEffect(() => {
@@ -162,7 +154,7 @@ function FocusChat({ skill, user }) {
       if (!response.ok) {
         const err = await response.json().catch(() => ({ error: 'Request failed' }))
         if (response.status === 402) {
-          setError('No credits remaining. Upgrade your plan to continue.')
+          setError('No training credits remaining. Upgrade your plan to continue.')
         } else {
           setError(err.error || 'Request failed')
         }
@@ -215,10 +207,6 @@ function FocusChat({ skill, user }) {
                 setScores(prev => [...prev, event.evaluation.score])
               }
             }
-            if (event.xpEarned) {
-              setSessionXp(prev => prev + event.xpEarned)
-              refreshStats()
-            }
           } else if (event.type === 'error') {
             setMessages(prev => {
               const updated = [...prev]
@@ -270,7 +258,6 @@ function FocusChat({ skill, user }) {
     saveCompletedSession(skill, {
       exchangeCount: exchangeCountRef.current,
       scores: scoresRef.current,
-      sessionXp: sessionXpRef.current,
     })
     clearChatSession(skill)
     setShowEndSummary(true)
@@ -306,10 +293,6 @@ function FocusChat({ skill, user }) {
               <span className="focus-stat-label">Avg Score</span>
             </div>
           )}
-          <div className="focus-summary-stat">
-            <span className="focus-stat-value xp-value">+{sessionXp}</span>
-            <span className="focus-stat-label">XP Earned</span>
-          </div>
         </div>
         {scores.length > 0 && (
           <div className="focus-summary-breakdown">
@@ -338,7 +321,6 @@ function FocusChat({ skill, user }) {
             setMessages([])
             messagesRef.current = []
             setExchangeCount(0)
-            setSessionXp(0)
             setScores([])
             setShowEndSummary(false)
             startedRef.current = false
@@ -369,9 +351,6 @@ function FocusChat({ skill, user }) {
           </span>
         </div>
         <div className="focus-header-right">
-          {sessionXp > 0 && (
-            <span className="focus-xp-counter">+{sessionXp} XP</span>
-          )}
           <button className="focus-end-btn" onClick={handleEndChat}>
             End Session
           </button>

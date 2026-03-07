@@ -2,14 +2,12 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { api } from '../utils/api'
-import { useGamification } from '../contexts/GamificationContext'
-import { getLevelForXp } from '../utils/gamification'
 import LogoWithFallbacks from './LogoWithFallbacks'
+import StreakActivityCard from './StreakActivityCard'
 import './MissionDashboard.css'
 
 function MissionDashboard({ user, onAnalyzeClick }) {
   const navigate = useNavigate()
-  const { gamStats } = useGamification()
   const [analyses, setAnalyses] = useState([])
   const [loading, setLoading] = useState(true)
   const [studyPlans, setStudyPlans] = useState({})
@@ -17,6 +15,7 @@ function MissionDashboard({ user, onAnalyzeClick }) {
   const [weaknessNudge, setWeaknessNudge] = useState(null)
   const [topicScores, setTopicScores] = useState([])
   const [allTopics, setAllTopics] = useState([])
+  const [activityData, setActivityData] = useState(null)
 
   useEffect(() => {
     loadData()
@@ -25,13 +24,14 @@ function MissionDashboard({ user, onAnalyzeClick }) {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [analysesRes, weaknessRes, topicsRes, allTopicsRes] = await Promise.all([
+      const [analysesRes, topicsRes, allTopicsRes, activityRes] = await Promise.all([
         axios.get('/api/user/analyses?limit=100'),
-        api.gamification.getWeaknessReport().catch(() => ({ data: null })),
         api.topics.getUserScores().catch(() => ({ data: [] })),
         api.topics.getAllTopics().catch(() => ({ data: [] })),
+        api.activity.getSummary().catch(() => ({ data: null })),
       ])
       setAnalyses(analysesRes.data)
+      setActivityData(activityRes.data)
 
       const scored = Array.isArray(topicsRes.data) ? topicsRes.data : []
       const sorted = [...scored].sort((a, b) => {
@@ -43,23 +43,16 @@ function MissionDashboard({ user, onAnalyzeClick }) {
       const all = Array.isArray(allTopicsRes.data) ? allTopicsRes.data : []
       setAllTopics(all)
 
-      if (weaknessRes.data?.weakCategories?.length > 0) {
-        const weakest = weaknessRes.data.weakCategories[0]
-        if (weakest.mastery < 80) {
-          setWeaknessNudge(weakest)
-        }
-      }
-
-      // If no weakness from API, derive from topic scores
-      if (!weaknessRes.data?.weakCategories?.length) {
-        const practiced = scored.filter(t => t.attempts > 0)
-        if (practiced.length > 0) {
-          const weakest = practiced.reduce((min, t) => t.score < min.score ? t : min, practiced[0])
+      // Derive weakness nudge from topic scores
+      const practiced = scored.filter(t => t.attempts > 0)
+      if (practiced.length > 0) {
+        const weakest = practiced.reduce((min, t) => t.score < min.score ? t : min, practiced[0])
+        if (weakest.score < 80) {
           setWeaknessNudge({ category: weakest.topic_name, mastery: weakest.score })
-        } else if (all.length > 0) {
-          const random = all[Math.floor(Math.random() * all.length)]
-          setWeaknessNudge({ category: random.topic_name || random.name, mastery: 0 })
         }
+      } else if (all.length > 0) {
+        const random = all[Math.floor(Math.random() * all.length)]
+        setWeaknessNudge({ category: random.topic_name || random.name, mastery: 0 })
       }
 
       // Load study plans and server progress in parallel
@@ -68,7 +61,7 @@ function MissionDashboard({ user, onAnalyzeClick }) {
       await Promise.all(analysesRes.data.map(async (analysis) => {
         try {
           const [planRes, progressRes] = await Promise.all([
-            axios.get(`/api/user/study-plan/${analysis.job_description_hash}`),
+            axios.get(`/api/user/study-plan/${analysis.job_description_hash}`).catch(() => ({ data: null })),
             api.progress.get(analysis.job_description_hash).catch(() => ({ data: {} })),
           ])
           plans[analysis.job_description_hash] = planRes.data
@@ -178,17 +171,6 @@ function MissionDashboard({ user, onAnalyzeClick }) {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
-  if (loading) {
-    return (
-      <div className="mission-dashboard">
-        <div className="dashboard-loading">Loading your dashboard...</div>
-      </div>
-    )
-  }
-
-  const levelInfo = gamStats ? getLevelForXp(gamStats.totalXp) : null
-  const streak = gamStats?.streak || { current: 0, multiplier: 1.0 }
-
   // All topics for full-width display (practiced first, then unpracticed)
   const allTopicsSorted = useMemo(() => {
     const practiced = topicScores.filter(t => t.attempts > 0)
@@ -198,6 +180,14 @@ function MissionDashboard({ user, onAnalyzeClick }) {
       .map(t => ({ ...t, topic_name: t.topic_name || t.name, score: 0, attempts: 0 }))
     return [...practiced, ...unpracticed]
   }, [topicScores, allTopics])
+
+  if (loading) {
+    return (
+      <div className="mission-dashboard">
+        <div className="dashboard-loading">Loading your dashboard...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="mission-dashboard">
@@ -212,26 +202,11 @@ function MissionDashboard({ user, onAnalyzeClick }) {
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
           <span>Analyze Job</span>
-          {user && <span className="analyze-cta-credits">5 credits</span>}
         </button>
       </div>
 
       {/* Stat Cards Row */}
       <div className="dash-stats-row">
-        <div className="dash-stat-card">
-          <span className="dash-stat-icon">🔥</span>
-          <div className="dash-stat-info">
-            <span className="dash-stat-value">{streak.current}</span>
-            <span className="dash-stat-label">Day Streak</span>
-          </div>
-        </div>
-        <div className="dash-stat-card">
-          <span className="dash-stat-icon">⚡</span>
-          <div className="dash-stat-info">
-            <span className="dash-stat-value">{gamStats?.totalXp || 0}</span>
-            <span className="dash-stat-label">Total XP</span>
-          </div>
-        </div>
         <div className="dash-stat-card">
           <span className="dash-stat-icon">🎯</span>
           <div className="dash-stat-info">
@@ -246,7 +221,24 @@ function MissionDashboard({ user, onAnalyzeClick }) {
             <span className="dash-stat-label">Avg Mastery</span>
           </div>
         </div>
+        <div className="dash-stat-card">
+          <span className="dash-stat-icon">📚</span>
+          <div className="dash-stat-info">
+            <span className="dash-stat-value">{studyOverview.practiced}/{studyOverview.totalTopics}</span>
+            <span className="dash-stat-label">Topics Practiced</span>
+          </div>
+        </div>
+        <div className="dash-stat-card">
+          <span className="dash-stat-icon">✅</span>
+          <div className="dash-stat-info">
+            <span className="dash-stat-value">{studyOverview.mastered}</span>
+            <span className="dash-stat-label">Mastered</span>
+          </div>
+        </div>
       </div>
+
+      {/* Streak & Activity */}
+      <StreakActivityCard data={activityData} />
 
       {/* Full-width Topics Section */}
       {allTopicsSorted.length > 0 && (

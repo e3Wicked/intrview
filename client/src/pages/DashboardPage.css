@@ -154,6 +154,159 @@
   font-size: 14px;
 }
 
+/* Credit gate inline message */
+.credit-gate {
+  margin-top: 16px;
+  padding: 20px;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.credit-gate-header {
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text-primary, #1a1a1a);
+  margin-bottom: 8px;
+}
+
+.credit-gate-detail {
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 14px;
+  color: var(--color-text-secondary, #6b6b6b);
+  margin: 0 0 4px 0;
+}
+
+.credit-gate-detail strong {
+  color: var(--color-accent, #2563eb);
+}
+
+.credit-gate-encouragement {
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b6b6b);
+  margin: 0 0 16px 0;
+}
+
+.credit-gate-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.credit-gate-upgrade {
+  padding: 10px 24px;
+  background: var(--color-accent, #2563eb);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.credit-gate-upgrade:hover {
+  background: #1d4ed8;
+}
+
+.credit-gate-dismiss {
+  padding: 10px 16px;
+  background: transparent;
+  color: var(--color-text-secondary, #6b6b6b);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 6px;
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.credit-gate-dismiss:hover {
+  border-color: var(--color-text-secondary, #6b6b6b);
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+/* Text input mode */
+.dashboard-text-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dashboard-text-input {
+  width: 100%;
+  padding: 14px 18px;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 8px;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 140px;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.dashboard-text-input:focus {
+  outline: none;
+  border-color: var(--color-accent, #2563eb);
+}
+
+.dashboard-text-input::placeholder {
+  color: var(--color-text-secondary, #6b6b6b);
+}
+
+.dashboard-analyze-btn-full {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Input mode toggle */
+.input-mode-toggle {
+  display: block;
+  margin-top: 8px;
+  background: none;
+  border: none;
+  color: var(--color-accent, #2563eb);
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.input-mode-toggle:hover {
+  color: #1d4ed8;
+}
+
+/* Error recovery button */
+.error-paste-btn {
+  display: inline-block;
+  margin-top: 8px;
+  background: none;
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  color: #dc2626;
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.error-paste-btn:hover {
+  background: rgba(220, 38, 38, 0.05);
+  border-color: #dc2626;
+}
+
 @media (max-width: 768px) {
   .dashboard-url-input-wrapper {
     flex-direction: column;

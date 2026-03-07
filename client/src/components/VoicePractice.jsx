@@ -12,8 +12,6 @@ function VoicePractice({ questions, jobDescription, jobDescriptionHash, sessionI
   const [transcribing, setTranscribing] = useState(false)
   const [transcript, setTranscript] = useState(null)
   const [scores, setScores] = useState([])
-  const [lastXp, setLastXp] = useState(null)
-
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const timerRef = useRef(null)
@@ -68,7 +66,7 @@ function VoicePractice({ questions, jobDescription, jobDescriptionHash, sessionI
     setLoading(true)
     setEvaluation(null)
     setTranscript(null)
-    setLastXp(null)
+
 
     try {
       const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
@@ -96,18 +94,7 @@ function VoicePractice({ questions, jobDescription, jobDescriptionHash, sessionI
               setEvaluation(response.data.evaluation)
             }
 
-            if (response.data.xpEarned !== undefined) {
-              setLastXp(response.data.xpEarned)
-              if (onXpGained) {
-                onXpGained({
-                  xpEarned: response.data.xpEarned,
-                  totalXp: response.data.totalXp,
-                  levelUp: response.data.levelUp,
-                  levelTitle: response.data.levelTitle,
-                  newAchievements: response.data.newAchievements,
-                })
-              }
-            }
+            if (onXpGained) onXpGained()
           }
         } catch (error) {
           console.error('Error evaluating voice:', error)
@@ -130,7 +117,7 @@ function VoicePractice({ questions, jobDescription, jobDescriptionHash, sessionI
       setAudioUrl(null)
       setEvaluation(null)
       setTranscript(null)
-      setLastXp(null)
+  
       audioChunksRef.current = []
     }
   }
@@ -141,7 +128,7 @@ function VoicePractice({ questions, jobDescription, jobDescriptionHash, sessionI
       setAudioUrl(null)
       setEvaluation(null)
       setTranscript(null)
-      setLastXp(null)
+  
       audioChunksRef.current = []
     }
   }
@@ -193,7 +180,7 @@ function VoicePractice({ questions, jobDescription, jobDescriptionHash, sessionI
                 setAudioUrl(null)
                 setTranscript(null)
                 setEvaluation(null)
-                setLastXp(null)
+            
                 audioChunksRef.current = []
               }}>Record Again</button>
               <button className="voice-submit-btn" onClick={handleSubmit} disabled={loading}>
@@ -219,9 +206,6 @@ function VoicePractice({ questions, jobDescription, jobDescriptionHash, sessionI
               <div className={`score-badge score-${evaluation.score >= 80 ? 'high' : evaluation.score >= 60 ? 'medium' : 'low'}`}>
                 {evaluation.score}/100
               </div>
-              {lastXp !== null && lastXp > 0 && (
-                <div className="quiz-xp-gain">+{lastXp} XP</div>
-              )}
             </div>
           </div>
 

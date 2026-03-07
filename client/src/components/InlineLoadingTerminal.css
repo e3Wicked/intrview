@@ -2,7 +2,7 @@
   margin-top: 20px;
   background: var(--color-bg-card, #ffffff);
   border: 1px solid var(--color-border, #e6e3de);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 20px 24px 16px;
   animation: iltFadeIn 0.3s ease;
   box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
@@ -17,40 +17,53 @@
 .ilt-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
   margin-bottom: 16px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--color-border, #e6e3de);
 }
 
-.ilt-indicator {
+.ilt-header-left {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 10px;
 }
 
-.ilt-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #d8d5ce;
+.ilt-icon-square {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.ilt-dot:nth-child(1) { background: #ff5f57; }
-.ilt-dot:nth-child(2) { background: #ffbd2e; }
-.ilt-dot:nth-child(3) { background: #28ca41; }
+.ilt-title {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+}
 
-.ilt-label {
-  font-family: 'Inconsolata', 'Courier New', monospace;
+.ilt-badge {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 12px;
-  color: #b0ada6;
-  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+  padding: 3px 10px;
+  border-radius: 20px;
+  flex-shrink: 0;
 }
 
 /* -- Steps -- */
 .ilt-steps {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 20px;
 }
 
@@ -58,46 +71,59 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 14px;
-  transition: opacity 0.3s ease;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: opacity 0.3s ease, background 0.3s ease;
 }
 
-.ilt-line.pending { opacity: 0.25; }
-.ilt-line.active  { opacity: 1; }
-.ilt-line.done    { opacity: 0.5; }
+.ilt-line.pending { opacity: 0.35; }
+.ilt-line.active  { opacity: 1; background: rgba(37, 99, 235, 0.05); }
+.ilt-line.done    { opacity: 0.55; }
 
 .ilt-prefix {
-  width: 16px;
-  text-align: center;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 
 .ilt-check {
-  color: #16a34a;
-  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
 }
 
 .ilt-spinner {
-  color: var(--color-accent, #2563eb);
-  font-size: 16px;
-  font-weight: bold;
-  animation: iltBlink 0.8s ease-in-out infinite;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(37, 99, 235, 0.2);
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: iltSpin 0.8s linear infinite;
 }
 
-@keyframes iltBlink {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.2; }
+@keyframes iltSpin {
+  to { transform: rotate(360deg); }
 }
 
-.ilt-pending { color: #d8d5ce; }
+.ilt-pending {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d4d2cc;
+}
 
 .ilt-text { color: var(--color-text-primary, #1a1a1a); }
-.ilt-line.done .ilt-text   { color: #b0ada6; }
-.ilt-line.active .ilt-text { color: var(--color-accent, #2563eb); }
+.ilt-line.done .ilt-text   { color: #9a9a9a; }
+.ilt-line.active .ilt-text { color: #2563eb; font-weight: 500; }
 
 .ilt-dots {
-  color: var(--color-accent, #2563eb);
+  color: #2563eb;
   letter-spacing: 1px;
   display: inline-block;
   width: 20px;
@@ -107,39 +133,29 @@
 .ilt-footer {
   display: flex;
   align-items: center;
-  gap: 12px;
   margin-bottom: 10px;
 }
 
 .ilt-bar-container {
   flex: 1;
-  height: 3px;
+  height: 6px;
   background: var(--color-bg-secondary, #f4f2ee);
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
 }
 
 .ilt-bar-fill {
   height: 100%;
   background: linear-gradient(90deg, #2563eb, #3b82f6);
-  border-radius: 2px;
-  transition: width 0.6s ease;
-}
-
-.ilt-pct {
-  font-family: 'Inconsolata', 'Courier New', monospace;
-  font-size: 12px;
-  color: #b0ada6;
-  width: 32px;
-  text-align: right;
-  flex-shrink: 0;
+  border-radius: 3px;
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* -- Footer note -- */
 .ilt-note {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 12px;
-  color: #c0bdb6;
+  color: #6b6b6b;
   margin: 0;
   text-align: center;
-  font-family: 'Inconsolata', 'Courier New', monospace;
 }

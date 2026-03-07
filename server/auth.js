@@ -2,12 +2,15 @@ import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { pool } from './db.js';
 
-// Plan configurations
+// Plan configurations — two-bucket model: job analyses + training credits
 export const PLANS = {
   free: {
     name: 'Free',
-    monthlyCredits: 15,
-    monthlyJobAnalyses: 1,
+    lifetimeJobAnalyses: 3,
+    lifetimeTrainingCredits: 15,
+    monthlyJobAnalyses: 0,
+    monthlyTrainingCredits: 0,
+    isLifetime: true,
     features: {
       studyPlan: true,
       questions: true,
@@ -22,8 +25,8 @@ export const PLANS = {
   },
   starter: {
     name: 'Starter',
-    monthlyCredits: 120,
-    monthlyJobAnalyses: 3,
+    monthlyJobAnalyses: 10,
+    monthlyTrainingCredits: 150,
     price: 9,
     features: {
       studyPlan: true,
@@ -39,8 +42,8 @@ export const PLANS = {
   },
   pro: {
     name: 'Pro',
-    monthlyCredits: 300,
-    monthlyJobAnalyses: -1, // unlimited
+    monthlyJobAnalyses: 30,
+    monthlyTrainingCredits: 400,
     price: 19,
     features: {
       studyPlan: true,
@@ -56,8 +59,8 @@ export const PLANS = {
   },
   elite: {
     name: 'Elite',
-    monthlyCredits: 600,
     monthlyJobAnalyses: -1, // unlimited
+    monthlyTrainingCredits: 800,
     price: 39,
     features: {
       studyPlan: true,
@@ -76,15 +79,26 @@ export const PLANS = {
   }
 };
 
-// Credit costs for different actions
-export const CREDIT_COSTS = {
-  companyInfo: 2,
-  studyPlan: 5,
-  companyResearch: 3,
-  quizEvaluation: 1,
-  voiceEvaluation: 2,
+// Training credit costs per action
+export const TRAINING_CREDIT_COSTS = {
   chatPractice: 1,
-  focusChat: 1
+  focusChat: 1,
+  quizEvaluation: 2,
+  voiceEvaluation: 2,
+  companyResearch: 3,
+  studyPlan: 5,
+};
+
+// Keep old CREDIT_COSTS as alias for backwards compat during migration
+export const CREDIT_COSTS = {
+  jobAnalysis: 5,
+  companyInfo: 2,
+  studyPlan: TRAINING_CREDIT_COSTS.studyPlan,
+  companyResearch: TRAINING_CREDIT_COSTS.companyResearch,
+  quizEvaluation: TRAINING_CREDIT_COSTS.quizEvaluation,
+  voiceEvaluation: TRAINING_CREDIT_COSTS.voiceEvaluation,
+  chatPractice: TRAINING_CREDIT_COSTS.chatPractice,
+  focusChat: TRAINING_CREDIT_COSTS.focusChat,
 };
 
 // Generate 6-digit verification code
@@ -115,18 +129,12 @@ export async function createUserWithoutPassword(email, name) {
 
     const newUser = result.rows[0];
 
-    // Check if admin user - give unlimited credits
+    // Check if admin user
     const isAdmin = isAdminUser(email);
     const plan = isAdmin ? 'elite' : 'free';
-    const credits = isAdmin ? 999999 : PLANS.free.monthlyCredits;
-    const resetInterval = isAdmin ? '365 days' : '30 days';
 
-    // Create subscription
-    await pool.query(
-      `INSERT INTO subscriptions (user_id, plan, credits_remaining, credits_monthly_allowance, credits_reset_at)
-       VALUES ($1, $2, $3, $3, CURRENT_TIMESTAMP + INTERVAL '${resetInterval}')`,
-      [newUser.id, plan, credits]
-    );
+    // Create subscription with two-bucket model
+    await createNewSubscription(newUser.id, plan);
 
     return newUser;
   } catch (error) {
@@ -216,18 +224,12 @@ export async function createUser(email, name, password) {
 
     const newUser = result.rows[0];
 
-    // Check if admin user - give unlimited credits
+    // Check if admin user
     const isAdmin = isAdminUser(email);
     const plan = isAdmin ? 'elite' : 'free';
-    const credits = isAdmin ? 999999 : PLANS.free.monthlyCredits;
-    const resetInterval = isAdmin ? '365 days' : '30 days';
 
-    // Create subscription
-    await pool.query(
-      `INSERT INTO subscriptions (user_id, plan, credits_remaining, credits_monthly_allowance, credits_reset_at)
-       VALUES ($1, $2, $3, $3, CURRENT_TIMESTAMP + INTERVAL '${resetInterval}')`,
-      [newUser.id, plan, credits]
-    );
+    // Create subscription with two-bucket model
+    await createNewSubscription(newUser.id, plan);
 
     return newUser;
   } catch (error) {
@@ -273,7 +275,7 @@ export async function verifyPassword(email, password) {
 // Create or get user (for Google OAuth)
 export async function createOrGetUser(email, name = null, googleId = null) {
   try {
-    // Check if user exists
+    // Check if user exists by google_id first, then fall back to email
     let user;
     if (googleId) {
       const result = await pool.query(
@@ -281,7 +283,9 @@ export async function createOrGetUser(email, name = null, googleId = null) {
         [googleId]
       );
       user = result.rows[0];
-    } else {
+    }
+
+    if (!user) {
       const result = await pool.query(
         'SELECT * FROM users WHERE email = $1',
         [email]
@@ -290,8 +294,16 @@ export async function createOrGetUser(email, name = null, googleId = null) {
     }
 
     if (user) {
-      // Update name if provided
-      if (name && name !== user.name) {
+      // Link google_id if the account didn't have one yet
+      if (googleId && !user.google_id) {
+        await pool.query(
+          'UPDATE users SET google_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+          [googleId, user.id]
+        );
+        user.google_id = googleId;
+      }
+      // Update name if provided and missing
+      if (name && !user.name) {
         await pool.query(
           'UPDATE users SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
           [name, user.id]
@@ -311,12 +323,8 @@ export async function createOrGetUser(email, name = null, googleId = null) {
 
     const newUser = result.rows[0];
 
-    // Create free subscription
-    await pool.query(
-      `INSERT INTO subscriptions (user_id, plan, credits_remaining, credits_monthly_allowance, credits_reset_at)
-       VALUES ($1, 'free', $2, $2, CURRENT_TIMESTAMP + INTERVAL '30 days')`,
-      [newUser.id, PLANS.free.monthlyCredits]
-    );
+    // Create subscription with two-bucket model
+    await createNewSubscription(newUser.id, 'free');
 
     return newUser;
   } catch (error) {
@@ -344,7 +352,10 @@ export async function createSession(userId) {
 export async function getUserFromSession(sessionToken) {
   try {
     const result = await pool.query(
-      `SELECT u.*, s.plan, s.credits_remaining, s.credits_monthly_allowance, 
+      `SELECT u.*, s.plan, s.credits_remaining, s.credits_monthly_allowance,
+              s.job_analyses_remaining, s.job_analyses_monthly_allowance,
+              s.training_credits_remaining, s.training_credits_monthly_allowance,
+              s.is_lifetime_plan,
               s.stripe_customer_id, s.stripe_subscription_id, s.status as subscription_status
        FROM user_sessions us
        JOIN users u ON us.user_id = u.id
@@ -359,29 +370,18 @@ export async function getUserFromSession(sessionToken) {
 
     const user = result.rows[0];
     const plan = PLANS[user.plan || 'free'];
-    
-    // Override credits and features for admin users
+
+    // Override for admin users
     const isAdmin = isAdminUser(user.email);
-    const creditsRemaining = isAdmin ? 999999 : (user.credits_remaining || 0);
-    const creditsMonthlyAllowance = isAdmin ? 999999 : (user.credits_monthly_allowance || 0);
-    
-    // Admin users get all features enabled
+
     const adminFeatures = {
-      studyPlan: true,
-      questions: true,
-      flashcards: true,
-      quiz: true,
-      companyResearch: true,
-      progressTracking: true,
-      voicePractice: true,
-      pdfExport: true,
-      prioritySpeed: true,
-      advancedInsights: true,
-      personalizedRecommendations: true,
-      customSimulation: true
+      studyPlan: true, questions: true, flashcards: true, quiz: true,
+      companyResearch: true, progressTracking: true, voicePractice: true,
+      pdfExport: true, prioritySpeed: true, advancedInsights: true,
+      personalizedRecommendations: true, customSimulation: true
     };
-    
-    const finalPlanDetails = isAdmin 
+
+    const finalPlanDetails = isAdmin
       ? { ...plan, features: adminFeatures }
       : plan;
 
@@ -391,12 +391,19 @@ export async function getUserFromSession(sessionToken) {
       name: user.name,
       plan: user.plan || 'free',
       planDetails: finalPlanDetails,
-      creditsRemaining: creditsRemaining,
-      creditsMonthlyAllowance: creditsMonthlyAllowance,
+      // Legacy single-bucket fields (kept for compat)
+      creditsRemaining: isAdmin ? 999999 : (user.credits_remaining || 0),
+      creditsMonthlyAllowance: isAdmin ? 999999 : (user.credits_monthly_allowance || 0),
+      // Two-bucket fields
+      jobAnalysesRemaining: isAdmin ? 999999 : (user.job_analyses_remaining || 0),
+      jobAnalysesMonthlyAllowance: isAdmin ? -1 : (user.job_analyses_monthly_allowance || 0),
+      trainingCreditsRemaining: isAdmin ? 999999 : (user.training_credits_remaining || 0),
+      trainingCreditsMonthlyAllowance: isAdmin ? 999999 : (user.training_credits_monthly_allowance || 0),
+      isLifetimePlan: user.is_lifetime_plan || false,
       stripeCustomerId: user.stripe_customer_id,
       stripeSubscriptionId: user.stripe_subscription_id,
       subscriptionStatus: user.subscription_status,
-      isAdmin: isAdmin // Add flag for frontend use
+      isAdmin: isAdmin
     };
   } catch (error) {
     console.error('Error getting user from session:', error);
@@ -515,7 +522,7 @@ export function requireAdmin(req, res, next) {
   });
 }
 
-// Middleware to require credits
+// Middleware to require credits (legacy — kept for any routes not yet migrated)
 export function requireCredits(actionCost) {
   return async (req, res, next) => {
     if (!req.user) {
@@ -523,9 +530,9 @@ export function requireCredits(actionCost) {
     }
 
     const { hasCredits, remaining } = await checkCredits(req.user.id, actionCost);
-    
+
     if (!hasCredits) {
-      return res.status(402).json({ 
+      return res.status(402).json({
         error: 'Insufficient credits',
         remaining,
         required: actionCost,
@@ -534,6 +541,168 @@ export function requireCredits(actionCost) {
     }
 
     req.creditCost = actionCost;
+    next();
+  };
+}
+
+// ==================== TWO-BUCKET CREDIT SYSTEM ====================
+
+// Helper to create a new subscription row with correct bucket values
+export async function createNewSubscription(userId, planKey) {
+  const isAdmin = (await pool.query('SELECT email FROM users WHERE id = $1', [userId])).rows[0]?.email;
+  const admin = isAdmin && isAdminUser(isAdmin);
+  const plan = PLANS[planKey] || PLANS.free;
+
+  let jobAnalyses, jobAllowance, trainingCredits, trainingAllowance, isLifetime;
+
+  if (admin) {
+    jobAnalyses = 999999; jobAllowance = -1;
+    trainingCredits = 999999; trainingAllowance = 999999;
+    isLifetime = false;
+  } else if (planKey === 'free') {
+    jobAnalyses = plan.lifetimeJobAnalyses;
+    jobAllowance = 0;
+    trainingCredits = plan.lifetimeTrainingCredits;
+    trainingAllowance = 0;
+    isLifetime = true;
+  } else {
+    jobAnalyses = plan.monthlyJobAnalyses === -1 ? 999999 : plan.monthlyJobAnalyses;
+    jobAllowance = plan.monthlyJobAnalyses;
+    trainingCredits = plan.monthlyTrainingCredits;
+    trainingAllowance = plan.monthlyTrainingCredits;
+    isLifetime = false;
+  }
+
+  // Also set legacy credits columns for backwards compat
+  const legacyCredits = admin ? 999999 : (planKey === 'free' ? 15 : (plan.monthlyTrainingCredits || 0));
+
+  await pool.query(
+    `INSERT INTO subscriptions (
+      user_id, plan, credits_remaining, credits_monthly_allowance, credits_reset_at,
+      job_analyses_remaining, job_analyses_monthly_allowance,
+      training_credits_remaining, training_credits_monthly_allowance,
+      is_lifetime_plan
+    ) VALUES ($1, $2, $3, $3, CURRENT_TIMESTAMP + INTERVAL '30 days', $4, $5, $6, $7, $8)`,
+    [userId, planKey, legacyCredits, jobAnalyses, jobAllowance, trainingCredits, trainingAllowance, isLifetime]
+  );
+}
+
+// Check if user has job analyses remaining
+export async function checkJobAnalyses(userId) {
+  const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+  if (userResult.rows.length > 0 && isAdminUser(userResult.rows[0].email)) {
+    return { hasAnalyses: true, remaining: 999999 };
+  }
+
+  const result = await pool.query(
+    'SELECT job_analyses_remaining, job_analyses_monthly_allowance FROM subscriptions WHERE user_id = $1',
+    [userId]
+  );
+
+  if (result.rows.length === 0) return { hasAnalyses: false, remaining: 0 };
+
+  const { job_analyses_remaining, job_analyses_monthly_allowance } = result.rows[0];
+  // allowance -1 means unlimited
+  if (job_analyses_monthly_allowance === -1) return { hasAnalyses: true, remaining: 999999 };
+
+  return { hasAnalyses: (job_analyses_remaining || 0) >= 1, remaining: job_analyses_remaining || 0 };
+}
+
+// Atomically deduct one job analysis
+export async function deductJobAnalysis(userId) {
+  const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+  if (userResult.rows.length > 0 && isAdminUser(userResult.rows[0].email)) return 999999;
+
+  // Skip deduction for unlimited plans
+  const allowance = await pool.query(
+    'SELECT job_analyses_monthly_allowance FROM subscriptions WHERE user_id = $1', [userId]
+  );
+  if (allowance.rows[0]?.job_analyses_monthly_allowance === -1) return 999999;
+
+  const result = await pool.query(
+    `UPDATE subscriptions
+     SET job_analyses_remaining = job_analyses_remaining - 1, updated_at = CURRENT_TIMESTAMP
+     WHERE user_id = $1 AND job_analyses_remaining >= 1
+     RETURNING job_analyses_remaining`,
+    [userId]
+  );
+
+  if (result.rows.length === 0) throw new Error('Failed to deduct job analysis');
+  return result.rows[0].job_analyses_remaining;
+}
+
+// Check if user has enough training credits
+export async function checkTrainingCredits(userId, cost) {
+  const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+  if (userResult.rows.length > 0 && isAdminUser(userResult.rows[0].email)) {
+    return { hasCredits: true, remaining: 999999 };
+  }
+
+  const result = await pool.query(
+    'SELECT training_credits_remaining FROM subscriptions WHERE user_id = $1',
+    [userId]
+  );
+
+  if (result.rows.length === 0) return { hasCredits: false, remaining: 0 };
+
+  const remaining = result.rows[0].training_credits_remaining || 0;
+  return { hasCredits: remaining >= cost, remaining };
+}
+
+// Atomically deduct training credits
+export async function deductTrainingCredits(userId, cost) {
+  const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+  if (userResult.rows.length > 0 && isAdminUser(userResult.rows[0].email)) return 999999;
+
+  const result = await pool.query(
+    `UPDATE subscriptions
+     SET training_credits_remaining = training_credits_remaining - $2, updated_at = CURRENT_TIMESTAMP
+     WHERE user_id = $1 AND training_credits_remaining >= $2
+     RETURNING training_credits_remaining`,
+    [userId, cost]
+  );
+
+  if (result.rows.length === 0) throw new Error('Failed to deduct training credits');
+  return result.rows[0].training_credits_remaining;
+}
+
+// Middleware: require a job analysis
+export function requireJobAnalysis() {
+  return async (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+
+    const { hasAnalyses, remaining } = await checkJobAnalyses(req.user.id);
+    if (!hasAnalyses) {
+      return res.status(402).json({
+        error: 'No job analyses remaining',
+        resourceType: 'jobAnalyses',
+        remaining,
+        upgradeRequired: true
+      });
+    }
+    next();
+  };
+}
+
+// Middleware: require training credits for a given action
+export function requireTrainingCredits(action) {
+  return async (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+
+    const cost = TRAINING_CREDIT_COSTS[action];
+    if (cost === undefined) return res.status(500).json({ error: `Unknown action: ${action}` });
+
+    const { hasCredits, remaining } = await checkTrainingCredits(req.user.id, cost);
+    if (!hasCredits) {
+      return res.status(402).json({
+        error: 'Insufficient training credits',
+        resourceType: 'trainingCredits',
+        remaining,
+        required: cost,
+        upgradeRequired: true
+      });
+    }
+    req.trainingCreditCost = cost;
     next();
   };
 }

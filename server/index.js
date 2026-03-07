@@ -1,4 +1,5 @@
 import express from 'express';
+import { OAuth2Client } from 'google-auth-library';
 import cors from 'cors';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
@@ -39,11 +40,11 @@ import {
   getDrillSessions,
   getAllDrillSessions
 } from './db.js';
-import { 
+import {
   createUser,
   verifyPassword,
-  createOrGetUser, 
-  createSession, 
+  createOrGetUser,
+  createSession,
   getUserFromSession,
   checkCredits,
   deductCredits,
@@ -57,11 +58,18 @@ import {
   generateVerificationCode,
   createUserWithoutPassword,
   saveVerificationCode,
-  verifyCode
+  verifyCode,
+  TRAINING_CREDIT_COSTS,
+  checkJobAnalyses,
+  deductJobAnalysis,
+  checkTrainingCredits,
+  deductTrainingCredits,
+  requireJobAnalysis,
+  requireTrainingCredits
 } from './auth.js';
 import { sendVerificationCode } from './email.js';
 import Stripe from 'stripe';
-import gamificationRouter, { recordAttemptAndAwardXp } from './routes/gamification.js';
+import practiceRouter, { recordAttempt } from './routes/practice.js';
 import { 
   createCheckoutSession, 
   handleWebhook, 
@@ -361,31 +369,37 @@ app.get('/api/auth/google', async (req, res) => {
 // Login with Google (POST - receives Google ID token)
 app.post('/api/auth/google', async (req, res) => {
   try {
-    const { email, name, googleId } = req.body;
-    
-    if (!email || !googleId) {
-      return res.status(400).json({ error: 'Email and Google ID are required' });
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({ error: 'Google credential token is required' });
     }
-    
+
+    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const { email, name, sub: googleId } = payload;
+
     const user = await createOrGetUser(email, name, googleId);
     const sessionToken = await createSession(user.id);
-    
+
     res.cookie('session_token', sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000
+      maxAge: 30 * 24 * 60 * 60 * 1000,
     });
-    
+
     const userWithPlan = await getUserFromSession(sessionToken);
-    
-    res.json({ 
-      success: true, 
-      user: userWithPlan,
-      sessionToken 
-    });
+
+    res.json({ success: true, user: userWithPlan, sessionToken });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Google auth error:', error.message);
+    console.error('GOOGLE_CLIENT_ID set:', !!process.env.GOOGLE_CLIENT_ID);
+    res.status(401).json({ error: 'Google authentication failed', detail: error.message });
   }
 });
 
@@ -531,11 +545,63 @@ function extractCompanyName(jobDescription, url) {
   return null;
 }
 
+// Function to scrape job description via Jina Reader (renders JS, returns markdown)
+async function scrapeWithJina(url) {
+  try {
+    const response = await axios.get(`https://r.jina.ai/${encodeURIComponent(url)}`, {
+      headers: {
+        'Accept': 'text/markdown',
+        'X-Return-Format': 'markdown',
+      },
+      timeout: 15000,
+    });
+    const text = typeof response.data === 'string' ? response.data.trim() : '';
+    if (text.length > 100) {
+      console.log(`Jina Reader returned ${text.length} chars`);
+      return text;
+    }
+    return null;
+  } catch (err) {
+    console.log('Jina Reader failed (non-critical):', err.message);
+    return null;
+  }
+}
+
+// Function to validate scraped content is actually a job posting
+async function validateJobContent(text) {
+  try {
+    const openai = getOpenAIClient();
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You classify web page content. Respond with JSON only: { "isJobPosting": boolean, "confidence": "high"|"medium"|"low", "contentType": "single_job"|"multiple_jobs"|"error_page"|"company_page"|"other", "reason": "brief explanation" }'
+        },
+        {
+          role: 'user',
+          content: `Is this a single job posting?\n\n${text.substring(0, 3000)}`
+        }
+      ],
+      temperature: 0,
+      max_tokens: 120,
+      response_format: { type: 'json_object' },
+    });
+    return JSON.parse(completion.choices[0].message.content);
+  } catch (err) {
+    console.log('Job content validation failed (non-critical):', err.message);
+    return { isJobPosting: true, confidence: 'low', contentType: 'unknown', reason: 'validation unavailable' };
+  }
+}
+
 // Function to scrape job description from URL
 async function scrapeJobDescription(url) {
   try {
+    // Start Jina fetch in parallel with cheerio fetch
+    const jinaPromise = scrapeWithJina(url);
+
     const agent = await getHttpsAgent();
-    
+
     const response = await axios.get(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -1014,7 +1080,14 @@ async function scrapeJobDescription(url) {
       .trim();
     
     console.log('Final logo result:', logo ? `✅ Found: ${logo}` : '❌ No logo found');
-    
+
+    // Compare with Jina result — prefer Jina if cheerio got an empty SPA shell
+    const jinaText = await jinaPromise;
+    if (jinaText && jinaText.length > jobDescription.length * 1.5) {
+      console.log(`Jina text (${jinaText.length} chars) substantially longer than cheerio (${jobDescription.length} chars) — using Jina`);
+      jobDescription = jinaText;
+    }
+
     return { jobDescription, logo, companyWebsite, linkedinCompanyUrl };
   } catch (error) {
     console.error('Error scraping URL:', error.message);
@@ -1399,9 +1472,20 @@ app.post('/api/analyze', requireAuth, async (req, res) => {
   // User is authenticated (required by requireAuth middleware)
   const user = req.user;
 
-  const { url } = req.body;
-  if (!url) {
-    return res.status(400).json({ error: 'URL is required' });
+  const { url, text: pastedText } = req.body;
+  if (!url && !pastedText) {
+    return res.status(400).json({ error: 'URL or pasted job description is required' });
+  }
+
+  // Job analysis check BEFORE SSE starts (so we can return JSON 402)
+  const analysisCheck = await checkJobAnalyses(user.id);
+  if (!analysisCheck.hasAnalyses) {
+    return res.status(402).json({
+      error: 'No job analyses remaining',
+      resourceType: 'jobAnalyses',
+      remaining: analysisCheck.remaining,
+      upgradeRequired: true
+    });
   }
 
   // --- SSE setup ---
@@ -1429,31 +1513,60 @@ app.post('/api/analyze', requireAuth, async (req, res) => {
   req.on('close', () => { clientDisconnected = true; });
 
   try {
-    // Step 1: Fetching job posting
+    // Step 0: Fetching job posting
     sendStep(0, 'Fetching job posting');
 
-    // Check cache first for logo, role title, and company name
-    let cachedUrlData = await getCachedJobUrl(url);
-    let cachedLogo = cachedUrlData?.logo_url;
-    let cachedRoleTitle = cachedUrlData?.role_title;
-    let cachedCompanyName = cachedUrlData?.company_name;
-
-    // If we have cached data but no logo, try to fetch logo again
+    let jobDescription, jobLogo = null, companyWebsite = null, linkedinCompanyUrl = null;
+    let cachedUrlData = null, cachedLogo = null, cachedRoleTitle = null, cachedCompanyName = null;
     let shouldRefetchLogo = false;
-    if (cachedUrlData && !cachedLogo) {
-      console.log('📋 JD already parsed but logo missing - will attempt to fetch logo');
-      shouldRefetchLogo = true;
+
+    if (pastedText) {
+      // User pasted text directly — skip scraping
+      jobDescription = pastedText.trim();
+      if (jobDescription.length < 100) {
+        return sendError('The pasted text is too short. Please paste the full job description.');
+      }
+    } else {
+      // Check cache first for logo, role title, and company name
+      cachedUrlData = await getCachedJobUrl(url);
+      cachedLogo = cachedUrlData?.logo_url;
+      cachedRoleTitle = cachedUrlData?.role_title;
+      cachedCompanyName = cachedUrlData?.company_name;
+
+      // If we have cached data but no logo, try to fetch logo again
+      if (cachedUrlData && !cachedLogo) {
+        console.log('📋 JD already parsed but logo missing - will attempt to fetch logo');
+        shouldRefetchLogo = true;
+      }
+
+      // Scrape the job description
+      const scrapeResult = await scrapeJobDescription(url);
+      jobDescription = scrapeResult.jobDescription;
+      jobLogo = scrapeResult.logo;
+      companyWebsite = scrapeResult.companyWebsite;
+      linkedinCompanyUrl = scrapeResult.linkedinCompanyUrl;
+
+      if (!jobDescription || jobDescription.length < 100) {
+        return sendError('Could not extract meaningful content from the URL. Try pasting the job description instead.');
+      }
     }
 
-    // Scrape the job description
-    const { jobDescription, logo: jobLogo, companyWebsite, linkedinCompanyUrl } = await scrapeJobDescription(url);
-
-    if (!jobDescription || jobDescription.length < 100) {
-      return sendError('Could not extract meaningful content from the URL');
+    // Step 1: Validating job content
+    sendStep(1, 'Validating job content');
+    const validation = await validateJobContent(jobDescription);
+    if (!validation.isJobPosting && validation.confidence === 'high') {
+      const errorMessages = {
+        multiple_jobs: 'This URL contains multiple job listings. Please link to a specific job posting, or paste the job description instead.',
+        error_page: "The page couldn't load properly. Try pasting the job description instead.",
+      };
+      return sendError(errorMessages[validation.contentType] || "This URL doesn't appear to contain a job posting. Try pasting the job description instead.");
+    }
+    if (validation.confidence === 'medium' && !validation.isJobPosting) {
+      console.log(`⚠️ Content validation uncertain: ${validation.reason}`);
     }
 
     // Step 2: Parsing description
-    sendStep(1, 'Parsing description content');
+    sendStep(2, 'Parsing description content');
 
     // Use cached logo if available, otherwise use scraped logo
     let finalLogo = cachedLogo || jobLogo;
@@ -1610,7 +1723,7 @@ app.post('/api/analyze', requireAuth, async (req, res) => {
     }
 
     // Step 3: Identifying company & role
-    sendStep(2, 'Identifying company & role');
+    sendStep(3, 'Identifying company & role');
 
     // First, try to extract company name using OpenAI (more reliable than regex)
     let companyName = cachedCompanyName || null;
@@ -1757,7 +1870,7 @@ Job title:`;
     }
 
     // Save to cache for future requests (saves API calls)
-    if (companyName || roleTitle || finalLogo) {
+    if (url && (companyName || roleTitle || finalLogo)) {
       await saveJobUrlCache(url, finalLogo, roleTitle, companyName);
     }
 
@@ -1784,7 +1897,7 @@ Job title:`;
     // No Clearbit - only use logos from actual sources (job page, LinkedIn, company website)
 
     // Step 4: Researching company
-    sendStep(3, 'Researching company background');
+    sendStep(4, 'Researching company background');
 
     // If we have a valid company name (not "us", "you", etc.), try to get more info from OpenAI
     if (companyName && companyName.length > 2 &&
@@ -1851,7 +1964,12 @@ Job title:`;
         fundingRounds: []
       };
     }
-    
+
+    // Quality gate: require at least a role or a real company name
+    if (!companyInfo.roleTitle && (!companyInfo.name || companyInfo.name === 'Company')) {
+      return sendError('Could not identify a role or company from this content. Try pasting the full job description instead.');
+    }
+
     console.log('Final companyInfo being sent:', {
       name: companyInfo.name,
       hasLogo: !!companyInfo.logo,
@@ -1861,32 +1979,29 @@ Job title:`;
     });
 
     // Step 5: Generating study plan
-    sendStep(4, 'Generating study plan');
+    sendStep(5, 'Generating study plan');
 
-    // Generate study plan and questions (requires auth and credits)
-    // Check credits for study plan (user is authenticated)
-    let studyPlan = null;
-    const creditCheck = await checkCredits(user.id, CREDIT_COSTS.studyPlan);
-    if (!creditCheck.hasCredits) {
-      studyPlan = {
-        requiresUpgrade: true,
-        message: 'Insufficient credits. Upgrade to continue.'
-      };
-    } else {
-      const companyNameForPlan = (companyInfo && companyInfo.name) ? companyInfo.name : 'the company';
-      const roleTitleForPlan = companyInfo?.roleTitle || null;
-      studyPlan = await generateStudyPlan(jobDescription, companyNameForPlan, roleTitleForPlan);
-      await deductCredits(user.id, CREDIT_COSTS.studyPlan);
+    // Generate study plan (credits were validated upfront)
+    const companyNameForPlan = (companyInfo && companyInfo.name) ? companyInfo.name : 'the company';
+    const roleTitleForPlan = companyInfo?.roleTitle || null;
+    const studyPlan = await generateStudyPlan(jobDescription, companyNameForPlan, roleTitleForPlan);
+
+    // Quality gate: ensure study plan has topics before charging
+    const planTopicsCheck = studyPlan?.studyPlan?.topics || studyPlan?.topics || [];
+    if (planTopicsCheck.length === 0) {
+      return sendError('Could not generate a meaningful study plan from this content. No credit was deducted. Try pasting a more detailed job description.');
     }
 
+    await deductJobAnalysis(user.id);
+
     // Step 6: Finalising
-    sendStep(5, 'Finalising your prep guide');
+    sendStep(6, 'Finalising your prep guide');
 
     // Track this job analysis
     const jobDescriptionHash = hashJobDescription(jobDescription);
     await trackJobAnalysis(
       user.id,
-      url,
+      url || 'pasted-text',
       jobDescriptionHash,
       companyInfo.name,
       companyInfo.roleTitle
@@ -1930,7 +2045,7 @@ Job title:`;
       jobDescriptionHash: jobDescriptionHash, // Add hash for generate more questions feature
       companyInfo: companyInfo,
       studyPlan,
-      url: url, // Include URL for reference
+      url: url || null, // Include URL for reference
       user: {
         creditsRemaining: updatedUser?.creditsRemaining || user.creditsRemaining,
         plan: updatedUser?.plan || user.plan
@@ -1952,7 +2067,7 @@ Job title:`;
 });
 
 // API endpoint to evaluate quiz answers
-app.post('/api/quiz/evaluate', requireAuth, requireCredits(CREDIT_COSTS.quizEvaluation), async (req, res) => {
+app.post('/api/quiz/evaluate', requireAuth, requireTrainingCredits('quizEvaluation'), async (req, res) => {
   try {
     const { question, userAnswer, correctAnswer, jobDescription } = req.body;
 
@@ -1960,8 +2075,8 @@ app.post('/api/quiz/evaluate', requireAuth, requireCredits(CREDIT_COSTS.quizEval
       return res.status(400).json({ error: 'Question and user answer are required' });
     }
 
-    // Deduct credits before processing
-    await deductCredits(req.user.id, CREDIT_COSTS.quizEvaluation);
+    // Deduct training credits before processing
+    await deductTrainingCredits(req.user.id, TRAINING_CREDIT_COSTS.quizEvaluation);
 
     const openai = getOpenAIClient();
     const prompt = `You are an expert interviewer evaluating a candidate's answer to an interview question.
@@ -2029,10 +2144,9 @@ Format your response as JSON:
       };
     }
 
-    // Persist attempt and award XP
-    let gamificationData = {};
+    // Persist attempt
     try {
-      gamificationData = await recordAttemptAndAwardXp(req.user.id, {
+      await recordAttempt(req.user.id, {
         jobDescriptionHash: req.body.jobDescriptionHash || '',
         sessionId: req.body.sessionId || null,
         questionText: question,
@@ -2042,11 +2156,11 @@ Format your response as JSON:
         score: evaluation.score || 0,
         evaluation: evaluation,
       });
-    } catch (xpError) {
-      console.error('Error recording attempt/XP (non-critical):', xpError.message);
+    } catch (attemptError) {
+      console.error('Error recording attempt (non-critical):', attemptError.message);
     }
 
-    res.json({ success: true, evaluation, ...gamificationData });
+    res.json({ success: true, evaluation });
   } catch (error) {
     console.error('Error in /api/quiz/evaluate:', error);
     res.status(500).json({ error: error.message || 'Failed to evaluate answer' });
@@ -2054,7 +2168,7 @@ Format your response as JSON:
 });
 
 // API endpoint to evaluate voice recordings (transcribe and evaluate)
-app.post('/api/voice/evaluate', requireAuth, requireCredits(CREDIT_COSTS.voiceEvaluation), async (req, res) => {
+app.post('/api/voice/evaluate', requireAuth, requireTrainingCredits('voiceEvaluation'), async (req, res) => {
   let tempFilePath = null;
   try {
     const { audioBase64, question, jobDescription } = req.body;
@@ -2063,8 +2177,8 @@ app.post('/api/voice/evaluate', requireAuth, requireCredits(CREDIT_COSTS.voiceEv
       return res.status(400).json({ error: 'Audio and question are required' });
     }
 
-    // Deduct credits before processing
-    await deductCredits(req.user.id, CREDIT_COSTS.voiceEvaluation);
+    // Deduct training credits before processing
+    await deductTrainingCredits(req.user.id, TRAINING_CREDIT_COSTS.voiceEvaluation);
 
     const openai = getOpenAIClient();
     
@@ -2159,10 +2273,9 @@ Format as JSON:
       };
     }
 
-    // Persist attempt and award XP
-    let gamificationData = {};
+    // Persist attempt
     try {
-      gamificationData = await recordAttemptAndAwardXp(req.user.id, {
+      await recordAttempt(req.user.id, {
         jobDescriptionHash: req.body.jobDescriptionHash || '',
         sessionId: req.body.sessionId || null,
         questionText: question,
@@ -2172,15 +2285,14 @@ Format as JSON:
         score: evaluation.score || 0,
         evaluation: evaluation,
       });
-    } catch (xpError) {
-      console.error('Error recording voice attempt/XP (non-critical):', xpError.message);
+    } catch (attemptError) {
+      console.error('Error recording voice attempt (non-critical):', attemptError.message);
     }
 
     res.json({
       success: true,
       transcription: transcribedText,
       evaluation,
-      ...gamificationData
     });
 
     // Clean up temp file
@@ -2202,7 +2314,7 @@ Format as JSON:
 });
 
 // API endpoint for chat-based practice
-app.post('/api/chat/practice', requireAuth, requireCredits(CREDIT_COSTS.chatPractice), async (req, res) => {
+app.post('/api/chat/practice', requireAuth, requireTrainingCredits('chatPractice'), async (req, res) => {
   try {
     const { jobDescriptionHash, topic, messages, companyName, roleTitle, sessionId } = req.body;
 
@@ -2210,8 +2322,8 @@ app.post('/api/chat/practice', requireAuth, requireCredits(CREDIT_COSTS.chatPrac
       return res.status(400).json({ error: 'Topic is required' });
     }
 
-    // Deduct credits
-    await deductCredits(req.user.id, CREDIT_COSTS.chatPractice);
+    // Deduct training credits
+    await deductTrainingCredits(req.user.id, TRAINING_CREDIT_COSTS.chatPractice);
 
     const openai = getOpenAIClient();
 
@@ -2309,14 +2421,12 @@ If the candidate hasn't answered a question yet (e.g., it's the opening), set ev
       reply = responseText;
     }
 
-    // Award XP for chat exchanges
-    let xpEarned = 0;
+    // Record attempt for chat exchanges
     if (messages && messages.length > 0) {
-      // Only award XP when user has sent at least one message
       const lastUserMsg = messages.filter(m => m.role === 'candidate').pop();
       if (lastUserMsg) {
         try {
-          const xpResult = await recordAttemptAndAwardXp(req.user.id, {
+          await recordAttempt(req.user.id, {
             jobDescriptionHash: jobDescriptionHash || '',
             sessionId: sessionId || null,
             questionText: `[Chat] ${topic}: ${lastUserMsg.content.substring(0, 100)}`,
@@ -2326,9 +2436,8 @@ If the candidate hasn't answered a question yet (e.g., it's the opening), set ev
             score: evaluation?.score || 50,
             evaluation: evaluation || { score: 50, feedback: 'Chat practice' },
           });
-          xpEarned = xpResult.xpEarned || 0;
-        } catch (xpError) {
-          console.error('Error recording chat XP (non-critical):', xpError.message);
+        } catch (attemptError) {
+          console.error('Error recording chat attempt (non-critical):', attemptError.message);
         }
       }
     }
@@ -2338,7 +2447,6 @@ If the candidate hasn't answered a question yet (e.g., it's the opening), set ev
       reply,
       evaluation,
       suggestedFollowups,
-      xpEarned,
     });
   } catch (error) {
     console.error('Error in /api/chat/practice:', error);
@@ -2355,13 +2463,13 @@ app.post('/api/chat/focus', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Skill is required' });
     }
 
-    // Check and deduct credits BEFORE starting SSE
+    // Check and deduct training credits BEFORE starting SSE
     const user = req.user;
-    const creditCheck = await checkCredits(user.id, CREDIT_COSTS.focusChat);
+    const creditCheck = await checkTrainingCredits(user.id, TRAINING_CREDIT_COSTS.focusChat);
     if (!creditCheck.hasCredits) {
-      return res.status(402).json({ error: 'Insufficient credits' });
+      return res.status(402).json({ error: 'Insufficient training credits', resourceType: 'trainingCredits', upgradeRequired: true });
     }
-    await deductCredits(user.id, CREDIT_COSTS.focusChat);
+    await deductTrainingCredits(user.id, TRAINING_CREDIT_COSTS.focusChat);
 
     // Set SSE headers
     res.writeHead(200, {
@@ -2427,8 +2535,7 @@ You are NOT an interviewer. You are a patient, expert tutor. Your goal is to bui
       }
     }
 
-    // After stream: evaluate user's last message and award XP
-    let xpEarned = 0;
+    // After stream: evaluate user's last message and record attempt
     let evaluation = null;
 
     if (recentMessages.length > 0) {
@@ -2453,7 +2560,7 @@ You are NOT an interviewer. You are a patient, expert tutor. Your goal is to bui
         }
 
         try {
-          const xpResult = await recordAttemptAndAwardXp(user.id, {
+          await recordAttempt(user.id, {
             jobDescriptionHash: '',
             sessionId: sessionId || null,
             questionText: `[Focus] ${skill}: ${lastUserMsg.content.substring(0, 100)}`,
@@ -2463,9 +2570,8 @@ You are NOT an interviewer. You are a patient, expert tutor. Your goal is to bui
             score: evaluation?.score || 50,
             evaluation: evaluation || { score: 50, feedback: 'Focus practice' },
           });
-          xpEarned = xpResult.xpEarned || 0;
-        } catch (xpError) {
-          console.error('Focus chat XP error (non-critical):', xpError.message);
+        } catch (attemptError) {
+          console.error('Focus chat attempt error (non-critical):', attemptError.message);
         }
 
         // Update user_topic_scores so Drills page reflects practice
@@ -2481,7 +2587,7 @@ You are NOT an interviewer. You are a patient, expert tutor. Your goal is to bui
       }
     }
 
-    res.write(`data: ${JSON.stringify({ type: 'done', evaluation, xpEarned })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'done', evaluation })}\n\n`);
     res.end();
 
   } catch (error) {
@@ -2621,18 +2727,11 @@ app.get('/api/company/info/:companyName', async (req, res) => {
   }
 })
 
-app.post('/api/company/research', async (req, res) => {
+app.post('/api/company/research', requireAuth, async (req, res) => {
   // Check if user is authenticated (optional for preview mode)
   const sessionToken = req.headers.authorization?.replace('Bearer ', '');
   const user = sessionToken ? await getUserFromSession(sessionToken) : null;
   
-  // Only require auth and credits if user is logged in
-  if (user) {
-    const creditCheck = await checkCredits(user.id, CREDIT_COSTS.companyResearch);
-    if (!creditCheck.hasCredits) {
-      return res.status(403).json({ error: 'Insufficient credits. Upgrade to continue.' });
-    }
-  }
   console.log('\n🟢 ✅ === COMPANY RESEARCH ENDPOINT HIT ===');
   console.log('Timestamp:', new Date().toISOString());
   console.log('Method:', req.method);
@@ -2675,6 +2774,19 @@ app.post('/api/company/research', async (req, res) => {
     } catch (dbError) {
       console.log('Database lookup failed, fetching from OpenAI:', dbError.message);
     }
+
+    // Cache miss — check and deduct training credits before calling OpenAI
+    const creditCheck = await checkTrainingCredits(req.user.id, TRAINING_CREDIT_COSTS.companyResearch);
+    if (!creditCheck.hasCredits) {
+      return res.status(402).json({
+        error: 'Insufficient training credits',
+        resourceType: 'trainingCredits',
+        remaining: creditCheck.remaining,
+        required: TRAINING_CREDIT_COSTS.companyResearch,
+        upgradeRequired: true
+      });
+    }
+    await deductTrainingCredits(req.user.id, TRAINING_CREDIT_COSTS.companyResearch);
 
     const openai = getOpenAIClient();
     const currentDate = new Date();
@@ -2770,11 +2882,6 @@ Format as JSON:
       await saveCompanyResearch(companyName, research);
     } catch (saveError) {
       console.log('Failed to save company research to database (non-critical):', saveError.message);
-    }
-    
-    // Deduct credits after successful research (only if user is logged in)
-    if (user) {
-      await deductCredits(user.id, CREDIT_COSTS.companyResearch);
     }
     
     // Return both research and extracted funding rounds for merging
@@ -2910,7 +3017,7 @@ app.post('/api/stripe/create-advertiser-checkout', async (req, res) => {
 // ==================== QUESTIONS MANAGEMENT ====================
 
 // Generate more questions without duplicates
-app.post('/api/questions/generate-more', requireAuth, requireCredits(CREDIT_COSTS.studyPlan), async (req, res) => {
+app.post('/api/questions/generate-more', requireAuth, requireTrainingCredits('studyPlan'), async (req, res) => {
   try {
     const { jobDescriptionHash, existingQuestions, companyName, roleTitle, techStack } = req.body;
     
@@ -3035,8 +3142,8 @@ Format as JSON array of question objects:
       return !existingQuestionTexts.has(questionText);
     });
 
-    // Deduct credits
-    await deductCredits(req.user.id, CREDIT_COSTS.studyPlan);
+    // Deduct training credits
+    await deductTrainingCredits(req.user.id, TRAINING_CREDIT_COSTS.studyPlan);
 
     // Persist new questions into the cached study plan so they survive page reloads
     if (uniqueQuestions.length > 0 && jobDescriptionHash) {
@@ -3081,11 +3188,21 @@ Format as JSON array of question objects:
 // Get user credits
 app.get('/api/credits', requireAuth, async (req, res) => {
   try {
-    const { creditsRemaining, creditsMonthlyAllowance } = req.user;
-    res.json({ 
-      remaining: creditsRemaining,
-      monthlyAllowance: creditsMonthlyAllowance,
-      plan: req.user.plan
+    const u = req.user;
+    res.json({
+      jobAnalyses: {
+        remaining: u.jobAnalysesRemaining,
+        monthly: u.jobAnalysesMonthlyAllowance,
+      },
+      trainingCredits: {
+        remaining: u.trainingCreditsRemaining,
+        monthly: u.trainingCreditsMonthlyAllowance,
+      },
+      isLifetimePlan: u.isLifetimePlan,
+      plan: u.plan,
+      // Legacy fields
+      remaining: u.creditsRemaining,
+      monthlyAllowance: u.creditsMonthlyAllowance,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -3196,6 +3313,24 @@ app.post('/api/admin/create-test-user', async (req, res) => {
 });
 
 // User endpoint to get their stats
+app.put('/api/user/profile', requireAuth, async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (name !== undefined && typeof name !== 'string') {
+      return res.status(400).json({ error: 'Name must be a string' });
+    }
+    const trimmedName = name ? name.trim().slice(0, 255) : null;
+    const result = await pool.query(
+      'UPDATE users SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING id, email, name',
+      [trimmedName, req.user.id]
+    );
+    res.json({ user: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
 app.get('/api/user/stats', requireAuth, async (req, res) => {
   try {
     const user = req.user;
@@ -3306,7 +3441,7 @@ app.get('/api/user/study-plan/:hash', requireAuth, async (req, res) => {
     const studyPlan = await getCachedStudyPlan(hash);
     
     if (!studyPlan) {
-      return res.status(404).json({ error: 'Study plan not found' });
+      return res.json(null);
     }
     
     res.json(studyPlan);
@@ -3481,8 +3616,8 @@ app.get('/api/advertisers', async (req, res) => {
   }
 });
 
-// Mount gamification routes
-app.use(gamificationRouter);
+// Mount practice/progress routes
+app.use(practiceRouter);
 
 // Topic API endpoints
 app.get('/api/user/topic-scores', requireAuth, async (req, res) => {
@@ -3528,7 +3663,7 @@ app.get('/api/topics/job/:hash', requireAuth, async (req, res) => {
 // Drill sessions API
 app.post('/api/drills/sessions', requireAuth, async (req, res) => {
   try {
-    const { skill, answers, avgScore, scores, xpEarned } = req.body;
+    const { skill, answers, avgScore, scores } = req.body;
     if (!skill) return res.status(400).json({ error: 'skill is required' });
 
     const topic = await getOrCreateTopic(skill);
@@ -3538,7 +3673,7 @@ app.post('/api/drills/sessions', requireAuth, async (req, res) => {
       answers: answers || 0,
       avgScore: avgScore || null,
       scores: scores || [],
-      xpEarned: xpEarned || 0,
+      xpEarned: 0,
     });
     // Note: user_topic_scores is already updated per-answer in the /api/chat/focus endpoint
     res.json(session);
@@ -3612,6 +3747,107 @@ app.post('/api/topics/backfill', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Error backfilling topics:', error);
     res.status(500).json({ error: 'Failed to backfill topics' });
+  }
+});
+
+// Activity summary: streak + 7-day chart (computed from existing practice data)
+app.get('/api/user/activity-summary', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // 7-day activity: count sessions per day
+    const last7DaysRes = await pool.query(`
+      WITH days AS (
+        SELECT generate_series(
+          CURRENT_DATE - INTERVAL '6 days',
+          CURRENT_DATE,
+          '1 day'
+        )::date AS day
+      ),
+      activity AS (
+        SELECT DATE(completed_at) AS day, COUNT(*) AS cnt
+        FROM drill_sessions WHERE user_id = $1
+          AND completed_at >= CURRENT_DATE - INTERVAL '6 days'
+        GROUP BY DATE(completed_at)
+        UNION ALL
+        SELECT DATE(ended_at) AS day, COUNT(*) AS cnt
+        FROM practice_sessions WHERE user_id = $1
+          AND ended_at IS NOT NULL
+          AND ended_at >= CURRENT_DATE - INTERVAL '6 days'
+        GROUP BY DATE(ended_at)
+      )
+      SELECT d.day, COALESCE(SUM(a.cnt), 0)::int AS sessions
+      FROM days d
+      LEFT JOIN activity a ON a.day = d.day
+      GROUP BY d.day
+      ORDER BY d.day
+    `, [userId]);
+
+    // All distinct practice days for streak calculation
+    const practiceDaysRes = await pool.query(`
+      SELECT DISTINCT practice_day FROM (
+        SELECT DATE(completed_at) AS practice_day FROM drill_sessions WHERE user_id = $1
+        UNION
+        SELECT DATE(ended_at) AS practice_day FROM practice_sessions
+          WHERE user_id = $1 AND ended_at IS NOT NULL
+      ) sub
+      WHERE practice_day IS NOT NULL
+      ORDER BY practice_day DESC
+    `, [userId]);
+
+    const practiceDays = practiceDaysRes.rows.map(r => r.practice_day.toISOString().slice(0, 10));
+
+    // Compute streaks
+    let currentStreak = 0;
+    let longestStreak = 0;
+
+    if (practiceDays.length > 0) {
+      const today = new Date().toISOString().slice(0, 10);
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+      // Current streak: walk backward from today or yesterday
+      if (practiceDays[0] === today || practiceDays[0] === yesterday) {
+        currentStreak = 1;
+        for (let i = 1; i < practiceDays.length; i++) {
+          const prev = new Date(practiceDays[i - 1]);
+          const curr = new Date(practiceDays[i]);
+          const diff = (prev - curr) / 86400000;
+          if (diff === 1) {
+            currentStreak++;
+          } else {
+            break;
+          }
+        }
+      }
+
+      // Longest streak
+      let streak = 1;
+      for (let i = 1; i < practiceDays.length; i++) {
+        const prev = new Date(practiceDays[i - 1]);
+        const curr = new Date(practiceDays[i]);
+        const diff = (prev - curr) / 86400000;
+        if (diff === 1) {
+          streak++;
+        } else {
+          longestStreak = Math.max(longestStreak, streak);
+          streak = 1;
+        }
+      }
+      longestStreak = Math.max(longestStreak, streak);
+    }
+
+    const practicedToday = last7DaysRes.rows.length > 0 &&
+      parseInt(last7DaysRes.rows[last7DaysRes.rows.length - 1].sessions) > 0;
+
+    const last7Days = last7DaysRes.rows.map(r => ({
+      date: r.day.toISOString().slice(0, 10),
+      sessions: parseInt(r.sessions),
+    }));
+
+    res.json({ currentStreak, longestStreak, practicedToday, last7Days });
+  } catch (error) {
+    console.error('Error getting activity summary:', error);
+    res.status(500).json({ error: 'Failed to get activity summary' });
   }
 });
 

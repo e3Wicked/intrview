@@ -9,7 +9,6 @@ function TopicChat({ jobDescription, companyName, roleTitle, techStack, jobDescr
   const [customTopic, setCustomTopic] = useState('')
   const [started, setStarted] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [sessionXp, setSessionXp] = useState(0)
   const [exchangeCount, setExchangeCount] = useState(0)
   const [showEndSummary, setShowEndSummary] = useState(false)
   const messagesEndRef = useRef(null)
@@ -57,10 +56,7 @@ function TopicChat({ jobDescription, companyName, roleTitle, techStack, jobDescr
       setMessages([
         { role: 'interviewer', content: res.data.reply }
       ])
-      if (res.data.xpEarned) {
-        setSessionXp(prev => prev + res.data.xpEarned)
-        if (onXpGained) onXpGained({ xpEarned: res.data.xpEarned })
-      }
+      if (onXpGained) onXpGained()
     } catch (err) {
       setMessages([
         { role: 'interviewer', content: `Let's discuss **${selectedTopic}**. Tell me about your understanding of this topic and how it relates to the ${roleTitle || 'role'} at ${companyName || 'the company'}.` }
@@ -97,10 +93,7 @@ function TopicChat({ jobDescription, companyName, roleTitle, techStack, jobDescr
       }
       setMessages(prev => [...prev, interviewerMsg])
 
-      if (res.data.xpEarned) {
-        setSessionXp(prev => prev + res.data.xpEarned)
-        if (onXpGained) onXpGained({ xpEarned: res.data.xpEarned })
-      }
+      if (onXpGained) onXpGained()
     } catch (err) {
       const errorMsg = err.response?.data?.error || 'Failed to get response. Please try again.'
       setMessages(prev => [...prev, {
@@ -222,10 +215,6 @@ function TopicChat({ jobDescription, companyName, roleTitle, techStack, jobDescr
             <span className="chat-stat-value">{exchangeCount}</span>
             <span className="chat-stat-label">Exchanges</span>
           </div>
-          <div className="chat-summary-stat">
-            <span className="chat-stat-value xp-value">+{sessionXp}</span>
-            <span className="chat-stat-label">XP Earned</span>
-          </div>
         </div>
         <div className="chat-summary-actions">
           <button className="chat-new-btn" onClick={handleNewChat}>
@@ -245,9 +234,6 @@ function TopicChat({ jobDescription, companyName, roleTitle, techStack, jobDescr
           <span className="chat-exchange-count">{exchangeCount} exchanges</span>
         </div>
         <div className="chat-header-actions">
-          {sessionXp > 0 && (
-            <span className="chat-xp-counter">+{sessionXp} XP</span>
-          )}
           <button className="chat-end-btn" onClick={handleEndChat}>
             End Chat
           </button>

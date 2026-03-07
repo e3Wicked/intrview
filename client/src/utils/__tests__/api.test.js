@@ -66,10 +66,10 @@ describe('api utility', () => {
       expect(axios.post).toHaveBeenCalledWith('/api/practice/smart-order', data);
     });
 
-    it('should call POST /api/practice/flashcard-xp', async () => {
+    it('should call POST /api/practice/flashcard-attempt', async () => {
       const data = { known: true };
-      await api.practice.flashcardXp(data);
-      expect(axios.post).toHaveBeenCalledWith('/api/practice/flashcard-xp', data);
+      await api.practice.flashcardAttempt(data);
+      expect(axios.post).toHaveBeenCalledWith('/api/practice/flashcard-attempt', data);
     });
   });
 
@@ -81,26 +81,4 @@ describe('api utility', () => {
     });
   });
 
-  describe('api.gamification', () => {
-    it('should call GET /api/gamification/stats', async () => {
-      await api.gamification.getStats();
-      expect(axios.get).toHaveBeenCalledWith('/api/gamification/stats');
-    });
-
-    it('should call GET /api/gamification/skill-stats', async () => {
-      await api.gamification.getSkillStats();
-      expect(axios.get).toHaveBeenCalledWith('/api/gamification/skill-stats');
-    });
-
-    it('should call GET /api/gamification/weakness-report', async () => {
-      await api.gamification.getWeaknessReport();
-      expect(axios.get).toHaveBeenCalledWith('/api/gamification/weakness-report');
-    });
-
-    it('should call POST /api/gamification/check-achievements with context', async () => {
-      const context = { mode: 'quiz' };
-      await api.gamification.checkAchievements(context);
-      expect(axios.post).toHaveBeenCalledWith('/api/gamification/check-achievements', { context });
-    });
-  });
 });

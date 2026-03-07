@@ -1,59 +1,77 @@
 import { useState } from 'react'
-import axios from 'axios'
 import './CreditBar.css'
 
-function CreditBar({ user, onUpgrade }) {
+function CreditBar({ user }) {
   const [showTooltip, setShowTooltip] = useState(false)
 
   if (!user) return null
 
-  const percentage = user.creditsMonthlyAllowance > 0 
-    ? (user.creditsRemaining / user.creditsMonthlyAllowance) * 100 
-    : 0
+  const analyses = user.jobAnalysesRemaining ?? 0
+  const analysesMax = user.isLifetimePlan
+    ? (user.planDetails?.lifetimeJobAnalyses || analyses)
+    : (user.jobAnalysesMonthlyAllowance === -1 ? null : (user.jobAnalysesMonthlyAllowance || 0))
 
-  const getCreditColor = () => {
-    if (percentage > 50) return '#f59e0b'
-    if (percentage > 20) return '#fbbf24'
+  const training = user.trainingCreditsRemaining ?? 0
+  const trainingMax = user.isLifetimePlan
+    ? (user.planDetails?.lifetimeTrainingCredits || training)
+    : (user.trainingCreditsMonthlyAllowance || 0)
+
+  const getBarColor = (pct) => {
+    if (pct > 50) return '#f59e0b'
+    if (pct > 20) return '#fbbf24'
     return '#ef4444'
   }
 
+  const analysisPct = analysesMax ? Math.min(100, (analyses / analysesMax) * 100) : 100
+  const trainingPct = trainingMax > 0 ? Math.min(100, (training / trainingMax) * 100) : 0
+
   return (
-    <div className="credit-bar">
-      <div 
-        className="credit-info"
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
-      >
-        <span className="credit-label">Credits:</span>
-        <span className="credit-amount">
-          {user.creditsRemaining}{user.creditsMonthlyAllowance > 0 ? ` / ${user.creditsMonthlyAllowance}` : ''}
-        </span>
-        {user.creditsMonthlyAllowance > 0 && (
+    <div
+      className="credit-bar"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <div className="credit-row">
+        <div className="credit-info">
+          <span className="credit-label">Analyses</span>
+          <span className="credit-amount">
+            {analysesMax === null ? 'Unlimited' : `${analyses}${user.isLifetimePlan ? '' : ` / ${analysesMax}`}`}
+          </span>
+        </div>
+        {analysesMax !== null && analysesMax > 0 && (
           <div className="credit-progress">
             <div
               className="credit-progress-fill"
-              style={{
-                width: `${Math.min(100, percentage)}%`,
-                backgroundColor: getCreditColor()
-              }}
+              style={{ width: `${analysisPct}%`, backgroundColor: getBarColor(analysisPct) }}
             />
           </div>
         )}
-        {showTooltip && (
-          <div className="credit-tooltip">
-            Prep credits power AI-generated study plans, questions, and feedback.
+      </div>
+
+      <div className="credit-row">
+        <div className="credit-info">
+          <span className="credit-label">Training</span>
+          <span className="credit-amount">
+            {training}{user.isLifetimePlan ? '' : (trainingMax > 0 ? ` / ${trainingMax}` : '')}
+          </span>
+        </div>
+        {trainingMax > 0 && (
+          <div className="credit-progress">
+            <div
+              className="credit-progress-fill"
+              style={{ width: `${trainingPct}%`, backgroundColor: getBarColor(trainingPct) }}
+            />
           </div>
         )}
       </div>
-      
-      {user.creditsRemaining === 0 && (
-        <button className="credit-upgrade-btn" onClick={onUpgrade}>
-          Upgrade
-        </button>
+
+      {showTooltip && (
+        <div className="credit-tooltip">
+          Analyses are used for job postings. Training credits power chat, quizzes, and practice.
+        </div>
       )}
     </div>
   )
 }
 
 export default CreditBar
-

@@ -1,22 +1,27 @@
 .credit-bar {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
   padding: 8px 10px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   font-family: 'Inter', -apple-system, sans-serif;
   font-size: 12px;
+  position: relative;
+}
+
+.credit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .credit-info {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  position: relative;
-  flex: 1;
-  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
 }
 
 .credit-label {
@@ -31,12 +36,11 @@
 }
 
 .credit-progress {
-  width: 60px;
-  height: 4px;
+  width: 100%;
+  height: 3px;
   background: rgba(255, 255, 255, 0.08);
   border-radius: 2px;
   overflow: hidden;
-  flex-shrink: 0;
 }
 
 .credit-progress-fill {
@@ -70,22 +74,4 @@
   transform: translateX(-50%);
   border: 6px solid transparent;
   border-top-color: #1a1a1a;
-}
-
-.credit-upgrade-btn {
-  background: var(--color-accent, #2563eb);
-  color: #ffffff;
-  border: none;
-  border-radius: 4px;
-  padding: 4px 10px;
-  font-family: 'Inter', -apple-system, sans-serif;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s;
-  flex-shrink: 0;
-}
-
-.credit-upgrade-btn:hover {
-  opacity: 0.9;
 }

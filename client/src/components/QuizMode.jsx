@@ -8,8 +8,6 @@ function QuizMode({ questions, jobDescription, jobDescriptionHash, sessionId, on
   const [evaluation, setEvaluation] = useState(null)
   const [loading, setLoading] = useState(false)
   const [scores, setScores] = useState([])
-  const [lastXp, setLastXp] = useState(null)
-
   if (!questions || questions.length === 0) {
     return <div className="quiz-empty">No questions available for quiz</div>
   }
@@ -24,7 +22,7 @@ function QuizMode({ questions, jobDescription, jobDescriptionHash, sessionId, on
 
     setLoading(true)
     setEvaluation(null)
-    setLastXp(null)
+
 
     try {
       const response = await axios.post('/api/quiz/evaluate', {
@@ -41,18 +39,7 @@ function QuizMode({ questions, jobDescription, jobDescriptionHash, sessionId, on
       setScores(prev => [...prev, newScore])
       setEvaluation(response.data.evaluation)
 
-      if (response.data.xpEarned !== undefined) {
-        setLastXp(response.data.xpEarned)
-        if (onXpGained) {
-          onXpGained({
-            xpEarned: response.data.xpEarned,
-            totalXp: response.data.totalXp,
-            levelUp: response.data.levelUp,
-            levelTitle: response.data.levelTitle,
-            newAchievements: response.data.newAchievements,
-          })
-        }
-      }
+      if (onXpGained) onXpGained()
     } catch (error) {
       console.error('Error evaluating answer:', error)
     } finally {
@@ -65,7 +52,7 @@ function QuizMode({ questions, jobDescription, jobDescriptionHash, sessionId, on
       setCurrentIndex(currentIndex + 1)
       setUserAnswer('')
       setEvaluation(null)
-      setLastXp(null)
+  
     }
   }
 
@@ -74,7 +61,7 @@ function QuizMode({ questions, jobDescription, jobDescriptionHash, sessionId, on
       setCurrentIndex(currentIndex - 1)
       setUserAnswer('')
       setEvaluation(null)
-      setLastXp(null)
+  
     }
   }
 
@@ -140,9 +127,6 @@ function QuizMode({ questions, jobDescription, jobDescriptionHash, sessionId, on
               <div className={`score-badge score-${evaluation.score >= 80 ? 'high' : evaluation.score >= 60 ? 'medium' : 'low'}`}>
                 {evaluation.score}/100
               </div>
-              {lastXp !== null && lastXp > 0 && (
-                <div className="quiz-xp-gain">+{lastXp} XP</div>
-              )}
             </div>
           </div>
 

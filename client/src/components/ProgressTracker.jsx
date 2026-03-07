@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../utils/api'
-import AchievementsBadgeGrid from './AchievementsBadgeGrid'
-import XPBar from './XPBar'
 import './ProgressTracker.css'
 
 function ProgressTracker({ topics, studyPlan, jobDescriptionHash }) {
@@ -92,8 +90,6 @@ function ProgressTracker({ topics, studyPlan, jobDescriptionHash }) {
     <div className="progress-container">
       <h2>Progress Tracking</h2>
 
-      <XPBar compact={false} />
-
       <div className="progress-stats" style={{ marginTop: '16px' }}>
         <div className="stat-card">
           <div className="stat-value">{studiedCount}/{totalTopics}</div>
@@ -159,7 +155,6 @@ function ProgressTracker({ topics, studyPlan, jobDescriptionHash }) {
         </div>
       )}
 
-      <AchievementsBadgeGrid />
     </div>
   )
 }
