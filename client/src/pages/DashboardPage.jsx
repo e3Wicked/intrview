@@ -21,7 +21,7 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
     if (analysisResult.user && setUser) {
       setUser(prevUser => ({
         ...prevUser,
-        creditsRemaining: analysisResult.user.creditsRemaining || prevUser.creditsRemaining
+        ...analysisResult.user
       }))
     }
 
@@ -257,6 +257,11 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
                       ? <>You have <strong>{creditGate.remaining}</strong> job analys{creditGate.remaining !== 1 ? 'es' : 'is'} remaining.</>
                       : <>You have <strong>{creditGate.remaining}</strong> training credit{creditGate.remaining !== 1 ? 's' : ''} remaining. This requires <strong>{creditGate.required}</strong>.</>}
                   </p>
+                  {creditGate.resetDate && (
+                    <p className="credit-gate-refresh">
+                      Your credits refresh on {new Date(creditGate.resetDate).toLocaleDateString()}.
+                    </p>
+                  )}
                   <p className="credit-gate-encouragement">
                     Upgrade your plan to unlock more and keep your prep momentum going.
                   </p>
@@ -279,7 +284,19 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
       {/* Mission Control Dashboard */}
       <MissionDashboard
         user={user}
-        onAnalyzeClick={() => setShowAnalyzeForm(true)}
+        onAnalyzeClick={() => {
+          if (user && user.jobAnalysesRemaining === 0 && user.jobAnalysesMonthlyAllowance !== -1) {
+            setCreditGate({
+              remaining: 0,
+              required: 1,
+              resourceType: 'jobAnalyses',
+              resetDate: user.creditsResetAt || null
+            })
+            setShowAnalyzeForm(true)
+            return
+          }
+          setShowAnalyzeForm(true)
+        }}
       />
     </div>
   )
