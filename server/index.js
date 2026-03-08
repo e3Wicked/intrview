@@ -36,6 +36,8 @@ import {
   getTopicsForJob,
   getSharedTopicsAcrossJobs,
   getAllUserTopics,
+  findSimilarUserTopic,
+  normalizeTopicName,
   saveDrillSession,
   getDrillSessions,
   getAllDrillSessions
@@ -104,6 +106,18 @@ function inferTopicCategory(topicName) {
   return 'general';
 }
 
+// Detect company-specific topics that shouldn't be drillable
+function isCompanySpecificTopic(topicName, companyName = null) {
+  const lower = topicName.toLowerCase()
+  if (/\b(culture\s*(and|&)\s*values|company\s*(fit|culture)|corporate\s*values|mission\s*(and|&)\s*values)\b/.test(lower)) return true
+  if (companyName) {
+    const comp = companyName.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    if (new RegExp(`\\b${comp}\\b.*(culture|values|mission|principles|fit)`, 'i').test(lower)) return true
+    if (new RegExp(`(culture|values|mission|principles|fit).*\\b${comp}\\b`, 'i').test(lower)) return true
+  }
+  return false
+}
+
 const app = express();
 const PORT = process.env.PORT || 5001;
 
@@ -123,8 +137,41 @@ app.use(cors({
   origin: true,
   credentials: true
 }));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '500kb' }));
 app.use(cookieParser());
+
+// --- In-memory rate limiter ---
+const rateLimitStore = new Map();
+
+function rateLimit(userId, action, maxRequests, windowMs) {
+  const key = `${userId}:${action}`;
+  const now = Date.now();
+  let entry = rateLimitStore.get(key);
+
+  if (!entry || now - entry.windowStart > windowMs) {
+    entry = { windowStart: now, count: 0 };
+    rateLimitStore.set(key, entry);
+  }
+
+  entry.count++;
+
+  if (entry.count > maxRequests) {
+    const retryAfter = Math.ceil((entry.windowStart + windowMs - now) / 1000);
+    return { allowed: false, retryAfter };
+  }
+
+  return { allowed: true };
+}
+
+// Cleanup stale entries every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateLimitStore) {
+    if (now - entry.windowStart > 600_000) {
+      rateLimitStore.delete(key);
+    }
+  }
+}, 600_000);
 
 // Log all API requests for debugging
 app.use('/api', (req, res, next) => {
@@ -555,11 +602,14 @@ async function scrapeWithJina(url) {
         'X-Return-Format': 'markdown',
       },
       timeout: 15000,
+      maxContentLength: 2_000_000,
     });
     const text = typeof response.data === 'string' ? response.data.trim() : '';
-    if (text.length > 100) {
-      console.log(`Jina Reader returned ${text.length} chars`);
-      return text;
+    const MAX_JINA_LENGTH = 50_000;
+    const truncatedText = text.length > MAX_JINA_LENGTH ? text.substring(0, MAX_JINA_LENGTH) : text;
+    if (truncatedText.length > 100) {
+      console.log(`Jina Reader returned ${text.length} chars (using ${truncatedText.length})`);
+      return truncatedText;
     }
     return null;
   } catch (err) {
@@ -647,7 +697,8 @@ async function scrapeJobDescription(url) {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       },
       httpsAgent: agent,
-      timeout: 30000
+      timeout: 30000,
+      maxContentLength: 2_000_000,
     });
     
     const $ = cheerio.load(response.data);
@@ -1351,7 +1402,7 @@ If you cannot find information about the company, return null for fields you don
 }
 
 // Function to generate study plan and questions using OpenAI
-async function generateStudyPlan(jobDescription, companyName = 'the company', roleTitle = null) {
+async function generateStudyPlan(jobDescription, companyName = 'the company', roleTitle = null, userId = null) {
   try {
     // Check database cache first (exact hash match)
     const jobHash = hashJobDescription(jobDescription);
@@ -1378,8 +1429,25 @@ async function generateStudyPlan(jobDescription, companyName = 'the company', ro
       console.log('Company+role lookup failed (non-critical):', matchError.message);
     }
 
+    // Query user's existing topics for prompt injection
+    let existingTopicsPrompt = '';
+    if (userId) {
+      try {
+        const userTopics = await getAllUserTopics(userId);
+        if (userTopics.length > 0) {
+          const topicNames = [...new Set(userTopics.map(t => t.topic_name))];
+          existingTopicsPrompt = `\nEXISTING USER TOPICS — REUSE WHEN RELEVANT:
+The user already has these study topics from previous job analyses. When a topic below matches what you would create, use the EXACT name from this list instead of inventing a new one. Only create a new topic name if none of these cover the concept.
+${topicNames.map(n => `- "${n}"`).join('\n')}
+`;
+        }
+      } catch (topicErr) {
+        console.log('Non-critical: failed to fetch user topics for prompt:', topicErr.message);
+      }
+    }
+
     const openai = getOpenAIClient();
-    
+
     // Extract key information from job description to create field-specific prompts
     const jobDescriptionLower = jobDescription.toLowerCase();
     let fieldContext = '';
@@ -1419,6 +1487,9 @@ async function generateStudyPlan(jobDescription, companyName = 'the company', ro
       techStack = foundTech.join(', ');
     }
     
+    const MAX_JD_FOR_PROMPT = 15_000;
+    const truncatedJD = jobDescription.length > MAX_JD_FOR_PROMPT ? jobDescription.substring(0, MAX_JD_FOR_PROMPT) : jobDescription;
+
     const prompt = `You are an expert career coach and technical interviewer specializing in ${fieldContext}. Based on the following job description for ${companyName}, create a comprehensive study plan and a LARGE set of interview questions.
 
 IMPORTANT: Generate questions that are SPECIFIC to ${companyName} and their tech stack. Include:
@@ -1429,7 +1500,7 @@ IMPORTANT: Generate questions that are SPECIFIC to ${companyName} and their tech
 5. Questions that test knowledge of ${techStack ? techStack.split(',').slice(0, 5).join(', ') : 'the technologies mentioned in the job description'}
 
 Job Description:
-${jobDescription}
+${truncatedJD}
 
 ${questionFocus}
 
@@ -1452,6 +1523,14 @@ CRITICAL — CATEGORY RULES:
 - Each question MUST have a specific category — aim for 5-8 distinct categories across all questions
 - Categories should reflect the actual technologies and skills in the job description
 
+CRITICAL — TOPIC NAMING RULES:
+- Use SHORT, GENERIC topic names reusable across companies (1-4 words max)
+- GOOD: "React & Frontend", "System Design", "SQL & Databases", "Python"
+- BAD: "Python & SQL Proficiency", "Advanced React Skills", "Qonto Culture and Values"
+- Do NOT include the company name in topic names
+- Do NOT add suffixes like "proficiency", "skills", "expertise", "fundamentals"
+- Do NOT create company culture/values as a study plan topic — culture questions belong in interviewQuestions only
+${existingTopicsPrompt}
 Format your response as JSON with the following structure:
 {
   "studyPlan": {
@@ -1547,7 +1626,13 @@ app.post('/api/analyze', requireAuth, async (req, res) => {
   // User is authenticated (required by requireAuth middleware)
   const user = req.user;
 
-  const { url, text: pastedText } = req.body;
+  // Rate limit: 5 analyses per 10 minutes
+  const rl = rateLimit(user.id, 'analyze', 5, 10 * 60 * 1000);
+  if (!rl.allowed) {
+    return res.status(429).json({ error: 'Too many analyses. Please wait before trying again.', retryAfter: rl.retryAfter });
+  }
+
+  const { url, text: pastedText, companyName: providedCompanyName, roleTitle: providedRoleTitle } = req.body;
   if (!url && !pastedText) {
     return res.status(400).json({ error: 'URL or pasted job description is required' });
   }
@@ -1614,9 +1699,13 @@ app.post('/api/analyze', requireAuth, async (req, res) => {
 
     if (pastedText) {
       // User pasted text directly — skip scraping
+      const MAX_JD_LENGTH = 30_000;
       jobDescription = pastedText.trim();
       if (jobDescription.length < 100) {
         return sendError('The pasted text is too short. Please paste the full job description.');
+      }
+      if (jobDescription.length > MAX_JD_LENGTH) {
+        jobDescription = jobDescription.substring(0, MAX_JD_LENGTH);
       }
     } else {
       // Check cache first for logo, role title, and company name
@@ -1841,8 +1930,8 @@ app.post('/api/analyze', requireAuth, async (req, res) => {
 
     // --- Priority cascade for company name and role title ---
     // Tier 1: Cache
-    let companyName = cachedCompanyName || null;
-    let roleTitle = cachedRoleTitle || null;
+    let companyName = providedCompanyName || cachedCompanyName || null;
+    let roleTitle = providedRoleTitle || cachedRoleTitle || null;
 
     // Tier 2: JSON-LD structured data
     if (!companyName && structuredCompanyName) {
@@ -2106,7 +2195,7 @@ Return JSON: {"companyName": "...", "roleTitle": "..."}`;
     // Generate study plan (credits were validated upfront)
     const companyNameForPlan = (companyInfo && companyInfo.name) ? companyInfo.name : 'the company';
     const roleTitleForPlan = companyInfo?.roleTitle || null;
-    const studyPlan = await generateStudyPlan(jobDescription, companyNameForPlan, roleTitleForPlan);
+    const studyPlan = await generateStudyPlan(jobDescription, companyNameForPlan, roleTitleForPlan, user.id);
 
     // Quality gate: ensure study plan has topics before charging
     const planTopicsCheck = studyPlan?.studyPlan?.topics || studyPlan?.topics || [];
@@ -2116,8 +2205,101 @@ Return JSON: {"companyName": "...", "roleTitle": "..."}`;
 
     await deductJobAnalysis(user.id);
 
-    // Step 6: Finalising
-    sendStep(6, 'Finalising your prep guide');
+    // Step 6: Company research (bundled into analysis — no training credit cost)
+    sendStep(6, 'Researching company intel');
+
+    let companyResearch = null;
+    const researchCompanyName = companyInfo?.name;
+    if (researchCompanyName && researchCompanyName !== 'Company' && researchCompanyName.length > 2) {
+      try {
+        // Check DB cache first
+        const cached = await getCompanyFullData(researchCompanyName);
+        if (cached && cached.research) {
+          companyResearch = cached.research;
+          console.log(`📦 Using cached company research for: ${researchCompanyName}`);
+        } else {
+          // Generate fresh research via OpenAI (no credit deduction — bundled with analysis)
+          const openai = getOpenAIClient();
+          const currentDate = new Date();
+          const currentYear = currentDate.getFullYear();
+          const currentMonth = currentDate.getMonth() + 1;
+
+          const researchPrompt = `Provide comprehensive research and insights about the company "${researchCompanyName}".
+
+${jobDescription ? `Job Context: ${jobDescription.substring(0, 1500)}` : ''}
+
+IMPORTANT: Current date is ${currentYear}-${String(currentMonth).padStart(2, '0')}. Only include news from the past 6 months (${currentYear} only). If there's no recent news in the past 6 months, use an empty array.
+
+Please provide:
+1. Recent news and developments (ONLY from the past 6 months)
+2. Company culture and values
+3. Tech stack and tools they use (if tech company)
+4. Team structure and size
+5. Recent achievements or milestones (from past 6 months only)
+6. What makes them unique
+7. Interview tips specific to this company
+8. What they value in candidates
+9. Recent funding rounds (if any from past 6 months)
+
+Format as JSON:
+{
+  "recentNews": ["News item 1", "News item 2"],
+  "culture": "Description of company culture",
+  "techStack": ["Technology 1", "Technology 2"],
+  "teamSize": "Approximate team size",
+  "achievements": ["Achievement 1", "Achievement 2"],
+  "uniqueAspects": ["What makes them unique"],
+  "interviewTips": ["Tip 1", "Tip 2"],
+  "values": ["Value 1", "Value 2"],
+  "recentFundingRounds": [
+    {
+      "year": ${currentYear},
+      "month": "January",
+      "type": "Series D",
+      "amount": "$150M",
+      "leadInvestors": ["Investor Name"],
+      "description": "Funding round description"
+    }
+  ]
+}`;
+
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4-turbo-preview",
+            messages: [
+              { role: "system", content: "You are a company research expert. Provide accurate, up-to-date information about companies." },
+              { role: "user", content: researchPrompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 2000,
+          });
+
+          const researchText = completion.choices[0].message.content.trim();
+          try {
+            const jsonMatch = researchText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              companyResearch = JSON.parse(jsonMatch[0]);
+            }
+          } catch (parseError) {
+            console.log('Failed to parse company research JSON:', parseError.message);
+          }
+
+          // Cache for future use
+          if (companyResearch) {
+            try {
+              await saveCompanyResearch(researchCompanyName, companyResearch);
+              console.log(`✅ Cached company research for: ${researchCompanyName}`);
+            } catch (saveErr) {
+              console.log('Failed to cache company research (non-critical):', saveErr.message);
+            }
+          }
+        }
+      } catch (researchErr) {
+        console.log('Company research failed (non-critical):', researchErr.message);
+      }
+    }
+
+    // Step 7: Finalising
+    sendStep(7, 'Finalising your prep guide');
 
     // Track this job analysis
     const jobDescriptionHash = hashJobDescription(jobDescription);
@@ -2137,9 +2319,20 @@ Return JSON: {"companyName": "...", "roleTitle": "..."}`;
         for (const topicObj of planTopics) {
           const topicName = typeof topicObj === 'string' ? topicObj : (topicObj.topic || topicObj.name || '');
           if (!topicName) continue;
+          const normalized = normalizeTopicName(topicName, companyInfo.name);
+
+          // Layer 2: Try fuzzy match against user's existing topics first
+          const similar = await findSimilarUserTopic(normalized, user.id);
+          if (similar) {
+            topicIds.push(similar.id);
+            continue;
+          }
+
+          // No match — create new topic
           const description = typeof topicObj === 'object' ? topicObj.description : null;
           const category = inferTopicCategory(topicName);
-          const topic = await getOrCreateTopic(topicName, category, description);
+          const drillable = !isCompanySpecificTopic(topicName, companyInfo.name);
+          const topic = await getOrCreateTopic(topicName, category, description, { companyName: companyInfo.name, isDrillable: drillable });
           topicIds.push(topic.id);
         }
         if (topicIds.length > 0) {
@@ -2154,7 +2347,12 @@ Return JSON: {"companyName": "...", "roleTitle": "..."}`;
     // Refresh user to get updated credits after deduction
     const sessionToken = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.session_token;
     const updatedUser = await getUserFromSession(sessionToken);
-    
+    console.log('Post-deduction user:', {
+      jobAnalysesRemaining: updatedUser?.jobAnalysesRemaining,
+      trainingCreditsRemaining: updatedUser?.trainingCreditsRemaining,
+      sessionTokenSource: req.headers.authorization ? 'header' : 'cookie'
+    });
+
     // Log what we're sending
     console.log('=== SENDING RESPONSE ===');
     console.log('companyInfo exists:', !!companyInfo);
@@ -2167,6 +2365,7 @@ Return JSON: {"companyName": "...", "roleTitle": "..."}`;
       jobDescription: jobDescription,
       jobDescriptionHash: jobDescriptionHash, // Add hash for generate more questions feature
       companyInfo: companyInfo,
+      companyResearch: companyResearch || null,
       studyPlan,
       url: url || null, // Include URL for reference
       user: {
@@ -2294,7 +2493,7 @@ Format your response as JSON:
 });
 
 // API endpoint to evaluate voice recordings (transcribe and evaluate)
-app.post('/api/voice/evaluate', requireAuth, requireTrainingCredits('voiceEvaluation'), async (req, res) => {
+app.post('/api/voice/evaluate', express.json({ limit: '5mb' }), requireAuth, requireTrainingCredits('voiceEvaluation'), async (req, res) => {
   let tempFilePath = null;
   try {
     const { audioBase64, question, jobDescription } = req.body;
@@ -2442,6 +2641,11 @@ Format as JSON:
 // API endpoint for chat-based practice
 app.post('/api/chat/practice', requireAuth, requireTrainingCredits('chatPractice'), async (req, res) => {
   try {
+    const practiceRl = rateLimit(req.user.id, 'chatPractice', 30, 10 * 60 * 1000);
+    if (!practiceRl.allowed) {
+      return res.status(429).json({ error: 'Too many requests. Please slow down.', retryAfter: practiceRl.retryAfter });
+    }
+
     const { jobDescriptionHash, topic, messages, companyName, roleTitle, sessionId } = req.body;
 
     if (!topic) {
@@ -2507,12 +2711,14 @@ If the candidate hasn't answered a question yet (e.g., it's the opening), set ev
       { role: 'system', content: systemPrompt }
     ];
 
-    if (messages && messages.length > 0) {
-      messages.forEach(msg => {
+    const recentMessages = (messages || []).slice(-20);
+    if (recentMessages.length > 0) {
+      recentMessages.forEach(msg => {
+        const content = typeof msg.content === 'string' ? msg.content.substring(0, 3000) : '';
         if (msg.role === 'interviewer') {
-          gptMessages.push({ role: 'assistant', content: msg.content });
+          gptMessages.push({ role: 'assistant', content });
         } else if (msg.role === 'candidate') {
-          gptMessages.push({ role: 'user', content: msg.content });
+          gptMessages.push({ role: 'user', content });
         }
       });
     } else {
@@ -2548,8 +2754,8 @@ If the candidate hasn't answered a question yet (e.g., it's the opening), set ev
     }
 
     // Record attempt for chat exchanges
-    if (messages && messages.length > 0) {
-      const lastUserMsg = messages.filter(m => m.role === 'candidate').pop();
+    if (recentMessages.length > 0) {
+      const lastUserMsg = recentMessages.filter(m => m.role === 'candidate').pop();
       if (lastUserMsg) {
         try {
           await recordAttempt(req.user.id, {
@@ -2583,6 +2789,11 @@ If the candidate hasn't answered a question yet (e.g., it's the opening), set ev
 // Focus Chat — SSE streaming skill coaching
 app.post('/api/chat/focus', requireAuth, async (req, res) => {
   try {
+    const focusRl = rateLimit(req.user.id, 'chatFocus', 20, 10 * 60 * 1000);
+    if (!focusRl.allowed) {
+      return res.status(429).json({ error: 'Too many requests. Please slow down.', retryAfter: focusRl.retryAfter });
+    }
+
     const { skill, messages, sessionId } = req.body;
 
     if (!skill) {
@@ -2629,10 +2840,11 @@ You are NOT an interviewer. You are a patient, expert tutor. Your goal is to bui
 
     if (recentMessages.length > 0) {
       recentMessages.forEach(msg => {
+        const content = typeof msg.content === 'string' ? msg.content.substring(0, 3000) : '';
         if (msg.role === 'coach') {
-          gptMessages.push({ role: 'assistant', content: msg.content });
+          gptMessages.push({ role: 'assistant', content });
         } else if (msg.role === 'user') {
-          gptMessages.push({ role: 'user', content: msg.content });
+          gptMessages.push({ role: 'user', content });
         }
       });
     } else {
@@ -2702,7 +2914,8 @@ You are NOT an interviewer. You are a patient, expert tutor. Your goal is to bui
 
         // Update user_topic_scores so Drills page reflects practice
         try {
-          const topic = await getOrCreateTopic(skill);
+          const drillable = !isCompanySpecificTopic(skill);
+          const topic = await getOrCreateTopic(skill, null, null, { isDrillable: drillable });
           if (topic) {
             const score = evaluation?.score || 50;
             await updateUserTopicScore(user.id, topic.id, score, score >= 70);
@@ -2867,6 +3080,11 @@ app.post('/api/company/research', requireAuth, async (req, res) => {
   console.log('==========================================\n');
   
   try {
+    const researchRl = rateLimit(req.user.id, 'companyResearch', 10, 10 * 60 * 1000);
+    if (!researchRl.allowed) {
+      return res.status(429).json({ error: 'Too many requests. Please slow down.', retryAfter: researchRl.retryAfter });
+    }
+
     const { companyName, jobDescription } = req.body;
 
     console.log('[Company Research] Request received:', { 
@@ -3794,7 +4012,8 @@ app.post('/api/drills/sessions', requireAuth, async (req, res) => {
     const { skill, answers, avgScore, scores } = req.body;
     if (!skill) return res.status(400).json({ error: 'skill is required' });
 
-    const topic = await getOrCreateTopic(skill);
+    const drillable = !isCompanySpecificTopic(skill);
+    const topic = await getOrCreateTopic(skill, null, null, { isDrillable: drillable });
     if (!topic) return res.status(404).json({ error: 'Topic not found' });
 
     const session = await saveDrillSession(req.user.id, topic.id, {
@@ -3856,12 +4075,23 @@ app.post('/api/topics/backfill', requireAuth, async (req, res) => {
       if (planTopics.length === 0) continue;
 
       const topicIds = [];
+      const companyName = analysis.company_name || null;
       for (const topicObj of planTopics) {
         const topicName = typeof topicObj === 'string' ? topicObj : (topicObj.topic || topicObj.name || '');
         if (!topicName) continue;
+        const normalized = normalizeTopicName(topicName, companyName);
+
+        // Try fuzzy match against user's existing topics first
+        const similar = await findSimilarUserTopic(normalized, user.id);
+        if (similar) {
+          topicIds.push(similar.id);
+          continue;
+        }
+
         const description = typeof topicObj === 'object' ? topicObj.description : null;
         const category = inferTopicCategory(topicName);
-        const topic = await getOrCreateTopic(topicName, category, description);
+        const drillable = !isCompanySpecificTopic(topicName, companyName);
+        const topic = await getOrCreateTopic(topicName, category, description, { companyName, isDrillable: drillable });
         topicIds.push(topic.id);
       }
       if (topicIds.length > 0) {

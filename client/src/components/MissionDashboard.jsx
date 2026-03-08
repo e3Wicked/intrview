@@ -287,7 +287,7 @@ function MissionDashboard({ user, onAnalyzeClick }) {
       )}
 
       {/* Bottom row: Jobs + Weakness nudge */}
-      <div className="dash-bottom-row">
+      <div className={`dash-bottom-row ${companiesWithJobs.length === 0 ? 'dash-bottom-row--full' : ''}`}>
         {/* Jobs card */}
         <div className="dash-card">
           <div className="dash-card-header">

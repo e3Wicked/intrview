@@ -60,6 +60,10 @@ DB_PASSWORD=intrview
 # OpenAI (required)
 OPENAI_API_KEY=sk-...
 
+# Google OAuth (optional — Google login won't work without these)
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+
 # Stripe (optional — payments won't work without these)
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
@@ -70,6 +74,12 @@ SMTP_PORT=587
 SMTP_USER=you@example.com
 SMTP_PASSWORD=your_smtp_password
 SMTP_FROM=intrview.io <noreply@intrview.io>
+```
+
+Then create `client/.env` based on the template below:
+
+```env
+VITE_GOOGLE_CLIENT_ID=...
 ```
 
 ### 3. Start the database
