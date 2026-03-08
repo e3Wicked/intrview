@@ -402,7 +402,7 @@ export async function getUserFromSession(sessionToken) {
       isLifetimePlan: user.is_lifetime_plan || false,
       stripeCustomerId: user.stripe_customer_id,
       stripeSubscriptionId: user.stripe_subscription_id,
-      creditsResetAt: user.credits_reset_at || null,
+      creditsResetAt: user.is_lifetime_plan ? null : (user.credits_reset_at || null),
       subscriptionStatus: user.subscription_status,
       isAdmin: isAdmin
     };
@@ -583,7 +583,7 @@ export async function createNewSubscription(userId, planKey) {
       job_analyses_remaining, job_analyses_monthly_allowance,
       training_credits_remaining, training_credits_monthly_allowance,
       is_lifetime_plan
-    ) VALUES ($1, $2, $3, $3, CURRENT_TIMESTAMP + INTERVAL '30 days', $4, $5, $6, $7, $8)`,
+    ) VALUES ($1, $2, $3, $3, ${isLifetime ? 'NULL' : "CURRENT_TIMESTAMP + INTERVAL '30 days'"}, $4, $5, $6, $7, $8)`,
     [userId, planKey, legacyCredits, jobAnalyses, jobAllowance, trainingCredits, trainingAllowance, isLifetime]
   );
 }

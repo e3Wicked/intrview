@@ -14,6 +14,8 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
   const [progressSteps, setProgressSteps] = useState([])
   const [inputMode, setInputMode] = useState('url') // 'url' | 'text'
   const [pastedText, setPastedText] = useState('')
+  const [companyNameInput, setCompanyNameInput] = useState('')
+  const [roleInput, setRoleInput] = useState('')
   const abortControllerRef = useRef(null)
 
   const processAnalysisResult = (analysisResult) => {
@@ -58,6 +60,14 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
       setError('Please paste at least 200 characters of the job description')
       return
     }
+    if (inputMode === 'text' && !companyNameInput.trim()) {
+      setError('Please enter the company name')
+      return
+    }
+    if (inputMode === 'text' && !roleInput.trim()) {
+      setError('Please enter the role / job title')
+      return
+    }
 
     setLocalLoading(true)
     setError(null)
@@ -75,7 +85,9 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(inputMode === 'url' ? { url: localUrl } : { text: pastedText }),
+        body: JSON.stringify(inputMode === 'url'
+          ? { url: localUrl }
+          : { text: pastedText, companyName: companyNameInput.trim(), roleTitle: roleInput.trim() }),
         signal: controller.signal,
       })
 
@@ -199,6 +211,26 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
                 </div>
               ) : (
                 <div className="dashboard-text-input-wrapper">
+                  <div className="dashboard-text-meta-row">
+                    <input
+                      type="text"
+                      value={companyNameInput}
+                      onChange={(e) => setCompanyNameInput(e.target.value)}
+                      placeholder="Company name"
+                      disabled={localLoading}
+                      className="dashboard-meta-input"
+                      required
+                    />
+                    <input
+                      type="text"
+                      value={roleInput}
+                      onChange={(e) => setRoleInput(e.target.value)}
+                      placeholder="Role / job title"
+                      disabled={localLoading}
+                      className="dashboard-meta-input"
+                      required
+                    />
+                  </div>
                   <textarea
                     value={pastedText}
                     onChange={(e) => setPastedText(e.target.value)}
@@ -206,11 +238,15 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
                     disabled={localLoading}
                     className="dashboard-text-input"
                     rows={8}
+                    maxLength={30000}
                     autoFocus
                   />
+                  <div className="char-counter" style={{ textAlign: 'right', fontSize: '0.75rem', color: pastedText.length > 25000 ? '#f59e0b' : '#888', marginTop: '0.25rem' }}>
+                    {pastedText.length.toLocaleString()} / 30,000
+                  </div>
                   <button
                     type="submit"
-                    disabled={localLoading || pastedText.trim().length < 200}
+                    disabled={localLoading || pastedText.trim().length < 200 || !companyNameInput.trim() || !roleInput.trim()}
                     className="dashboard-analyze-btn dashboard-analyze-btn-full"
                   >
                     {localLoading ? 'Analyzing...' : (
@@ -257,7 +293,7 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
                       ? <>You have <strong>{creditGate.remaining}</strong> job analys{creditGate.remaining !== 1 ? 'es' : 'is'} remaining.</>
                       : <>You have <strong>{creditGate.remaining}</strong> training credit{creditGate.remaining !== 1 ? 's' : ''} remaining. This requires <strong>{creditGate.required}</strong>.</>}
                   </p>
-                  {creditGate.resetDate && (
+                  {creditGate.resetDate && !user.isLifetimePlan && (
                     <p className="credit-gate-refresh">
                       Your credits refresh on {new Date(creditGate.resetDate).toLocaleDateString()}.
                     </p>
@@ -290,7 +326,7 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
               remaining: 0,
               required: 1,
               resourceType: 'jobAnalyses',
-              resetDate: user.creditsResetAt || null
+              resetDate: user.isLifetimePlan ? null : (user.creditsResetAt || null)
             })
             setShowAnalyzeForm(true)
             return

@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import './InlineLoadingTerminal.css'
 
 const STEP_LABELS = [
-  'Fetching job posting',
-  'Parsing description content',
-  'Identifying company & role',
-  'Researching company background',
-  'Generating study plan',
-  'Finalising your prep guide',
+  'Fetching job posting',        // 0
+  'Validating job content',      // 1
+  'Parsing description content', // 2
+  'Identifying company & role',  // 3
+  'Researching company background', // 4
+  'Generating study plan',       // 5
+  'Researching company intel',   // 6
+  'Finalising your prep guide',  // 7
 ]
 
 function InlineLoadingTerminal({ steps, loading }) {

@@ -774,15 +774,53 @@ async function ensureEmailVerificationCodesTable() {
 }
 
 // Normalize a topic name for deduplication
-function normalizeTopicName(name) {
-  return name.toLowerCase().trim()
+function normalizeTopicName(name, companyName = null) {
+  let n = name.toLowerCase().trim()
     .replace(/\s+/g, ' ')
     .replace(/['']/g, "'")
+    .replace(/&/g, ' and ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  // Normalize common variants
+  n = n.replace(/\bfront[-\s]end\b/g, 'frontend')
+    .replace(/\bback[-\s]end\b/g, 'backend')
+
+  // Strip leading fluff prefixes
+  n = n.replace(/^(advanced|introduction to|intro to|basic)\s+/, '')
+
+  // Strip trailing fluff words
+  const fluffWords = ['proficiency', 'skills', 'expertise', 'fundamentals', 'concepts', 'best practices', 'knowledge', 'essentials']
+  for (const word of fluffWords) {
+    n = n.replace(new RegExp(`\\s+${word}$`), '')
+  }
+
+  // Strip company name from topic if provided
+  if (companyName) {
+    const compLower = companyName.toLowerCase().trim()
+    n = n.replace(new RegExp(`\\b${compLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g'), '').replace(/\s+/g, ' ').trim()
+  }
+
+  // Sort multi-part names for consistency ("sql and python" -> "python and sql")
+  // Only sort simple parts (no parentheses or complex content)
+  if (!/[()]/.test(n)) {
+    const andParts = n.split(' and ')
+    if (andParts.length > 1) {
+      n = andParts.map(p => p.trim()).filter(Boolean).sort().join(' and ')
+    } else {
+      const commaParts = n.split(', ')
+      if (commaParts.length > 1) {
+        n = commaParts.map(p => p.trim()).filter(Boolean).sort().join(', ')
+      }
+    }
+  }
+
+  return n
 }
 
 // Get or create a topic, returning its id
-async function getOrCreateTopic(name, category = null, description = null) {
-  const normalized = normalizeTopicName(name)
+async function getOrCreateTopic(name, category = null, description = null, { companyName = null, isDrillable = true } = {}) {
+  const normalized = normalizeTopicName(name, companyName)
   try {
     const existing = await pool.query(
       'SELECT * FROM topics WHERE normalized_name = $1',
@@ -791,13 +829,14 @@ async function getOrCreateTopic(name, category = null, description = null) {
     if (existing.rows.length > 0) return existing.rows[0]
 
     const result = await pool.query(
-      `INSERT INTO topics (name, normalized_name, category, description)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO topics (name, normalized_name, category, description, is_drillable)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (normalized_name) DO UPDATE SET
          category = COALESCE(EXCLUDED.category, topics.category),
-         description = COALESCE(EXCLUDED.description, topics.description)
+         description = COALESCE(EXCLUDED.description, topics.description),
+         is_drillable = EXCLUDED.is_drillable
        RETURNING *`,
-      [name, normalized, category, description]
+      [name, normalized, category, description, isDrillable]
     )
     return result.rows[0]
   } catch (error) {
@@ -854,7 +893,7 @@ async function getAllUserTopics(userId) {
        JOIN job_topics jt ON jt.topic_id = t.id
        JOIN job_analyses ja ON ja.job_description_hash = jt.job_description_hash
        LEFT JOIN user_topic_scores uts ON uts.topic_id = t.id AND uts.user_id = $1
-       WHERE ja.user_id = $1
+       WHERE ja.user_id = $1 AND t.is_drillable = TRUE
        GROUP BY t.id, t.name, t.normalized_name, t.category, t.description, uts.score, uts.attempts, uts.correct_count, uts.last_practiced_at
        ORDER BY COALESCE(uts.attempts, 0) DESC, t.name`,
       [userId]
@@ -889,7 +928,7 @@ async function updateUserTopicScore(userId, topicId, score, isCorrect) {
 async function getTopicsForJob(jobDescriptionHash) {
   try {
     const result = await pool.query(
-      `SELECT t.*, jt.relevance_score
+      `SELECT t.*, t.is_drillable, jt.relevance_score
        FROM topics t
        JOIN job_topics jt ON jt.topic_id = t.id
        WHERE jt.job_description_hash = $1
@@ -915,7 +954,7 @@ async function getSharedTopicsAcrossJobs(userId) {
        JOIN job_topics jt ON jt.topic_id = t.id
        JOIN job_analyses ja ON ja.job_description_hash = jt.job_description_hash
        LEFT JOIN user_topic_scores uts ON uts.topic_id = t.id AND uts.user_id = $1
-       WHERE ja.user_id = $1
+       WHERE ja.user_id = $1 AND t.is_drillable = TRUE
        GROUP BY t.id, t.name, t.normalized_name, t.category, uts.score, uts.attempts
        HAVING COUNT(DISTINCT jt.job_description_hash) > 1
        ORDER BY job_count DESC, t.name`,
@@ -959,6 +998,68 @@ async function getDrillSessions(userId, topicId) {
     console.error('Error in getDrillSessions:', error.message)
     return []
   }
+}
+
+// Synonym map for fuzzy topic matching
+const TOPIC_SYNONYMS = {
+  'frontend': ['front-end', 'front end'],
+  'backend': ['back-end', 'back end'],
+  'javascript': ['js'],
+  'typescript': ['ts'],
+  'databases': ['db', 'database'],
+  'devops': ['dev ops', 'dev-ops'],
+  'ci/cd': ['cicd', 'ci cd'],
+}
+
+// Build reverse map for quick lookup
+const SYNONYM_LOOKUP = new Map()
+for (const [canonical, synonyms] of Object.entries(TOPIC_SYNONYMS)) {
+  SYNONYM_LOOKUP.set(canonical, canonical)
+  for (const syn of synonyms) {
+    SYNONYM_LOOKUP.set(syn, canonical)
+  }
+}
+
+function canonicalWord(word) {
+  return SYNONYM_LOOKUP.get(word) || word
+}
+
+// Find a similar existing topic for a user using fuzzy matching
+async function findSimilarUserTopic(normalizedName, userId) {
+  const userTopics = await getAllUserTopics(userId)
+  if (userTopics.length === 0) return null
+
+  const newWords = new Set(normalizedName.split(/\s+/).map(canonicalWord).filter(w => w !== 'and'))
+
+  let bestMatch = null
+  let bestScore = 0
+
+  for (const topic of userTopics) {
+    const existingNorm = topic.normalized_name
+
+    // Exact match (already handled by getOrCreateTopic, but just in case)
+    if (existingNorm === normalizedName) return topic
+
+    // Containment match (only when shorter string is >= 2 words)
+    const shorter = normalizedName.length < existingNorm.length ? normalizedName : existingNorm
+    const longer = normalizedName.length < existingNorm.length ? existingNorm : normalizedName
+    if (shorter.split(/\s+/).length >= 2 && longer.includes(shorter)) {
+      return topic
+    }
+
+    // Word overlap with synonym awareness (Jaccard)
+    const existingWords = new Set(existingNorm.split(/\s+/).map(canonicalWord).filter(w => w !== 'and'))
+    const intersection = [...newWords].filter(w => existingWords.has(w))
+    const unionSize = new Set([...newWords, ...existingWords]).size
+    const jaccard = unionSize > 0 ? intersection.length / unionSize : 0
+
+    if (jaccard >= 0.6 && jaccard > bestScore) {
+      bestScore = jaccard
+      bestMatch = topic
+    }
+  }
+
+  return bestMatch
 }
 
 // Get all drill sessions for a user (for the drills page overview)
@@ -1011,6 +1112,7 @@ export {
   getSharedTopicsAcrossJobs,
   normalizeTopicName,
   getAllUserTopics,
+  findSimilarUserTopic,
   saveDrillSession,
   getDrillSessions,
   getAllDrillSessions

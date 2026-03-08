@@ -290,6 +290,10 @@
   align-items: start;
 }
 
+.dash-bottom-row--full {
+  grid-template-columns: 1fr;
+}
+
 /* ========== Jobs List (grouped by company) ========== */
 .jobs-list {
   display: flex;

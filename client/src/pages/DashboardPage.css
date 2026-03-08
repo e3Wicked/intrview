@@ -237,6 +237,32 @@
   gap: 12px;
 }
 
+.dashboard-text-meta-row {
+  display: flex;
+  gap: 10px;
+}
+
+.dashboard-meta-input {
+  flex: 1;
+  padding: 12px 16px;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 8px;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.dashboard-meta-input:focus {
+  outline: none;
+  border-color: var(--color-accent, #2563eb);
+}
+
+.dashboard-meta-input::placeholder {
+  color: var(--color-text-secondary, #6b6b6b);
+}
+
 .dashboard-text-input {
   width: 100%;
   padding: 14px 18px;
