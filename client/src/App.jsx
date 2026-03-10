@@ -63,6 +63,7 @@ function Layout({ children, user, setUser, showLoginModal, setShowLoginModal, lo
           user={user}
           onSelectPlan={handleSelectPlan}
           onLoginRequired={() => setShowLoginModal(true)}
+          onUserUpdate={setUser}
         />
       </Suspense>
     </div>
@@ -88,6 +89,36 @@ function App() {
   useEffect(() => {
     checkAuth()
   }, [])
+
+  // Re-fetch user data after Stripe checkout redirect
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get('upgraded') !== 'true') return
+
+    let cancelled = false
+
+    const refreshUser = async (retries = 5) => {
+      for (let i = 0; i < retries && !cancelled; i++) {
+        try {
+          // First, try to verify the checkout directly with Stripe
+          await axios.get('/api/stripe/verify-checkout')
+          // Then fetch updated user data
+          const res = await axios.get('/api/auth/me')
+          if (res.data.user && res.data.user.plan !== 'free') {
+            setUser(res.data.user)
+            navigate(location.pathname, { replace: true })
+            return
+          }
+        } catch {}
+        if (i < retries - 1) await new Promise(r => setTimeout(r, 1500))
+      }
+      // Final fallback — strip query param even if still free
+      navigate(location.pathname, { replace: true })
+    }
+
+    refreshUser()
+    return () => { cancelled = true }
+  }, [location.search])
 
   // Redirect signed-in users from homepage to dashboard
   useEffect(() => {

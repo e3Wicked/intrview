@@ -11,14 +11,14 @@ const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SEC
 // Create Stripe products and prices (run once to set up)
 export async function createStripeProducts() {
   const products = [];
-  
+
   for (const [planKey, plan] of Object.entries(PLANS)) {
     if (plan.price) {
       const product = await stripe.products.create({
         name: `${plan.name} Plan`,
         description: `intrview.io ${plan.name} subscription`
       });
-      
+
       const price = await stripe.prices.create({
         product: product.id,
         unit_amount: plan.price * 100, // Convert to cents
@@ -27,7 +27,7 @@ export async function createStripeProducts() {
           interval: 'month'
         }
       });
-      
+
       products.push({
         plan: planKey,
         productId: product.id,
@@ -35,11 +35,47 @@ export async function createStripeProducts() {
       });
     }
   }
-  
+
   return products;
 }
 
-// Create checkout session
+// Resolve the Stripe price ID for a plan (from env or auto-create)
+export async function getPriceIdForPlan(planKey) {
+  const plan = PLANS[planKey];
+  if (!plan || !plan.price) {
+    throw new Error('Invalid plan');
+  }
+
+  let priceId = process.env[`STRIPE_PRICE_ID_${planKey.toUpperCase()}`];
+
+  if (!priceId) {
+    console.log(`Creating Stripe product and price for ${planKey}...`);
+    try {
+      const product = await stripe.products.create({
+        name: `${plan.name} Plan`,
+        description: `intrview.io ${plan.name} subscription`
+      });
+
+      const price = await stripe.prices.create({
+        product: product.id,
+        unit_amount: plan.price * 100,
+        currency: 'usd',
+        recurring: { interval: 'month' }
+      });
+
+      priceId = price.id;
+      console.log(`✅ Created Stripe price for ${planKey}: ${priceId}`);
+      console.log(`💡 Add this to your .env: STRIPE_PRICE_ID_${planKey.toUpperCase()}=${priceId}`);
+    } catch (error) {
+      console.error('Error creating Stripe product/price:', error);
+      throw new Error(`Failed to create Stripe price: ${error.message}`);
+    }
+  }
+
+  return priceId;
+}
+
+// Create checkout session (for free → paid transitions)
 export async function createCheckoutSession(userId, planKey, successUrl, cancelUrl) {
   const plan = PLANS[planKey];
   if (!plan || !plan.price) {
@@ -51,13 +87,13 @@ export async function createCheckoutSession(userId, planKey, successUrl, cancelU
     'SELECT stripe_customer_id FROM subscriptions WHERE user_id = $1',
     [userId]
   );
-  
+
   let customerId = userResult.rows[0]?.stripe_customer_id;
-  
+
   if (!customerId) {
     const userResult = await pool.query('SELECT email, name FROM users WHERE id = $1', [userId]);
     const user = userResult.rows[0];
-    
+
     const customer = await stripe.customers.create({
       email: user.email,
       name: user.name,
@@ -65,45 +101,16 @@ export async function createCheckoutSession(userId, planKey, successUrl, cancelU
         userId: userId.toString()
       }
     });
-    
+
     customerId = customer.id;
-    
+
     await pool.query(
       'UPDATE subscriptions SET stripe_customer_id = $1 WHERE user_id = $2',
       [customerId, userId]
     );
   }
 
-  // Get price ID from environment or create it
-  // In production, store these in your database
-  let priceId = process.env[`STRIPE_PRICE_ID_${planKey.toUpperCase()}`];
-  
-  if (!priceId) {
-    // Auto-create product and price if not exists
-    console.log(`Creating Stripe product and price for ${planKey}...`);
-    try {
-      const product = await stripe.products.create({
-        name: `${plan.name} Plan`,
-        description: `intrview.io ${plan.name} subscription`
-      });
-      
-      const price = await stripe.prices.create({
-        product: product.id,
-        unit_amount: plan.price * 100, // Convert to cents
-        currency: 'usd',
-        recurring: {
-          interval: 'month'
-        }
-      });
-      
-      priceId = price.id;
-      console.log(`✅ Created Stripe price for ${planKey}: ${priceId}`);
-      console.log(`💡 Add this to your .env: STRIPE_PRICE_ID_${planKey.toUpperCase()}=${priceId}`);
-    } catch (error) {
-      console.error('Error creating Stripe product/price:', error);
-      throw new Error(`Failed to create Stripe price: ${error.message}`);
-    }
-  }
+  const priceId = await getPriceIdForPlan(planKey);
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
@@ -126,25 +133,91 @@ export async function createCheckoutSession(userId, planKey, successUrl, cancelU
   return session;
 }
 
+// Upgrade an existing subscription to a new plan (paid → paid)
+export async function upgradeSubscription(userId, newPlanKey) {
+  const planDef = PLANS[newPlanKey];
+  if (!planDef || !planDef.price) {
+    throw new Error('Invalid plan');
+  }
+
+  // Get existing subscription ID
+  const subResult = await pool.query(
+    'SELECT stripe_subscription_id FROM subscriptions WHERE user_id = $1 AND stripe_subscription_id IS NOT NULL',
+    [userId]
+  );
+
+  const subscriptionId = subResult.rows[0]?.stripe_subscription_id;
+  if (!subscriptionId) {
+    throw new Error('No active subscription to upgrade');
+  }
+
+  // Get current subscription to find the item ID
+  const currentSub = await stripe.subscriptions.retrieve(subscriptionId);
+  const itemId = currentSub.items.data[0].id;
+
+  // Get price ID for new plan
+  const newPriceId = await getPriceIdForPlan(newPlanKey);
+
+  // Update the subscription with the new price
+  const updatedSub = await stripe.subscriptions.update(subscriptionId, {
+    items: [{ id: itemId, price: newPriceId }],
+    proration_behavior: 'create_prorations'
+  });
+
+  // Update DB with new plan and reset credits
+  const jobAnalyses = planDef.monthlyJobAnalyses === -1 ? 999999 : planDef.monthlyJobAnalyses;
+  const trainingCredits = planDef.monthlyTrainingCredits;
+
+  await pool.query(
+    `UPDATE subscriptions
+     SET plan = $1,
+         status = 'active',
+         current_period_start = to_timestamp($2),
+         current_period_end = to_timestamp($3),
+         credits_remaining = $4,
+         credits_monthly_allowance = $4,
+         credits_reset_at = to_timestamp($3),
+         job_analyses_remaining = $5,
+         job_analyses_monthly_allowance = $6,
+         training_credits_remaining = $7,
+         training_credits_monthly_allowance = $7,
+         is_lifetime_plan = false,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE user_id = $8`,
+    [
+      newPlanKey,
+      updatedSub.current_period_start,
+      updatedSub.current_period_end,
+      trainingCredits,
+      jobAnalyses,
+      planDef.monthlyJobAnalyses,
+      trainingCredits,
+      userId
+    ]
+  );
+
+  return updatedSub;
+}
+
 // Handle webhook events
 export async function handleWebhook(event) {
   switch (event.type) {
     case 'checkout.session.completed':
       await handleCheckoutCompleted(event.data.object);
       break;
-    
+
     case 'invoice.payment_succeeded':
       await handlePaymentSucceeded(event.data.object);
       break;
-    
+
     case 'invoice.payment_failed':
       await handlePaymentFailed(event.data.object);
       break;
-    
+
     case 'customer.subscription.deleted':
       await handleSubscriptionDeleted(event.data.object);
       break;
-    
+
     case 'customer.subscription.updated':
       await handleSubscriptionUpdated(event.data.object);
       break;
@@ -155,10 +228,10 @@ async function handleCheckoutCompleted(session) {
   const userId = parseInt(session.metadata.userId);
   const plan = session.metadata.plan;
   const subscriptionId = session.subscription;
-  
+
   // Get subscription details
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-  
+
   const planDef = PLANS[plan];
   const jobAnalyses = planDef.monthlyJobAnalyses === -1 ? 999999 : planDef.monthlyJobAnalyses;
   const jobAllowance = planDef.monthlyJobAnalyses;
@@ -200,15 +273,15 @@ async function handleCheckoutCompleted(session) {
 async function handlePaymentSucceeded(invoice) {
   const subscriptionId = invoice.subscription;
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-  
+
   const result = await pool.query(
     'SELECT user_id, plan FROM subscriptions WHERE stripe_subscription_id = $1',
     [subscriptionId]
   );
-  
+
   if (result.rows.length > 0) {
     const { user_id, plan } = result.rows[0];
-    
+
     const planDef = PLANS[plan];
     const jobAnalyses = planDef.monthlyJobAnalyses === -1 ? 999999 : planDef.monthlyJobAnalyses;
     const trainingCredits = planDef.monthlyTrainingCredits;
@@ -241,9 +314,9 @@ async function handlePaymentSucceeded(invoice) {
 
 async function handlePaymentFailed(invoice) {
   const subscriptionId = invoice.subscription;
-  
+
   await pool.query(
-    `UPDATE subscriptions 
+    `UPDATE subscriptions
      SET status = 'past_due',
          updated_at = CURRENT_TIMESTAMP
      WHERE stripe_subscription_id = $1`,
@@ -272,7 +345,7 @@ async function handleSubscriptionDeleted(subscription) {
 
 async function handleSubscriptionUpdated(subscription) {
   await pool.query(
-    `UPDATE subscriptions 
+    `UPDATE subscriptions
      SET current_period_start = to_timestamp($1),
          current_period_end = to_timestamp($2),
          status = $3,
@@ -293,7 +366,6 @@ export async function createPortalSession(customerId, returnUrl) {
     customer: customerId,
     return_url: returnUrl
   });
-  
+
   return session;
 }
-

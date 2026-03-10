@@ -3,20 +3,14 @@ import axios from 'axios'
 import PricingSection from './PricingSection'
 import './UpgradeModal.css'
 
-function UpgradeModal({ isOpen, onClose, currentPlan, onLoginRequired }) {
+function UpgradeModal({ isOpen, onClose, user, onLoginRequired, onUserUpdate }) {
   const [loading, setLoading] = useState(null)
 
   const handleSelectPlan = async (planKey) => {
-    if (planKey === currentPlan) {
-      onClose()
-      return
-    }
-
     // Check if user needs to login first
     try {
       const meResponse = await axios.get('/api/auth/me')
       if (!meResponse.data.user) {
-        // User not logged in, show login modal
         onClose()
         if (onLoginRequired) {
           onLoginRequired()
@@ -24,7 +18,6 @@ function UpgradeModal({ isOpen, onClose, currentPlan, onLoginRequired }) {
         return
       }
     } catch (error) {
-      // If auth check fails, assume not logged in
       onClose()
       if (onLoginRequired) {
         onLoginRequired()
@@ -35,22 +28,44 @@ function UpgradeModal({ isOpen, onClose, currentPlan, onLoginRequired }) {
     setLoading(planKey)
 
     try {
-      const response = await axios.post('/api/stripe/create-checkout', { plan: planKey })
-      if (response.data.url) {
-        window.location.href = response.data.url
+      // Paid user with active subscription → use upgrade endpoint (instant, no redirect)
+      if (user?.subscriptionStatus === 'active' && user?.stripeSubscriptionId) {
+        const response = await axios.post('/api/stripe/upgrade-subscription', { plan: planKey })
+        if (response.data.success) {
+          // Refresh user data to reflect the new plan
+          const meRes = await axios.get('/api/auth/me')
+          if (meRes.data.user && onUserUpdate) {
+            onUserUpdate(meRes.data.user)
+          }
+          onClose()
+        }
+      } else {
+        // Free user → use checkout (needs payment info)
+        const response = await axios.post('/api/stripe/create-checkout', { plan: planKey })
+        if (response.data.url) {
+          window.location.href = response.data.url
+        }
       }
     } catch (error) {
-      console.error('Error creating checkout:', error)
+      console.error('Error upgrading:', error)
       if (error.response?.status === 401) {
-        // Not authenticated, show login
         onClose()
         if (onLoginRequired) {
           onLoginRequired()
         }
       } else {
-        alert('Failed to start checkout. Please try again.')
+        alert(error.response?.data?.error || 'Failed to start checkout. Please try again.')
         setLoading(null)
       }
+    }
+  }
+
+  const handleManageBilling = async () => {
+    try {
+      const res = await axios.post('/api/stripe/create-portal')
+      window.location.href = res.data.url
+    } catch (err) {
+      console.error('Portal error:', err)
     }
   }
 
@@ -60,19 +75,25 @@ function UpgradeModal({ isOpen, onClose, currentPlan, onLoginRequired }) {
     <div className="upgrade-modal-overlay" onClick={onClose}>
       <div className="upgrade-modal" onClick={(e) => e.stopPropagation()}>
         <button className="upgrade-modal-close" onClick={onClose}>×</button>
-        
+
         <div className="upgrade-modal-header">
           <h2>Upgrade Your Plan</h2>
-          <p>Choose a plan to unlock more features and credits</p>
+          <p>Choose a plan that fits your interview journey</p>
         </div>
 
         <div className="upgrade-modal-content">
-          <PricingSection onSelectPlan={handleSelectPlan} />
+          <PricingSection
+            onSelectPlan={handleSelectPlan}
+            currentPlan={user?.plan}
+            onManageBilling={handleManageBilling}
+          />
         </div>
 
         {loading && (
           <div className="upgrade-loading">
-            Redirecting to checkout...
+            {user?.subscriptionStatus === 'active' && user?.stripeSubscriptionId
+              ? 'Upgrading your plan...'
+              : 'Redirecting to checkout...'}
           </div>
         )}
       </div>
@@ -81,4 +102,3 @@ function UpgradeModal({ isOpen, onClose, currentPlan, onLoginRequired }) {
 }
 
 export default UpgradeModal
-

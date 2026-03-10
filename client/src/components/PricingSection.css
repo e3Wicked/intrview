@@ -170,11 +170,37 @@
   transition: opacity 0.2s;
 }
 
-.pricing-cta:hover {
+.pricing-cta:hover:not(:disabled) {
   opacity: 0.9;
 }
 
-.pricing-card.popular .pricing-cta {
+.pricing-cta.current {
+  background: var(--color-bg-secondary, #f4f2ee);
+  color: var(--color-text-secondary, #6b6b6b);
+  cursor: default;
+  border: 1px solid var(--color-border, #e6e3de);
+}
+
+.pricing-cta.secondary {
+  background: transparent;
+  color: var(--color-text-primary, #1a1a1a);
+  border: 1px solid var(--color-border, #e6e3de);
+}
+
+.pricing-cta.secondary:hover {
+  background: var(--color-bg-secondary, #f4f2ee);
+}
+
+.pricing-card.current {
+  border-color: var(--color-accent, #2563eb);
+  box-shadow: 0 0 0 1px var(--color-accent, #2563eb);
+}
+
+.pricing-badge.current-badge {
+  background: var(--color-accent, #2563eb);
+}
+
+.pricing-card.popular .pricing-cta:not(.current):not(.secondary) {
   background: var(--color-accent, #2563eb);
   color: #ffffff;
 }

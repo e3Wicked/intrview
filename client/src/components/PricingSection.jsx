@@ -1,6 +1,9 @@
 import './PricingSection.css'
 
-function PricingSection({ onSelectPlan }) {
+function PricingSection({ onSelectPlan, currentPlan, onManageBilling }) {
+  const planOrder = ['free', 'starter', 'pro', 'elite']
+  const currentIndex = planOrder.indexOf(currentPlan || 'free')
+
   const plans = [
     {
       key: 'starter',
@@ -60,56 +63,78 @@ function PricingSection({ onSelectPlan }) {
       </div>
 
       <div className="pricing-cards">
-        {plans.map((plan) => (
-          <div
-            key={plan.key}
-            className={`pricing-card ${plan.popular ? 'popular' : ''}`}
-          >
-            {plan.popular && (
-              <div className="pricing-badge">Most Popular</div>
-            )}
+        {plans.map((plan) => {
+          const planIndex = planOrder.indexOf(plan.key)
+          const isCurrent = plan.key === currentPlan
+          const isDowngrade = planIndex < currentIndex && planIndex > 0
 
-            <div className="pricing-card-header">
-              <h3>{plan.name}</h3>
-              <div className="pricing-price">
-                <span className="pricing-amount">${plan.price}</span>
-                <span className="pricing-period">/month</span>
-              </div>
-            </div>
-
-            <div className="pricing-details">
-              <div className="pricing-analyses">
-                <strong>{plan.jobAnalyses}</strong> job analyses / month
-              </div>
-              <div className="pricing-credits">
-                <strong>{plan.trainingCredits}</strong> training credits / month
-                <span className="pricing-tooltip" title="Training credits power AI chat, quizzes, voice practice, and company research.">
-                  ?
-                </span>
-              </div>
-            </div>
-
-            <ul className="pricing-features">
-              {plan.features.map((feature, idx) => (
-                <li key={idx}>
-                  <span className="feature-check">&#10003;</span>
-                  {feature}
-                </li>
-              ))}
-            </ul>
-
-            {plan.badge && (
-              <div className="pricing-badge-small">{plan.badge}</div>
-            )}
-
-            <button
-              className="pricing-cta"
-              onClick={() => onSelectPlan(plan.key)}
+          return (
+            <div
+              key={plan.key}
+              className={`pricing-card ${plan.popular ? 'popular' : ''} ${isCurrent ? 'current' : ''}`}
             >
-              {plan.cta}
-            </button>
-          </div>
-        ))}
+              {isCurrent && (
+                <div className="pricing-badge current-badge">Current Plan</div>
+              )}
+              {!isCurrent && plan.popular && (
+                <div className="pricing-badge">Most Popular</div>
+              )}
+
+              <div className="pricing-card-header">
+                <h3>{plan.name}</h3>
+                <div className="pricing-price">
+                  <span className="pricing-amount">${plan.price}</span>
+                  <span className="pricing-period">/month</span>
+                </div>
+              </div>
+
+              <div className="pricing-details">
+                <div className="pricing-analyses">
+                  <strong>{plan.jobAnalyses}</strong> job analyses / month
+                </div>
+                <div className="pricing-credits">
+                  <strong>{plan.trainingCredits}</strong> training credits / month
+                  <span className="pricing-tooltip" title="Training credits power AI chat, quizzes, voice practice, and company research.">
+                    ?
+                  </span>
+                </div>
+              </div>
+
+              <ul className="pricing-features">
+                {plan.features.map((feature, idx) => (
+                  <li key={idx}>
+                    <span className="feature-check">&#10003;</span>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+
+              {plan.badge && (
+                <div className="pricing-badge-small">{plan.badge}</div>
+              )}
+
+              {isCurrent ? (
+                <button className="pricing-cta current" disabled>
+                  Current Plan
+                </button>
+              ) : isDowngrade ? (
+                <button
+                  className="pricing-cta secondary"
+                  onClick={() => onManageBilling?.()}
+                >
+                  Manage in Billing
+                </button>
+              ) : (
+                <button
+                  className="pricing-cta"
+                  onClick={() => onSelectPlan(plan.key)}
+                >
+                  {plan.cta}
+                </button>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       <p className="pricing-footer">

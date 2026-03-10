@@ -73,10 +73,11 @@ import {
 import { sendVerificationCode } from './email.js';
 import Stripe from 'stripe';
 import practiceRouter, { recordAttempt } from './routes/practice.js';
-import { 
-  createCheckoutSession, 
-  handleWebhook, 
-  createPortalSession 
+import {
+  createCheckoutSession,
+  upgradeSubscription,
+  handleWebhook,
+  createPortalSession
 } from './stripe.js';
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
@@ -137,6 +138,40 @@ app.use(cors({
   origin: true,
   credentials: true
 }));
+
+// Stripe webhook must be registered BEFORE express.json() because Stripe
+// signature verification requires the raw request body. express.json()
+// parses the body into an object, which breaks constructEvent().
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripe) {
+    return res.status(500).json({ error: 'Stripe not configured' });
+  }
+
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    return res.status(500).json({ error: 'Webhook secret not configured' });
+  }
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
+    await handleWebhook(event);
+    res.json({ received: true });
+  } catch (error) {
+    console.error('Webhook handler error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.use(express.json({ limit: '500kb' }));
 app.use(cookieParser());
 
@@ -3257,9 +3292,17 @@ app.post('/api/stripe/create-checkout', requireAuth, async (req, res) => {
     if (!PLANS[plan] || !PLANS[plan].price) {
       return res.status(400).json({ error: 'Invalid plan' });
     }
-    
-    const successUrl = `${req.headers.origin || 'http://localhost:5000'}/billing/success?session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${req.headers.origin || 'http://localhost:5000'}/billing/cancel`;
+
+    if (req.user.plan === plan && req.user.subscriptionStatus === 'active') {
+      return res.status(400).json({ error: 'You are already on this plan' });
+    }
+
+    if (req.user.subscriptionStatus === 'active' && req.user.stripeSubscriptionId) {
+      return res.status(400).json({ error: 'Use the upgrade endpoint to change plans' });
+    }
+
+    const successUrl = `${req.headers.origin || 'http://localhost:5173'}/dashboard?upgraded=true`;
+    const cancelUrl = `${req.headers.origin || 'http://localhost:5173'}/dashboard`;
     
     const session = await createCheckoutSession(req.user.id, plan, successUrl, cancelUrl);
     
@@ -3269,33 +3312,34 @@ app.post('/api/stripe/create-checkout', requireAuth, async (req, res) => {
   }
 });
 
-// Stripe webhook
-app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  if (!stripe) {
-    return res.status(500).json({ error: 'Stripe not configured' });
-  }
-  
-  const sig = req.headers['stripe-signature'];
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  
-  if (!webhookSecret) {
-    return res.status(500).json({ error: 'Webhook secret not configured' });
-  }
-  
-  let event;
-  
+// Upgrade existing subscription (paid → paid)
+app.post('/api/stripe/upgrade-subscription', requireAuth, async (req, res) => {
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-  } catch (err) {
-    console.error('Webhook signature verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-  
-  try {
-    await handleWebhook(event);
-    res.json({ received: true });
+    const { plan } = req.body;
+
+    if (!PLANS[plan] || !PLANS[plan].price) {
+      return res.status(400).json({ error: 'Invalid plan' });
+    }
+
+    if (req.user.plan === plan) {
+      return res.status(400).json({ error: 'You are already on this plan' });
+    }
+
+    if (!req.user.stripeSubscriptionId || req.user.subscriptionStatus !== 'active') {
+      return res.status(400).json({ error: 'No active subscription. Use checkout for initial subscription.' });
+    }
+
+    const planOrder = ['free', 'starter', 'pro', 'elite'];
+    const currentIndex = planOrder.indexOf(req.user.plan);
+    const newIndex = planOrder.indexOf(plan);
+
+    if (newIndex <= currentIndex) {
+      return res.status(400).json({ error: 'Use the billing portal to downgrade your plan' });
+    }
+
+    const updatedSub = await upgradeSubscription(req.user.id, plan);
+    res.json({ success: true, plan, subscriptionId: updatedSub.id });
   } catch (error) {
-    console.error('Webhook handler error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -3307,11 +3351,98 @@ app.post('/api/stripe/create-portal', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'No active subscription' });
     }
     
-    const returnUrl = `${req.headers.origin || 'http://localhost:5000'}/billing`;
+    const returnUrl = `${req.headers.origin || 'http://localhost:5173'}/settings`;
     const session = await createPortalSession(req.user.stripeCustomerId, returnUrl);
     
     res.json({ url: session.url });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Verify checkout — fallback for when webhook hasn't fired yet
+app.get('/api/stripe/verify-checkout', requireAuth, async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).json({ error: 'Stripe not configured' });
+    }
+
+    const subResult = await pool.query(
+      'SELECT plan, stripe_customer_id FROM subscriptions WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    const sub = subResult.rows[0];
+    if (!sub || !sub.stripe_customer_id) {
+      return res.json({ plan: sub?.plan || 'free', updated: false });
+    }
+
+    // Already on a paid plan — no need to check Stripe
+    if (sub.plan !== 'free') {
+      return res.json({ plan: sub.plan, updated: false });
+    }
+
+    // Check Stripe for active subscriptions
+    const subscriptions = await stripe.subscriptions.list({
+      customer: sub.stripe_customer_id,
+      status: 'active',
+      limit: 1
+    });
+
+    if (subscriptions.data.length === 0) {
+      return res.json({ plan: 'free', updated: false });
+    }
+
+    const stripeSub = subscriptions.data[0];
+    // Find plan from the checkout session metadata or price lookup
+    const sessions = await stripe.checkout.sessions.list({
+      subscription: stripeSub.id,
+      limit: 1
+    });
+
+    const planKey = sessions.data[0]?.metadata?.plan;
+    if (!planKey || !PLANS[planKey]) {
+      return res.json({ plan: 'free', updated: false });
+    }
+
+    // Webhook hasn't fired yet — update DB directly
+    const planDef = PLANS[planKey];
+    const jobAnalyses = planDef.monthlyJobAnalyses === -1 ? 999999 : planDef.monthlyJobAnalyses;
+    const trainingCredits = planDef.monthlyTrainingCredits;
+
+    await pool.query(
+      `UPDATE subscriptions
+       SET plan = $1,
+           stripe_subscription_id = $2,
+           status = 'active',
+           current_period_start = to_timestamp($3),
+           current_period_end = to_timestamp($4),
+           credits_remaining = $5,
+           credits_monthly_allowance = $5,
+           credits_reset_at = to_timestamp($4),
+           job_analyses_remaining = $6,
+           job_analyses_monthly_allowance = $7,
+           training_credits_remaining = $8,
+           training_credits_monthly_allowance = $8,
+           is_lifetime_plan = false,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $9`,
+      [
+        planKey,
+        stripeSub.id,
+        stripeSub.current_period_start,
+        stripeSub.current_period_end,
+        trainingCredits,
+        jobAnalyses,
+        planDef.monthlyJobAnalyses,
+        trainingCredits,
+        req.user.id
+      ]
+    );
+
+    res.json({ plan: planKey, updated: true });
+  } catch (error) {
+    console.error('Verify checkout error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -4255,9 +4386,11 @@ app.listen(PORT, () => {
   console.log('✅ POST /api/voice/evaluate');
   console.log('✅ POST /api/company/research');
   console.log('✅ POST /api/stripe/create-checkout');
+  console.log('✅ POST /api/stripe/upgrade-subscription');
   console.log('✅ POST /api/stripe/create-advertiser-checkout');
   console.log('✅ POST /api/stripe/webhook');
   console.log('✅ POST /api/stripe/create-portal');
+  console.log('✅ GET  /api/stripe/verify-checkout');
   console.log('✅ POST /api/questions/generate-more');
   console.log('✅ GET  /api/test');
   console.log('=============================\n');

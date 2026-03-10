@@ -83,7 +83,9 @@ function SettingsPage({ user, setUser, onUpgrade, onLogout }) {
           </div>
         </div>
         <div className="settings-plan-actions">
-          <button className="settings-btn" onClick={onUpgrade}>Upgrade Plan</button>
+          {user.plan !== 'elite' && (
+            <button className="settings-btn" onClick={onUpgrade}>Upgrade Plan</button>
+          )}
           {user.stripeCustomerId && (
             <button className="settings-btn secondary" onClick={handleManageBilling}>Manage Billing</button>
           )}
