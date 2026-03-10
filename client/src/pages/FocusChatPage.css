@@ -215,6 +215,75 @@
   background: #1d4ed8;
 }
 
+/* Difficulty Picker */
+.difficulty-picker-container {
+  max-width: 500px;
+  margin: 80px auto 0;
+  text-align: center;
+}
+
+.difficulty-picker-container h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 8px;
+}
+
+.difficulty-picker-container > p {
+  color: #6b6b6b;
+  font-size: 15px;
+  margin: 0 0 32px;
+}
+
+.difficulty-pills {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.difficulty-pill {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 20px 16px;
+  background: #ffffff;
+  border: 2px solid #e6e3de;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: 'Inter', -apple-system, sans-serif;
+  text-align: center;
+}
+
+.difficulty-pill:hover {
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, 0.03);
+}
+
+.difficulty-pill.inferred {
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, 0.05);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.difficulty-pill-label {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.difficulty-pill-desc {
+  font-size: 12px;
+  color: #999;
+}
+
+.difficulty-inferred-note {
+  font-size: 13px;
+  color: #6b6b6b;
+  margin-top: 8px;
+}
+
 @media (max-width: 600px) {
   .focus-chat-page {
     padding: 20px 16px;

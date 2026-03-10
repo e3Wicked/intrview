@@ -1,0 +1,2 @@
+ALTER TABLE user_topic_scores ADD COLUMN IF NOT EXISTS difficulty VARCHAR(20) DEFAULT 'mid';
+ALTER TABLE drill_sessions ADD COLUMN IF NOT EXISTS difficulty VARCHAR(20) DEFAULT 'mid';

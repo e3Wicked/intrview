@@ -658,11 +658,14 @@ async function trackJobAnalysis(userId, url, jobDescriptionHash, companyName, ro
        RETURNING id`,
       [userId, url, jobDescriptionHash, companyName || null, roleTitle || null]
     );
-    console.log(`✅ Tracked job analysis: ${companyName || 'Unknown'} - ${roleTitle || 'No role'} (ID: ${result.rows[0]?.id})`);
+    const analysisId = result.rows[0]?.id;
+    console.log(`✅ Tracked job analysis: ${companyName || 'Unknown'} - ${roleTitle || 'No role'} (ID: ${analysisId})`);
+    return analysisId;
   } catch (error) {
     console.error('❌ Error tracking job analysis:', error.message);
     console.error('Error details:', error);
     // Don't throw - tracking failure shouldn't break the app
+    return null;
   }
 }
 
@@ -888,13 +891,14 @@ async function getAllUserTopics(userId) {
               COALESCE(uts.attempts, 0) as attempts,
               COALESCE(uts.correct_count, 0) as correct_count,
               uts.last_practiced_at,
+              uts.difficulty,
               COUNT(DISTINCT jt.job_description_hash) as job_count
        FROM topics t
        JOIN job_topics jt ON jt.topic_id = t.id
        JOIN job_analyses ja ON ja.job_description_hash = jt.job_description_hash
        LEFT JOIN user_topic_scores uts ON uts.topic_id = t.id AND uts.user_id = $1
        WHERE ja.user_id = $1 AND t.is_drillable = TRUE
-       GROUP BY t.id, t.name, t.normalized_name, t.category, t.description, uts.score, uts.attempts, uts.correct_count, uts.last_practiced_at
+       GROUP BY t.id, t.name, t.normalized_name, t.category, t.description, uts.score, uts.attempts, uts.correct_count, uts.last_practiced_at, uts.difficulty
        ORDER BY COALESCE(uts.attempts, 0) DESC, t.name`,
       [userId]
     );
@@ -906,18 +910,19 @@ async function getAllUserTopics(userId) {
 }
 
 // Update a user's score on a topic
-async function updateUserTopicScore(userId, topicId, score, isCorrect) {
+async function updateUserTopicScore(userId, topicId, score, isCorrect, difficulty) {
   try {
     await pool.query(
-      `INSERT INTO user_topic_scores (user_id, topic_id, score, attempts, correct_count, last_practiced_at, updated_at)
-       VALUES ($1, $2, $3, 1, $4, NOW(), NOW())
+      `INSERT INTO user_topic_scores (user_id, topic_id, score, attempts, correct_count, difficulty, last_practiced_at, updated_at)
+       VALUES ($1, $2, $3, 1, $4, COALESCE($5, 'mid'), NOW(), NOW())
        ON CONFLICT (user_id, topic_id) DO UPDATE SET
          score = (user_topic_scores.score * user_topic_scores.attempts + $3) / (user_topic_scores.attempts + 1),
          attempts = user_topic_scores.attempts + 1,
          correct_count = user_topic_scores.correct_count + $4,
+         difficulty = COALESCE($5, user_topic_scores.difficulty),
          last_practiced_at = NOW(),
          updated_at = NOW()`,
-      [userId, topicId, score, isCorrect ? 1 : 0]
+      [userId, topicId, score, isCorrect ? 1 : 0, difficulty || null]
     )
   } catch (error) {
     console.error('Error in updateUserTopicScore:', error.message)
@@ -967,14 +972,125 @@ async function getSharedTopicsAcrossJobs(userId) {
   }
 }
 
-// Save a completed drill session
-async function saveDrillSession(userId, topicId, { answers, avgScore, scores, xpEarned }) {
+// Create a new structured drill session
+async function createDrillSession(userId, topicId, { difficulty, questionCount }) {
   try {
     const result = await pool.query(
-      `INSERT INTO drill_sessions (user_id, topic_id, answers, avg_score, scores, xp_earned)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO drill_sessions (user_id, topic_id, status, question_count, questions_answered, difficulty, started_at)
+       VALUES ($1, $2, 'active', $3, 0, $4, NOW())
        RETURNING *`,
-      [userId, topicId, answers, avgScore, JSON.stringify(scores || []), xpEarned || 0]
+      [userId, topicId, questionCount, difficulty || 'mid']
+    )
+    return result.rows[0]
+  } catch (error) {
+    console.error('Error in createDrillSession:', error.message)
+    throw error
+  }
+}
+
+// Save an individual drill question
+async function saveDrillQuestion(sessionId, { questionNumber, questionText, userAnswer, coachResponse, score, feedback }) {
+  try {
+    await pool.query(
+      `INSERT INTO drill_questions (session_id, question_number, question_text, user_answer, coach_response, score, feedback)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (session_id, question_number) DO UPDATE SET
+         user_answer = EXCLUDED.user_answer,
+         coach_response = EXCLUDED.coach_response,
+         score = EXCLUDED.score,
+         feedback = EXCLUDED.feedback`,
+      [sessionId, questionNumber, questionText, userAnswer, coachResponse, score, feedback]
+    )
+    await pool.query(
+      `UPDATE drill_sessions SET questions_answered = $1 WHERE id = $2`,
+      [questionNumber, sessionId]
+    )
+  } catch (error) {
+    console.error('Error in saveDrillQuestion:', error.message)
+  }
+}
+
+// Complete a drill session (compute scores from drill_questions)
+async function completeDrillSession(sessionId) {
+  try {
+    const questionsResult = await pool.query(
+      `SELECT score FROM drill_questions WHERE session_id = $1 ORDER BY question_number`,
+      [sessionId]
+    )
+    const scores = questionsResult.rows.map(r => r.score).filter(s => s !== null)
+    const avgScore = scores.length > 0
+      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+      : null
+
+    await pool.query(
+      `UPDATE drill_sessions SET status = 'completed', avg_score = $1, scores = $2, answers = questions_answered, completed_at = NOW() WHERE id = $3`,
+      [avgScore, JSON.stringify(scores), sessionId]
+    )
+  } catch (error) {
+    console.error('Error in completeDrillSession:', error.message)
+  }
+}
+
+// Abandon a drill session (partial scores kept)
+async function abandonDrillSession(sessionId) {
+  try {
+    const questionsResult = await pool.query(
+      `SELECT score FROM drill_questions WHERE session_id = $1 ORDER BY question_number`,
+      [sessionId]
+    )
+    const scores = questionsResult.rows.map(r => r.score).filter(s => s !== null)
+    const avgScore = scores.length > 0
+      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+      : null
+
+    await pool.query(
+      `UPDATE drill_sessions SET status = 'abandoned', avg_score = $1, scores = $2, answers = questions_answered, completed_at = NOW() WHERE id = $3`,
+      [avgScore, JSON.stringify(scores), sessionId]
+    )
+  } catch (error) {
+    console.error('Error in abandonDrillSession:', error.message)
+  }
+}
+
+// Get recent drill questions for deduplication (question memory)
+async function getRecentDrillQuestions(userId, topicId, limit = 50) {
+  try {
+    const result = await pool.query(
+      `SELECT dq.question_text FROM drill_questions dq
+       JOIN drill_sessions ds ON dq.session_id = ds.id
+       WHERE ds.user_id = $1 AND ds.topic_id = $2
+       ORDER BY dq.created_at DESC LIMIT $3`,
+      [userId, topicId, limit]
+    )
+    return result.rows.map(r => r.question_text)
+  } catch (error) {
+    console.error('Error in getRecentDrillQuestions:', error.message)
+    return []
+  }
+}
+
+// Get active drill session for a user+topic (prevents duplicates)
+async function getActiveDrillSession(userId, topicId) {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM drill_sessions WHERE user_id = $1 AND topic_id = $2 AND status = 'active' LIMIT 1`,
+      [userId, topicId]
+    )
+    return result.rows[0] || null
+  } catch (error) {
+    console.error('Error in getActiveDrillSession:', error.message)
+    return null
+  }
+}
+
+// Save a completed drill session (legacy)
+async function saveDrillSession(userId, topicId, { answers, avgScore, scores, xpEarned, difficulty }) {
+  try {
+    const result = await pool.query(
+      `INSERT INTO drill_sessions (user_id, topic_id, answers, avg_score, scores, xp_earned, difficulty)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [userId, topicId, answers, avgScore, JSON.stringify(scores || []), xpEarned || 0, difficulty || 'mid']
     )
     return result.rows[0]
   } catch (error) {
@@ -997,6 +1113,38 @@ async function getDrillSessions(userId, topicId) {
   } catch (error) {
     console.error('Error in getDrillSessions:', error.message)
     return []
+  }
+}
+
+// Set difficulty level for a specific user topic
+async function setUserTopicDifficulty(userId, topicId, difficulty) {
+  try {
+    await pool.query(
+      `INSERT INTO user_topic_scores (user_id, topic_id, score, attempts, correct_count, difficulty, last_practiced_at, updated_at)
+       VALUES ($1, $2, 0, 0, 0, $3, NULL, NOW())
+       ON CONFLICT (user_id, topic_id) DO UPDATE SET
+         difficulty = $3,
+         updated_at = NOW()`,
+      [userId, topicId, difficulty]
+    );
+  } catch (error) {
+    console.error('Error in setUserTopicDifficulty:', error.message);
+  }
+}
+
+// Get the most recent role title from a user's job analyses
+async function getUserMostRecentRoleTitle(userId) {
+  try {
+    const result = await pool.query(
+      `SELECT role_title FROM job_analyses
+       WHERE user_id = $1 AND role_title IS NOT NULL AND role_title != ''
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+    return result.rows[0]?.role_title || null;
+  } catch (error) {
+    console.error('Error in getUserMostRecentRoleTitle:', error.message);
+    return null;
   }
 }
 
@@ -1113,8 +1261,16 @@ export {
   normalizeTopicName,
   getAllUserTopics,
   findSimilarUserTopic,
+  createDrillSession,
+  saveDrillQuestion,
+  completeDrillSession,
+  abandonDrillSession,
+  getRecentDrillQuestions,
+  getActiveDrillSession,
   saveDrillSession,
   getDrillSessions,
-  getAllDrillSessions
+  getAllDrillSessions,
+  setUserTopicDifficulty,
+  getUserMostRecentRoleTitle
 };
 

@@ -5,7 +5,7 @@ import { api } from '../utils/api'
 import LogoWithFallbacks from '../components/LogoWithFallbacks'
 import './JobAnalysisPage.css'
 
-function JobAnalysisPage({ result, companyName, progress, user }) {
+function JobAnalysisPage({ result: resultProp, setResult, companyName, progress, user }) {
   const { jobId } = useParams()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('company')
@@ -13,6 +13,48 @@ function JobAnalysisPage({ result, companyName, progress, user }) {
   const [researchLoading, setResearchLoading] = useState(false)
   const [serverProgress, setServerProgress] = useState(null)
   const [lastSession, setLastSession] = useState(null)
+  const [selfLoaded, setSelfLoaded] = useState(null)
+  const [loadError, setLoadError] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  const result = resultProp || selfLoaded
+
+  // Self-load: if no result prop, fetch from sessionStorage or server
+  useEffect(() => {
+    if (resultProp || selfLoaded) return
+    if (!jobId) return
+
+    // Try sessionStorage first
+    const sessionData = sessionStorage.getItem(`job_analysis_${jobId}`)
+    if (sessionData) {
+      try {
+        const parsed = JSON.parse(sessionData)
+        setSelfLoaded(parsed)
+        if (setResult) setResult(parsed)
+        return
+      } catch (e) {
+        console.error('Error parsing sessionStorage:', e)
+      }
+    }
+
+    // Fetch from server
+    if (/^\d+$/.test(jobId)) {
+      setLoading(true)
+      axios.get(`/api/user/analysis/${jobId}`)
+        .then(res => {
+          setSelfLoaded(res.data)
+          if (setResult) setResult(res.data)
+          sessionStorage.setItem(`job_analysis_${jobId}`, JSON.stringify(res.data))
+        })
+        .catch(err => {
+          console.error('Error loading analysis:', err)
+          setLoadError('Could not load this job analysis. It may have been deleted or you may not have access.')
+        })
+        .finally(() => setLoading(false))
+    } else {
+      setLoadError('Invalid job ID. Please go back to the dashboard and try again.')
+    }
+  }, [jobId, resultProp, selfLoaded])
 
   // Load company research (use result.companyResearch first, fetch as fallback)
   useEffect(() => {
@@ -68,6 +110,29 @@ function JobAnalysisPage({ result, companyName, progress, user }) {
     }
   }, [result?.studyPlan])
 
+  if (loading) {
+    return (
+      <div style={{ padding: '64px', textAlign: 'center', color: '#6b6b6b' }}>
+        <p>Loading job analysis...</p>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div style={{ padding: '64px', textAlign: 'center', color: '#6b6b6b' }}>
+        <p>{loadError}</p>
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="jb-back-btn"
+          style={{ marginTop: '16px', padding: '8px 20px', background: '#1a1a1a', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+        >
+          Back to Dashboard
+        </button>
+      </div>
+    )
+  }
+
   if (!result) {
     return (
       <div style={{ padding: '64px', textAlign: 'center', color: '#6b6b6b' }}>
@@ -75,6 +140,7 @@ function JobAnalysisPage({ result, companyName, progress, user }) {
         <button
           onClick={() => navigate('/dashboard')}
           className="jb-back-btn"
+          style={{ marginTop: '16px', padding: '8px 20px', background: '#1a1a1a', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
         >
           Back to Dashboard
         </button>

@@ -4,9 +4,17 @@ import { api } from '../utils/api'
 import FocusChat from '../components/FocusChat'
 import './FocusChatPage.css'
 
+const DIFFICULTY_META = {
+  junior: { label: 'Junior', desc: 'Fundamentals & basics' },
+  mid: { label: 'Mid', desc: 'Practical patterns' },
+  senior: { label: 'Senior', desc: 'Architecture & edge cases' },
+  staff: { label: 'Staff', desc: 'Cross-system design' },
+}
+
 function FocusChatPage({ user }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const skill = searchParams.get('skill') || ''
+  const paramDifficulty = searchParams.get('difficulty') || null
   const [topics, setTopics] = useState([])
   const [jobs, setJobs] = useState([])
   const [allJobTopics, setAllJobTopics] = useState([])
@@ -14,6 +22,8 @@ function FocusChatPage({ user }) {
   const [jobTopics, setJobTopics] = useState({})
   const [loadingJobTopics, setLoadingJobTopics] = useState({})
   const [loading, setLoading] = useState(true)
+  const [difficulty, setDifficulty] = useState(paramDifficulty)
+  const [inferredDifficulty, setInferredDifficulty] = useState(null)
 
   useEffect(() => {
     if (skill) return
@@ -37,6 +47,21 @@ function FocusChatPage({ user }) {
     else setLoading(false)
   }, [user, skill])
 
+  // When skill is set but no difficulty, check stored or fetch inferred
+  useEffect(() => {
+    if (!skill || difficulty) return
+    // Check if topic has stored difficulty from allJobTopics
+    const topicData = allJobTopics.find(t => (t.topic_name || t.name) === skill)
+    if (topicData?.difficulty) {
+      setDifficulty(topicData.difficulty)
+      return
+    }
+    // Fetch inferred difficulty
+    api.topics.getInferredDifficulty()
+      .then(res => setInferredDifficulty(res.data?.difficulty || 'mid'))
+      .catch(() => setInferredDifficulty('mid'))
+  }, [skill, difficulty, allJobTopics])
+
   const toggleJob = async (hash) => {
     if (expandedJob === hash) {
       setExpandedJob(null)
@@ -57,11 +82,53 @@ function FocusChatPage({ user }) {
     }
   }
 
+  const handleDifficultySelect = (level) => {
+    const topicData = allJobTopics.find(t => (t.topic_name || t.name) === skill)
+    if (topicData?.id) {
+      api.topics.setTopicDifficulty({ topicId: topicData.id, difficulty: level }).catch(() => {})
+    }
+    setDifficulty(level)
+  }
+
+  const handleDifficultyChange = () => {
+    try { sessionStorage.removeItem(`focus_chat_${skill}`) } catch {}
+    setDifficulty(null)
+  }
+
   if (skill) {
-    return <FocusChat skill={skill} user={user} />
+    if (difficulty) {
+      return <FocusChat skill={skill} user={user} difficulty={difficulty} onDifficultyChange={handleDifficultyChange} />
+    }
+    // Show difficulty picker
+    return (
+      <div className="focus-chat-page">
+        <div className="difficulty-picker-container">
+          <h2>Choose Your Level</h2>
+          <p>Training for: <strong>{skill}</strong></p>
+          <div className="difficulty-pills">
+            {Object.entries(DIFFICULTY_META).map(([level, meta]) => (
+              <button
+                key={level}
+                className={`difficulty-pill${inferredDifficulty === level ? ' inferred' : ''}`}
+                onClick={() => handleDifficultySelect(level)}
+              >
+                <span className="difficulty-pill-label">{meta.label}</span>
+                <span className="difficulty-pill-desc">{meta.desc}</span>
+              </button>
+            ))}
+          </div>
+          {inferredDifficulty && (
+            <p className="difficulty-inferred-note">
+              Suggested: <strong>{DIFFICULTY_META[inferredDifficulty]?.label}</strong> based on your recent role
+            </p>
+          )}
+        </div>
+      </div>
+    )
   }
 
   const startChat = (topicName) => {
+    setDifficulty(null)
     setSearchParams({ skill: topicName })
   }
 
