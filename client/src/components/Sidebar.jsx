@@ -28,9 +28,8 @@ function Sidebar({ user, onLogout, onUpgrade, isAdmin }) {
   ]
 
   const studyItems = [
-    { path: '/focus-chat', label: 'Chat', icon: 'message' },
-    { path: '/study/mock-interview', label: 'Mock Interview', icon: 'mic' },
     { path: '/study/drills', label: 'Drills', icon: 'zap' },
+    { path: '/study/mock-interview', label: 'Mock Interview', icon: 'mic', badge: 'Soon' },
   ]
 
   const progressItem = { path: '/progress', label: 'Progress', icon: 'bar-chart' }
@@ -59,6 +58,12 @@ function Sidebar({ user, onLogout, onUpgrade, isAdmin }) {
         return (
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+        )
+      case 'compass':
+        return (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
           </svg>
         )
       case 'bar-chart':
@@ -122,17 +127,17 @@ function Sidebar({ user, onLogout, onUpgrade, isAdmin }) {
           </button>
         ))}
 
-        {/* Study With section */}
+        {/* Train section */}
         <div className="sidebar-section">
           <button
             className="sidebar-section-header"
             onClick={() => !collapsed && setStudyExpanded(!studyExpanded)}
-            title={collapsed ? 'Study With' : undefined}
+            title={collapsed ? 'Train' : undefined}
           >
             {renderIcon('book')}
             {!collapsed && (
               <>
-                <span>Study With</span>
+                <span>Train</span>
                 <span className="sidebar-section-chevron">{renderIcon('chevron')}</span>
               </>
             )}
@@ -147,7 +152,9 @@ function Sidebar({ user, onLogout, onUpgrade, isAdmin }) {
                   title={collapsed ? item.label : undefined}
                 >
                   {renderIcon(item.icon)}
-                  {!collapsed && <span>{item.label}</span>}
+                  {!collapsed && (
+                    <span>{item.label}{item.badge && <span className="sidebar-item-badge">{item.badge}</span>}</span>
+                  )}
                 </button>
               ))}
             </div>

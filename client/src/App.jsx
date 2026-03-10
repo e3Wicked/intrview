@@ -5,6 +5,7 @@ import './App.css'
 import HomePage from './pages/HomePage'
 import SignInPrompt from './components/SignInPrompt'
 import Sidebar from './components/Sidebar'
+import ErrorBoundary from './components/ErrorBoundary'
 import { api } from './utils/api'
 
 // Lazy-loaded pages (not needed on initial homepage load)
@@ -194,7 +195,7 @@ function App() {
       // Save to JD history and navigate
       if (analysisResult && analysisResult.companyInfo) {
         const jdEntry = {
-          id: Date.now().toString(),
+          id: (analysisResult.analysisId || Date.now()).toString(),
           url: url,
           companyName: analysisResult.companyInfo?.name || 'Unknown Company',
           roleTitle: analysisResult.companyInfo?.roleTitle || analysisResult.roleTitle || 'Unknown Role',
@@ -327,6 +328,7 @@ function App() {
       </Suspense>
 
       <Suspense fallback={<div style={{ padding: '64px', textAlign: 'center', color: '#6b6b6b' }}>Loading...</div>}>
+      <ErrorBoundary>
       <Routes>
         <Route
           path="/"
@@ -382,7 +384,7 @@ function App() {
               : <div style={{ padding: '64px', textAlign: 'center', color: '#6b6b6b' }}>Access denied.</div>
           }
         />
-        <Route
+<Route
           path="/focus-chat"
           element={
             user ? (
@@ -405,18 +407,13 @@ function App() {
         <Route
           path="/job/:jobId"
           element={
-            result ? (
-              <JobAnalysisPage
-                result={result}
-                companyName={companyName}
-                progress={progress}
-                user={user}
-              />
-            ) : (
-              <div style={{ padding: '64px', textAlign: 'center', color: '#6b6b6b' }}>
-                <p>Loading job analysis...</p>
-              </div>
-            )
+            <JobAnalysisPage
+              result={result}
+              setResult={setResult}
+              companyName={companyName}
+              progress={progress}
+              user={user}
+            />
           }
         />
         <Route
@@ -501,6 +498,7 @@ function App() {
           }
         />
       </Routes>
+      </ErrorBoundary>
       </Suspense>
     </Layout>
   )

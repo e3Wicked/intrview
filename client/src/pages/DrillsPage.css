@@ -286,6 +286,37 @@
   text-transform: capitalize;
 }
 
+.drills-difficulty-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: 'Inter', -apple-system, sans-serif;
+  text-transform: capitalize;
+  margin-left: 6px;
+}
+
+.drills-difficulty-tag.junior {
+  background: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+}
+
+.drills-difficulty-tag.mid {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+}
+
+.drills-difficulty-tag.senior {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+.drills-difficulty-tag.staff {
+  background: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+}
+
 .drills-session-info {
   font-size: 11px;
   color: var(--color-accent, #2563eb);

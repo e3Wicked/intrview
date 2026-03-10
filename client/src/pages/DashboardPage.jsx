@@ -29,7 +29,7 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
 
     if (analysisResult && analysisResult.companyInfo) {
       const jdEntry = {
-        id: Date.now().toString(),
+        id: (analysisResult.analysisId || Date.now()).toString(),
         url: localUrl || 'pasted-text',
         companyName: analysisResult.companyInfo?.name || 'Unknown Company',
         roleTitle: analysisResult.companyInfo?.roleTitle || analysisResult.roleTitle || 'Unknown Role',

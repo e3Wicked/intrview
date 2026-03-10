@@ -16,16 +16,6 @@ function timeAgo(dateStr) {
   return new Date(dateStr).toLocaleDateString()
 }
 
-function getSavedSession(topicName) {
-  try {
-    const raw = sessionStorage.getItem(`focus_chat_${topicName}`)
-    if (!raw) return null
-    const data = JSON.parse(raw)
-    if (data.messages?.length > 0) return data
-    return null
-  } catch { return null }
-}
-
 function DrillsPage({ user }) {
   const navigate = useNavigate()
   const [topics, setTopics] = useState([])
@@ -86,6 +76,12 @@ function DrillsPage({ user }) {
     return sessionsByTopic[(topicName || '').toLowerCase().trim()] || []
   }
 
+  // Get active (in-progress) session for a topic from server data
+  const getActiveSession = (topicName) => {
+    const sessions = getTopicSessions(topicName)
+    return sessions.find(s => s.status === 'active') || null
+  }
+
   const summary = useMemo(() => {
     const total = topics.length
     const practiced = topics.filter(t => Number(t.attempts) > 0)
@@ -117,18 +113,20 @@ function DrillsPage({ user }) {
     else filtered = topics.filter(t => t.category === filter)
 
     return [...filtered].sort((a, b) => {
-      const aActive = getSavedSession(a.topic_name) ? 1 : 0
-      const bActive = getSavedSession(b.topic_name) ? 1 : 0
+      const aActive = getActiveSession(a.topic_name) ? 1 : 0
+      const bActive = getActiveSession(b.topic_name) ? 1 : 0
       if (bActive !== aActive) return bActive - aActive
       const aP = a.last_practiced_at ? new Date(a.last_practiced_at).getTime() : 0
       const bP = b.last_practiced_at ? new Date(b.last_practiced_at).getTime() : 0
       if (bP !== aP) return bP - aP
       return (a.topic_name || '').localeCompare(b.topic_name || '')
     })
-  }, [topics, filter])
+  }, [topics, filter, drillSessions])
 
-  const handlePractice = (topicName) => {
-    navigate(`/focus-chat?skill=${encodeURIComponent(topicName)}&from=/study/drills`)
+  const handlePractice = (topicName, topicDifficulty) => {
+    const params = new URLSearchParams({ skill: topicName, from: '/study/drills' })
+    if (topicDifficulty) params.set('difficulty', topicDifficulty)
+    navigate(`/focus-chat?${params.toString()}`)
   }
 
   const toggleExpand = (topicId, e) => {
@@ -196,7 +194,7 @@ function DrillsPage({ user }) {
                 </span>
                 Your weakest topic is <strong>{summary.weakest.topic_name}</strong> ({Math.round(summary.weakest.score)}% mastery)
               </div>
-              <button className="drills-nudge-btn" onClick={() => handlePractice(summary.weakest.topic_name)}>
+              <button className="drills-nudge-btn" onClick={() => handlePractice(summary.weakest.topic_name, summary.weakest.difficulty)}>
                 Practice Now
               </button>
             </div>
@@ -244,37 +242,33 @@ function DrillsPage({ user }) {
               const attempts = Number(topic.attempts)
               const isMastered = score >= 80
               const lastPracticed = timeAgo(topic.last_practiced_at)
-              const session = getSavedSession(topic.topic_name)
-              const history = getTopicSessions(topic.topic_name)
-              const lastSession = history.length > 0 ? history[0] : null // already sorted DESC
+              const activeSession = getActiveSession(topic.topic_name)
+              const history = getTopicSessions(topic.topic_name).filter(s => s.status !== 'active')
+              const lastSession = history.length > 0 ? history[0] : null
               const isExpanded = expandedTopic === topic.id
-              const sessionAvg = session?.scores?.length > 0
-                ? Math.round(session.scores.reduce((a, b) => a + b, 0) / session.scores.length)
-                : null
 
               return (
                 <div key={topic.id} className={`drills-topic-group ${isExpanded ? 'expanded' : ''}`}>
                   <div
-                    className={`drills-list-row ${isMastered ? 'mastered' : ''} ${session ? 'has-session' : ''}`}
-                    onClick={() => handlePractice(topic.topic_name)}
+                    className={`drills-list-row ${isMastered ? 'mastered' : ''} ${activeSession ? 'has-session' : ''}`}
+                    onClick={() => handlePractice(topic.topic_name, topic.difficulty)}
                   >
                     <div className="drills-col-name">
                       <div className="drills-row-name-line">
-                        {session && <span className="drills-active-dot" title="Active session" />}
+                        {activeSession && <span className="drills-active-dot" title="Active session" />}
                         <span className="drills-row-name">{topic.topic_name}</span>
                       </div>
                       {topic.category && (
                         <span className="drills-row-category">{topic.category.replace('_', ' ')}</span>
                       )}
-                      {session && (
+                      {topic.difficulty && (
+                        <span className={`drills-difficulty-tag ${topic.difficulty}`}>
+                          {topic.difficulty.charAt(0).toUpperCase() + topic.difficulty.slice(1)}
+                        </span>
+                      )}
+                      {activeSession && (
                         <span className="drills-session-info">
-                          {session.exchangeCount} {session.exchangeCount === 1 ? 'answer' : 'answers'}
-                          {sessionAvg !== null && (
-                            <> &middot; avg <strong className={sessionAvg >= 70 ? 'score-good' : sessionAvg >= 40 ? 'score-mid' : 'score-low'}>{sessionAvg}%</strong></>
-                          )}
-                          {session.sessionXp > 0 && (
-                            <> &middot; +{session.sessionXp} XP</>
-                          )}
+                          {activeSession.questions_answered}/{activeSession.question_count} questions
                         </span>
                       )}
                     </div>
@@ -291,8 +285,10 @@ function DrillsPage({ user }) {
                       <span className="drills-row-value">{attempts > 0 ? attempts : '--'}</span>
                     </div>
                     <div className="drills-col-last">
-                      {session ? (
-                        <span className="drills-row-active-tag">In progress</span>
+                      {activeSession ? (
+                        <span className="drills-row-active-tag">
+                          Resume ({activeSession.questions_answered}/{activeSession.question_count})
+                        </span>
                       ) : lastSession ? (
                         <div className="drills-last-session">
                           <span className="drills-last-session-label">
@@ -327,10 +323,10 @@ function DrillsPage({ user }) {
                         </button>
                       )}
                       <button
-                        className={`drills-practice-btn ${session ? 'resume' : attempts > 0 ? 'continue' : ''}`}
-                        onClick={(e) => { e.stopPropagation(); handlePractice(topic.topic_name) }}
+                        className={`drills-practice-btn ${activeSession ? 'resume' : attempts > 0 ? 'continue' : ''}`}
+                        onClick={(e) => { e.stopPropagation(); handlePractice(topic.topic_name, topic.difficulty) }}
                       >
-                        {session ? 'Resume' : attempts > 0 ? 'Continue' : 'Start'}
+                        {activeSession ? 'Resume' : attempts > 0 ? 'Continue' : 'Start'}
                       </button>
                     </div>
                   </div>
@@ -371,7 +367,7 @@ function DrillsPage({ user }) {
                               return (
                                 <div key={s.id || i} className="drills-history-row">
                                   <span className="drills-history-date">{timeAgo(s.completed_at) || 'Unknown'}</span>
-                                  <span className="drills-history-answers">{s.answers} {s.answers === 1 ? 'answer' : 'answers'}</span>
+                                  <span className="drills-history-answers">{s.answers || s.questions_answered || 0} answers</span>
                                   {sAvg !== null && (
                                     <span className={`drills-history-score ${sAvg >= 70 ? 'high' : sAvg >= 40 ? 'mid' : 'low'}`}>
                                       {sAvg}%

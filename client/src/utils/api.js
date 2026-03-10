@@ -23,11 +23,15 @@ export const api = {
     getForJob: (hash) => axios.get(`/api/topics/job/${hash}`),
     getAllTopics: () => axios.get('/api/user/all-topics'),
     backfill: () => axios.post('/api/topics/backfill'),
+    setTopicDifficulty: (data) => axios.put('/api/user/topic-difficulty', data),
+    getInferredDifficulty: () => axios.get('/api/user/inferred-difficulty'),
   },
   drills: {
     saveDrillSession: (data) => axios.post('/api/drills/sessions', data),
     getAllSessions: () => axios.get('/api/drills/sessions'),
     getTopicSessions: (topicId) => axios.get(`/api/drills/sessions/${topicId}`),
+    start: (data) => axios.post('/api/drills/start', data),
+    abandon: (data) => axios.post('/api/drills/abandon', data),
   },
   activity: {
     getSummary: () => axios.get('/api/user/activity-summary'),

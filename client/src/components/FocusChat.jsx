@@ -3,114 +3,87 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../utils/api'
 import './FocusChat.css'
 
-const STORAGE_KEY = (skill) => `focus_chat_${skill}`
-
-function loadSavedSession(skill) {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY(skill))
-    if (!raw) return null
-    return JSON.parse(raw)
-  } catch { return null }
-}
-
-function saveChatSession(skill, data) {
-  try {
-    sessionStorage.setItem(STORAGE_KEY(skill), JSON.stringify(data))
-  } catch { /* storage full, non-critical */ }
-}
-
-function clearChatSession(skill) {
-  try { sessionStorage.removeItem(STORAGE_KEY(skill)) } catch {}
-}
-
-function saveCompletedSession(skill, { exchangeCount, scores }) {
-  const avgScore = scores.length > 0
-    ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-    : null
-  // Save to DB (primary)
-  api.drills.saveDrillSession({
-    skill,
-    answers: exchangeCount,
-    avgScore,
-    scores,
-  }).catch(err => console.error('[Drill] Failed to save session to DB:', err))
-}
-
-function FocusChat({ skill, user }) {
+function FocusChat({ skill, user, difficulty, onDifficultyChange }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const returnTo = searchParams.get('from') || '/dashboard'
-  // Try to restore a saved session for this skill
-  const saved = useRef(loadSavedSession(skill))
 
-  const [messages, setMessages] = useState(saved.current?.messages || [])
+  const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
-  const [exchangeCount, setExchangeCount] = useState(saved.current?.exchangeCount || 0)
-  const [scores, setScores] = useState(saved.current?.scores || [])
-  const [sessionId, setSessionId] = useState(saved.current?.sessionId || null)
+  const [scores, setScores] = useState([])
+  const [sessionId, setSessionId] = useState(null)
   const [showEndSummary, setShowEndSummary] = useState(false)
   const [error, setError] = useState(null)
+
+  // Structured drill state
+  const [drillSessionId, setDrillSessionId] = useState(null)
+  const [questionNumber, setQuestionNumber] = useState(0)
+  const [questionCount, setQuestionCount] = useState(5)
+  const [previousQuestions, setPreviousQuestions] = useState([])
+  const [drillComplete, setDrillComplete] = useState(false)
+
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const abortRef = useRef(null)
-  const startedRef = useRef(!!saved.current)
-  const sessionIdRef = useRef(saved.current?.sessionId || null)
-  const messagesRef = useRef(saved.current?.messages || [])
-  const scoresRef = useRef(saved.current?.scores || [])
-  const exchangeCountRef = useRef(saved.current?.exchangeCount || 0)
+  const startedRef = useRef(false)
+  const sessionIdRef = useRef(null)
+  const messagesRef = useRef([])
+  const scoresRef = useRef([])
+  const drillSessionIdRef = useRef(null)
+  const questionNumberRef = useRef(0)
+  const previousQuestionsRef = useRef([])
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages, scrollToBottom])
+  useEffect(() => { scrollToBottom() }, [messages, scrollToBottom])
 
   useEffect(() => {
-    if (!streaming && inputRef.current) {
-      inputRef.current.focus()
-    }
+    if (!streaming && inputRef.current) inputRef.current.focus()
   }, [streaming])
 
-  // Keep refs in sync with state
+  // Keep refs in sync
   useEffect(() => { messagesRef.current = messages }, [messages])
   useEffect(() => { scoresRef.current = scores }, [scores])
-  useEffect(() => { exchangeCountRef.current = exchangeCount }, [exchangeCount])
+  useEffect(() => { drillSessionIdRef.current = drillSessionId }, [drillSessionId])
+  useEffect(() => { questionNumberRef.current = questionNumber }, [questionNumber])
+  useEffect(() => { previousQuestionsRef.current = previousQuestions }, [previousQuestions])
 
-  // Save chat state to sessionStorage whenever it changes
-  useEffect(() => {
-    if (messages.length > 0 && !showEndSummary) {
-      saveChatSession(skill, {
-        messages: messages.filter(m => m.content), // skip empty streaming messages
-        exchangeCount,
-        scores,
-        sessionId: sessionIdRef.current,
-      })
-    }
-  }, [messages, exchangeCount, scores, skill, showEndSummary])
-
-  // Start session and first message on mount (only if no saved session)
+  // Start session on mount
   useEffect(() => {
     if (!skill || startedRef.current) return
     startedRef.current = true
 
     const init = async () => {
       try {
-        const res = await api.practice.startSession({ jobDescriptionHash: '', mode: 'focus' })
-        setSessionId(res.data.sessionId)
-        sessionIdRef.current = res.data.sessionId
+        const { data } = await api.drills.start({ skill, difficulty, questionCount: 5 })
+        setDrillSessionId(data.session.id)
+        drillSessionIdRef.current = data.session.id
+        setQuestionCount(data.session.question_count || 5)
+        setPreviousQuestions(data.previousQuestions || [])
+        previousQuestionsRef.current = data.previousQuestions || []
+
+        // If resuming an active session with questions already answered
+        if (data.session.questions_answered > 0) {
+          setQuestionNumber(data.session.questions_answered)
+          questionNumberRef.current = data.session.questions_answered
+        }
+
+        // Also start a practice session for credit tracking
+        try {
+          const res = await api.practice.startSession({ jobDescriptionHash: '', mode: 'focus' })
+          setSessionId(res.data.sessionId)
+          sessionIdRef.current = res.data.sessionId
+        } catch (e) { /* non-critical */ }
       } catch (e) {
-        // Non-critical
+        console.error('Failed to start drill:', e)
       }
       doSendMessage(null)
     }
     init()
   }, [skill])
-
-  // On unmount: DON'T end the session — we're saving state for resume.
-  // Session gets ended explicitly via "End Session" button.
 
   const doSendMessage = async (userText) => {
     const currentMessages = messagesRef.current
@@ -122,7 +95,6 @@ function FocusChat({ skill, user }) {
       setMessages(updatedMessages)
       messagesRef.current = updatedMessages
       setInput('')
-      setExchangeCount(prev => prev + 1)
     }
 
     setStreaming(true)
@@ -147,6 +119,11 @@ function FocusChat({ skill, user }) {
           skill,
           messages: updatedMessages.map(m => ({ role: m.role, content: m.content })),
           sessionId: sessionIdRef.current,
+          difficulty,
+          drillSessionId: drillSessionIdRef.current,
+          questionNumber: questionNumberRef.current,
+          questionCount,
+          previousQuestions: previousQuestionsRef.current,
         }),
         signal: controller.signal,
       })
@@ -207,6 +184,14 @@ function FocusChat({ skill, user }) {
                 setScores(prev => [...prev, event.evaluation.score])
               }
             }
+            // Handle drill progress
+            if (event.drillProgress) {
+              setQuestionNumber(event.drillProgress.current)
+              questionNumberRef.current = event.drillProgress.current
+              if (event.drillProgress.isComplete) {
+                setDrillComplete(true)
+              }
+            }
           } else if (event.type === 'error') {
             setMessages(prev => {
               const updated = [...prev]
@@ -238,7 +223,7 @@ function FocusChat({ skill, user }) {
 
   const handleSend = () => {
     const text = input.trim()
-    if (!text || streaming) return
+    if (!text || streaming || drillComplete) return
     doSendMessage(text)
   }
 
@@ -254,20 +239,24 @@ function FocusChat({ skill, user }) {
     if (sessionIdRef.current) {
       api.practice.endSession({ sessionId: sessionIdRef.current }).catch(() => {})
     }
-    // Use refs to ensure we get the latest values (not stale closure)
-    saveCompletedSession(skill, {
-      exchangeCount: exchangeCountRef.current,
-      scores: scoresRef.current,
-    })
-    clearChatSession(skill)
+    if (drillSessionIdRef.current && !drillComplete) {
+      api.drills.abandon({ sessionId: drillSessionIdRef.current }).catch(() => {})
+    }
     setShowEndSummary(true)
   }
 
   const goBack = () => {
-    // Save is automatic via the useEffect — just navigate away
     if (abortRef.current) abortRef.current.abort()
     navigate(returnTo)
   }
+
+  // Auto-show summary when drill completes
+  useEffect(() => {
+    if (drillComplete && !streaming) {
+      const timer = setTimeout(() => setShowEndSummary(true), 1500)
+      return () => clearTimeout(timer)
+    }
+  }, [drillComplete, streaming])
 
   const avgScore = scores.length > 0
     ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
@@ -277,13 +266,15 @@ function FocusChat({ skill, user }) {
     return (
       <div className="focus-chat-summary">
         <div className="focus-summary-header">
-          <h3>Session Complete</h3>
+          <h3>{drillComplete ? 'Drill Complete!' : 'Session Ended'}</h3>
           <p>{skill}</p>
         </div>
         <div className="focus-summary-stats">
           <div className="focus-summary-stat">
-            <span className="focus-stat-value">{exchangeCount}</span>
-            <span className="focus-stat-label">Questions Answered</span>
+            <span className="focus-stat-value">{questionNumber}</span>
+            <span className="focus-stat-label">
+              {drillComplete ? `of ${questionCount} Questions` : `of ${questionCount} Answered`}
+            </span>
           </div>
           {avgScore !== null && (
             <div className="focus-summary-stat">
@@ -320,8 +311,13 @@ function FocusChat({ skill, user }) {
           <button className="focus-restart-btn" onClick={() => {
             setMessages([])
             messagesRef.current = []
-            setExchangeCount(0)
+            setQuestionNumber(0)
+            questionNumberRef.current = 0
             setScores([])
+            scoresRef.current = []
+            setDrillComplete(false)
+            setDrillSessionId(null)
+            drillSessionIdRef.current = null
             setShowEndSummary(false)
             startedRef.current = false
           }}>
@@ -332,37 +328,45 @@ function FocusChat({ skill, user }) {
     )
   }
 
-  const isResumed = saved.current && messages.length > 0
-
   return (
     <div className="focus-chat-container">
       {/* Header */}
       <div className="focus-header">
         <div className="focus-header-left">
-          <button className="focus-nav-back" onClick={goBack} title="Back (session saved)">
+          <button className="focus-nav-back" onClick={goBack} title="Back (progress saved)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 12H5M12 19l-7-7 7-7"/>
             </svg>
           </button>
           <span className="focus-skill-badge">{skill}</span>
+          {difficulty && (
+            <button
+              className={`focus-difficulty-badge clickable ${difficulty}`}
+              onClick={onDifficultyChange}
+              title="Change difficulty"
+            >
+              {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+              <svg className="focus-difficulty-edit-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+              </svg>
+            </button>
+          )}
           <span className="focus-exchange-count">
-            {exchangeCount} {exchangeCount === 1 ? 'answer' : 'answers'}
+            Question {Math.min(questionNumber + (streaming ? 1 : 0), questionCount)} of {questionCount}
             {avgScore !== null && <> &middot; avg {avgScore}%</>}
           </span>
         </div>
         <div className="focus-header-right">
           <button className="focus-end-btn" onClick={handleEndChat}>
-            End Session
+            {drillComplete ? 'View Summary' : 'End Early'}
           </button>
         </div>
       </div>
 
-      {/* Resumed banner */}
-      {isResumed && (
-        <div className="focus-resumed-banner">
-          Resumed previous session &middot; {exchangeCount} answers so far
-        </div>
-      )}
+      {/* Progress bar */}
+      <div className="drill-progress-bar">
+        <div className="drill-progress-fill" style={{ width: `${(questionNumber / questionCount) * 100}%` }} />
+      </div>
 
       {/* Messages */}
       <div className="focus-messages">
@@ -394,7 +398,11 @@ function FocusChat({ skill, user }) {
               <div className="focus-message-role">
                 {msg.role === 'coach' ? 'Coach' : msg.role === 'user' ? 'You' : 'System'}
               </div>
-              <div className="focus-message-text">{msg.content}</div>
+              <div className="focus-message-text">
+                {msg.role === 'coach' && !msg.content && streaming && idx === messages.length - 1
+                  ? <span className="focus-typing-dots"><span/><span/><span/></span>
+                  : msg.content}
+              </div>
               {msg.evaluation && (
                 <div className="focus-evaluation">
                   <span className={`focus-eval-badge ${msg.evaluation.score >= 70 ? 'good' : msg.evaluation.score >= 40 ? 'mid' : 'low'}`}>
@@ -411,9 +419,23 @@ function FocusChat({ skill, user }) {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Drill complete banner */}
+      {drillComplete && !showEndSummary && (
+        <div className="focus-complete-banner">
+          All {questionCount} questions answered! Showing summary...
+        </div>
+      )}
+
       {/* Error banner */}
       {error && (
-        <div className="focus-error-banner">{error}</div>
+        <div className="focus-error-banner">
+          {error}
+          {messages.length === 0 && (
+            <button className="focus-retry-btn" onClick={() => { setError(null); startedRef.current = true; doSendMessage(null) }}>
+              Retry
+            </button>
+          )}
+        </div>
       )}
 
       {/* Input */}
@@ -424,14 +446,14 @@ function FocusChat({ skill, user }) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type your answer..."
+          placeholder={drillComplete ? 'Drill complete!' : 'Type your answer...'}
           rows={2}
-          disabled={streaming}
+          disabled={streaming || drillComplete}
         />
         <button
           className="focus-send-btn"
           onClick={handleSend}
-          disabled={!input.trim() || streaming}
+          disabled={!input.trim() || streaming || drillComplete}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="22" y1="2" x2="11" y2="13" />

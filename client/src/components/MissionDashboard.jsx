@@ -369,13 +369,14 @@ function MissionDashboard({ user, onAnalyzeClick }) {
               </p>
               <button
                 className="nudge-cta"
-                onClick={() => navigate(`/focus-chat?skill=${encodeURIComponent(weaknessNudge.category)}`)}
+                onClick={() => navigate('/study/drills')}
               >
                 Practice Now
               </button>
             </div>
           </div>
         )}
+
       </div>
     </div>
   )

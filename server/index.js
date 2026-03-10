@@ -38,9 +38,17 @@ import {
   getAllUserTopics,
   findSimilarUserTopic,
   normalizeTopicName,
+  createDrillSession,
+  saveDrillQuestion,
+  completeDrillSession,
+  abandonDrillSession,
+  getRecentDrillQuestions,
+  getActiveDrillSession,
   saveDrillSession,
   getDrillSessions,
-  getAllDrillSessions
+  getAllDrillSessions,
+  setUserTopicDifficulty,
+  getUserMostRecentRoleTitle
 } from './db.js';
 import {
   createUser,
@@ -87,6 +95,16 @@ const __dirname = path.dirname(__filename);
 
 // Load .env file from the server directory
 dotenv.config({ path: path.join(__dirname, '.env') });
+
+// Infer difficulty/seniority level from a role title
+function inferDifficultyFromRole(roleTitle) {
+  if (!roleTitle) return 'mid';
+  const t = roleTitle.toLowerCase();
+  if (/\b(staff|principal|distinguished|architect)\b/.test(t)) return 'staff';
+  if (/\b(senior|sr\.?|lead)\b/.test(t)) return 'senior';
+  if (/\b(junior|jr\.?|entry|associate|intern)\b/.test(t)) return 'junior';
+  return 'mid';
+}
 
 // Infer topic category from name using keyword heuristics
 function inferTopicCategory(topicName) {
@@ -2303,7 +2321,7 @@ Format as JSON:
 
     // Track this job analysis
     const jobDescriptionHash = hashJobDescription(jobDescription);
-    await trackJobAnalysis(
+    const analysisId = await trackJobAnalysis(
       user.id,
       url || 'pasted-text',
       jobDescriptionHash,
@@ -2362,6 +2380,7 @@ Format as JSON:
 
     const response = {
       success: true,
+      analysisId: analysisId || null,
       jobDescription: jobDescription,
       jobDescriptionHash: jobDescriptionHash, // Add hash for generate more questions feature
       companyInfo: companyInfo,
@@ -2794,11 +2813,13 @@ app.post('/api/chat/focus', requireAuth, async (req, res) => {
       return res.status(429).json({ error: 'Too many requests. Please slow down.', retryAfter: focusRl.retryAfter });
     }
 
-    const { skill, messages, sessionId } = req.body;
+    const { skill, messages, sessionId, difficulty, drillSessionId, questionNumber, questionCount, previousQuestions } = req.body;
 
     if (!skill) {
       return res.status(400).json({ error: 'Skill is required' });
     }
+
+    const validDifficulty = ['junior', 'mid', 'senior', 'staff'].includes(difficulty) ? difficulty : 'mid';
 
     // Check and deduct training credits BEFORE starting SSE
     const user = req.user;
@@ -2819,6 +2840,13 @@ app.post('/api/chat/focus', requireAuth, async (req, res) => {
 
     const openai = getOpenAIClient();
 
+    const difficultyInstructions = {
+      junior: `\n\nThe user is training at a JUNIOR level. Calibrate accordingly:\n- Focus on fundamentals and core concepts\n- Use step-by-step explanations with simple examples\n- Be encouraging and patient — build confidence\n- Ask questions that test understanding of basics before advancing`,
+      mid: `\n\nThe user is training at a MID level. Calibrate accordingly:\n- Focus on practical patterns and real-world trade-offs\n- Use realistic scenarios and production code examples\n- Test ability to compare approaches and explain reasoning\n- Push toward deeper understanding when basics are solid`,
+      senior: `\n\nThe user is training at a SENIOR level. Calibrate accordingly:\n- Focus on architecture, edge cases, and system-level thinking\n- Ask about scalability, failure modes, and performance implications\n- Expect precise technical language and nuanced answers\n- Challenge assumptions and explore corner cases`,
+      staff: `\n\nThe user is training at a STAFF level. Calibrate accordingly:\n- Focus on cross-system design, organizational impact, and technical strategy\n- Ask about trade-offs at scale, migration strategies, and system evolution\n- Expect deep expertise — probe for novel insights and contrarian views\n- Discuss broader engineering culture, mentorship approaches, and technical vision`,
+    };
+
     const systemPrompt = `You are a focused skill coach helping a software engineer improve their understanding of: ${skill}.
 
 Your approach:
@@ -2831,9 +2859,20 @@ Your approach:
 - Keep responses concise (2-3 paragraphs max)
 - Use markdown for code snippets when relevant
 
-You are NOT an interviewer. You are a patient, expert tutor. Your goal is to build their understanding from wherever they currently are.`;
+You are NOT an interviewer. You are a patient, expert tutor. Your goal is to build their understanding from wherever they currently are.` + (difficultyInstructions[validDifficulty] || '');
 
-    const gptMessages = [{ role: 'system', content: systemPrompt }];
+    // Add structured drill instructions if this is a drill session
+    let finalSystemPrompt = systemPrompt;
+    if (drillSessionId && questionNumber !== undefined && questionCount) {
+      let drillAddition = `\n\nYou are conducting a structured drill session. This is question ${questionNumber + 1} of ${questionCount}.`;
+      if (previousQuestions && previousQuestions.length > 0) {
+        drillAddition += `\n\nThe following questions have already been asked in previous sessions. You MUST ask a DIFFERENT question:\n${previousQuestions.map((q, i) => `${i+1}. ${q.substring(0, 100)}`).join('\n')}`;
+      }
+      drillAddition += '\n\nAsk exactly ONE clear, focused question. Then wait for the answer.';
+      finalSystemPrompt += drillAddition;
+    }
+
+    const gptMessages = [{ role: 'system', content: finalSystemPrompt }];
 
     // Cap history to last 20 messages
     const recentMessages = (messages || []).slice(-20);
@@ -2883,7 +2922,7 @@ You are NOT an interviewer. You are a patient, expert tutor. Your goal is to bui
           const evalCompletion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             messages: [
-              { role: 'system', content: `Score this answer about ${skill} from 0-100. Return JSON only: {"score": N, "feedback": "brief feedback"}` },
+              { role: 'system', content: `Score this answer about ${skill} from 0-100, calibrated for a ${validDifficulty}-level software engineer. A correct but basic answer should score well at junior level but not at staff level. Return JSON only: {"score": N, "feedback": "brief feedback"}` },
               { role: 'user', content: lastUserMsg.content }
             ],
             temperature: 0.3,
@@ -2918,15 +2957,42 @@ You are NOT an interviewer. You are a patient, expert tutor. Your goal is to bui
           const topic = await getOrCreateTopic(skill, null, null, { isDrillable: drillable });
           if (topic) {
             const score = evaluation?.score || 50;
-            await updateUserTopicScore(user.id, topic.id, score, score >= 70);
+            await updateUserTopicScore(user.id, topic.id, score, score >= 70, validDifficulty);
           }
         } catch (topicErr) {
           console.error('Focus chat topic score update (non-critical):', topicErr.message);
         }
+
+        // Save drill question if this is a structured drill session
+        if (drillSessionId && questionNumber !== undefined) {
+          try {
+            await saveDrillQuestion(drillSessionId, {
+              questionNumber: questionNumber + 1,
+              questionText: recentMessages.filter(m => m.role === 'coach').pop()?.content || fullReply.substring(0, 200),
+              userAnswer: lastUserMsg.content,
+              coachResponse: fullReply,
+              score: evaluation?.score,
+              feedback: evaluation?.feedback,
+            });
+            if (questionNumber + 1 >= questionCount) {
+              await completeDrillSession(drillSessionId);
+            }
+          } catch (drillErr) {
+            console.error('Drill question save (non-critical):', drillErr.message);
+          }
+        }
       }
     }
 
-    res.write(`data: ${JSON.stringify({ type: 'done', evaluation })}\n\n`);
+    const donePayload = { type: 'done', evaluation };
+    if (drillSessionId && questionNumber !== undefined) {
+      donePayload.drillProgress = {
+        current: questionNumber + 1,
+        total: questionCount,
+        isComplete: questionNumber + 1 >= questionCount,
+      };
+    }
+    res.write(`data: ${JSON.stringify(donePayload)}\n\n`);
     res.end();
 
   } catch (error) {
@@ -2939,6 +3005,7 @@ You are NOT an interviewer. You are a patient, expert tutor. Your goal is to bui
     }
   }
 });
+
 
 // Helper function to extract funding rounds from text
 function extractFundingFromText(text, currentYear) {
@@ -4006,10 +4073,74 @@ app.get('/api/topics/job/:hash', requireAuth, async (req, res) => {
   }
 });
 
-// Drill sessions API
+// Set topic difficulty
+app.put('/api/user/topic-difficulty', requireAuth, async (req, res) => {
+  try {
+    const { topicId, difficulty } = req.body;
+    if (!topicId || !['junior', 'mid', 'senior', 'staff'].includes(difficulty)) {
+      return res.status(400).json({ error: 'Valid topicId and difficulty required' });
+    }
+    await setUserTopicDifficulty(req.user.id, topicId, difficulty);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error setting topic difficulty:', error);
+    res.status(500).json({ error: 'Failed to set difficulty' });
+  }
+});
+
+// Infer difficulty from most recent role title
+app.get('/api/user/inferred-difficulty', requireAuth, async (req, res) => {
+  try {
+    const roleTitle = await getUserMostRecentRoleTitle(req.user.id);
+    const difficulty = inferDifficultyFromRole(roleTitle);
+    res.json({ difficulty, roleTitle });
+  } catch (error) {
+    console.error('Error inferring difficulty:', error);
+    res.status(500).json({ error: 'Failed to infer difficulty' });
+  }
+});
+
+// Start a structured drill session
+app.post('/api/drills/start', requireAuth, async (req, res) => {
+  try {
+    const { skill, difficulty, questionCount = 5 } = req.body;
+    if (!skill) return res.status(400).json({ error: 'skill is required' });
+
+    const drillable = !isCompanySpecificTopic(skill);
+    const topic = await getOrCreateTopic(skill, null, null, { isDrillable: drillable });
+    if (!topic) return res.status(404).json({ error: 'Topic not found' });
+
+    // Check for existing active session (resume case)
+    let session = await getActiveDrillSession(req.user.id, topic.id);
+    if (!session) {
+      session = await createDrillSession(req.user.id, topic.id, { difficulty, questionCount: Math.min(Math.max(questionCount, 1), 20) });
+    }
+
+    const previousQuestions = await getRecentDrillQuestions(req.user.id, topic.id, 50);
+    res.json({ session, previousQuestions });
+  } catch (error) {
+    console.error('Error starting drill:', error);
+    res.status(500).json({ error: 'Failed to start drill session' });
+  }
+});
+
+// Abandon a drill session
+app.post('/api/drills/abandon', requireAuth, async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
+    await abandonDrillSession(sessionId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error abandoning drill:', error);
+    res.status(500).json({ error: 'Failed to abandon drill session' });
+  }
+});
+
+// Drill sessions API (legacy)
 app.post('/api/drills/sessions', requireAuth, async (req, res) => {
   try {
-    const { skill, answers, avgScore, scores } = req.body;
+    const { skill, answers, avgScore, scores, difficulty } = req.body;
     if (!skill) return res.status(400).json({ error: 'skill is required' });
 
     const drillable = !isCompanySpecificTopic(skill);
@@ -4021,6 +4152,7 @@ app.post('/api/drills/sessions', requireAuth, async (req, res) => {
       avgScore: avgScore || null,
       scores: scores || [],
       xpEarned: 0,
+      difficulty: difficulty || 'mid',
     });
     // Note: user_topic_scores is already updated per-answer in the /api/chat/focus endpoint
     res.json(session);
@@ -4133,6 +4265,11 @@ app.get('/api/user/activity-summary', requireAuth, async (req, res) => {
           AND ended_at IS NOT NULL
           AND ended_at >= CURRENT_DATE - INTERVAL '6 days'
         GROUP BY DATE(ended_at)
+        UNION ALL
+        SELECT DATE(last_practiced_at) AS day, COUNT(*) AS cnt
+        FROM user_topic_scores WHERE user_id = $1
+          AND last_practiced_at >= CURRENT_DATE - INTERVAL '6 days'
+        GROUP BY DATE(last_practiced_at)
       )
       SELECT d.day, COALESCE(SUM(a.cnt), 0)::int AS sessions
       FROM days d
@@ -4148,6 +4285,9 @@ app.get('/api/user/activity-summary', requireAuth, async (req, res) => {
         UNION
         SELECT DATE(ended_at) AS practice_day FROM practice_sessions
           WHERE user_id = $1 AND ended_at IS NOT NULL
+        UNION
+        SELECT DATE(last_practiced_at) AS practice_day FROM user_topic_scores
+          WHERE user_id = $1 AND last_practiced_at IS NOT NULL
       ) sub
       WHERE practice_day IS NOT NULL
       ORDER BY practice_day DESC
