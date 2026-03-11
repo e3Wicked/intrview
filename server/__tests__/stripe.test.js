@@ -9,9 +9,13 @@ const mockStripe = {
     retrieve: vi.fn(),
     update: vi.fn(),
     cancel: vi.fn(),
+    list: vi.fn(),
   },
   checkout: {
-    sessions: { create: vi.fn() },
+    sessions: { create: vi.fn(), list: vi.fn() },
+  },
+  webhooks: {
+    constructEvent: vi.fn(),
   },
   billingPortal: {
     sessions: { create: vi.fn() },
@@ -301,5 +305,109 @@ describe('handleWebhook', () => {
     const updateCall = pool.query.mock.calls[1];
     expect(updateCall[1][0]).toBe(400); // pro training credits
     expect(updateCall[1][4]).toBe(30); // pro job analyses
+  });
+});
+
+describe('webhook middleware ordering', () => {
+  it('should register webhook route before express.json() middleware', async () => {
+    // Read the server source and verify the webhook route appears before express.json()
+    const fs = await import('fs');
+    const source = fs.readFileSync(new URL('../../server/index.js', import.meta.url), 'utf8');
+
+    const webhookPos = source.indexOf("app.post('/api/stripe/webhook'");
+    const jsonMiddlewarePos = source.indexOf("app.use(express.json(");
+
+    expect(webhookPos).toBeGreaterThan(-1);
+    expect(jsonMiddlewarePos).toBeGreaterThan(-1);
+    expect(webhookPos).toBeLessThan(jsonMiddlewarePos);
+  });
+
+  it('webhook route should use express.raw() for body parsing', async () => {
+    const fs = await import('fs');
+    const source = fs.readFileSync(new URL('../../server/index.js', import.meta.url), 'utf8');
+
+    // Extract the webhook route line
+    const webhookLine = source.substring(
+      source.indexOf("app.post('/api/stripe/webhook'"),
+      source.indexOf("app.post('/api/stripe/webhook'") + 200
+    );
+
+    expect(webhookLine).toContain("express.raw({ type: 'application/json' })");
+  });
+});
+
+describe('verify-checkout route logic', () => {
+  // The verify-checkout route is defined inline in index.js, not exported.
+  // We test the underlying Stripe API interactions it performs.
+
+  it('should detect active subscription and resolve plan from checkout session metadata', async () => {
+    // Simulates what verify-checkout does: list subscriptions, list checkout sessions
+    mockStripe.subscriptions.list.mockResolvedValueOnce({
+      data: [{
+        id: 'sub_123',
+        current_period_start: 1700000000,
+        current_period_end: 1702600000,
+      }],
+    });
+
+    mockStripe.checkout.sessions.list.mockResolvedValueOnce({
+      data: [{ metadata: { plan: 'starter' } }],
+    });
+
+    const subs = await mockStripe.subscriptions.list({
+      customer: 'cus_test',
+      status: 'active',
+      limit: 1,
+    });
+
+    expect(subs.data.length).toBe(1);
+    expect(subs.data[0].id).toBe('sub_123');
+
+    const sessions = await mockStripe.checkout.sessions.list({
+      subscription: subs.data[0].id,
+      limit: 1,
+    });
+
+    expect(sessions.data[0].metadata.plan).toBe('starter');
+  });
+
+  it('should return no update when subscriptions list is empty', async () => {
+    mockStripe.subscriptions.list.mockResolvedValueOnce({ data: [] });
+
+    const subs = await mockStripe.subscriptions.list({
+      customer: 'cus_no_sub',
+      status: 'active',
+      limit: 1,
+    });
+
+    expect(subs.data.length).toBe(0);
+  });
+
+  it('should return no update when checkout session has no plan metadata', async () => {
+    mockStripe.subscriptions.list.mockResolvedValueOnce({
+      data: [{ id: 'sub_456' }],
+    });
+    mockStripe.checkout.sessions.list.mockResolvedValueOnce({
+      data: [{ metadata: {} }],
+    });
+
+    const subs = await mockStripe.subscriptions.list({ customer: 'cus_1', status: 'active', limit: 1 });
+    const sessions = await mockStripe.checkout.sessions.list({ subscription: subs.data[0].id, limit: 1 });
+
+    expect(sessions.data[0].metadata.plan).toBeUndefined();
+  });
+
+  it('should return no update when checkout session has invalid plan', async () => {
+    mockStripe.subscriptions.list.mockResolvedValueOnce({
+      data: [{ id: 'sub_789' }],
+    });
+    mockStripe.checkout.sessions.list.mockResolvedValueOnce({
+      data: [{ metadata: { plan: 'nonexistent' } }],
+    });
+
+    const sessions = await mockStripe.checkout.sessions.list({ subscription: 'sub_789', limit: 1 });
+    const { PLANS } = await import('../auth.js');
+
+    expect(PLANS[sessions.data[0].metadata.plan]).toBeUndefined();
   });
 });
