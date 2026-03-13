@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import './PricingSection.css'
 
-function PricingSection({ onSelectPlan, currentPlan, onManageBilling }) {
+function PricingSection({ onSelectPlan, currentPlan, onManageBilling, onDowngrade, scheduledDowngradePlan }) {
   const [billingInterval, setBillingInterval] = useState('month')
   const planOrder = ['free', 'starter', 'pro', 'elite']
   const currentIndex = planOrder.indexOf(currentPlan || 'free')
@@ -145,12 +145,18 @@ function PricingSection({ onSelectPlan, currentPlan, onManageBilling }) {
                   Current Plan
                 </button>
               ) : isDowngrade ? (
-                <button
-                  className="pricing-cta secondary"
-                  onClick={() => onManageBilling?.()}
-                >
-                  Manage in Billing
-                </button>
+                scheduledDowngradePlan === plan.key ? (
+                  <button className="pricing-cta downgrade-scheduled" disabled>
+                    Downgrade Scheduled
+                  </button>
+                ) : (
+                  <button
+                    className="pricing-cta downgrade"
+                    onClick={() => onDowngrade?.(plan.key, billingInterval)}
+                  >
+                    Downgrade to {plan.name}
+                  </button>
+                )
               ) : (
                 <button
                   className="pricing-cta"

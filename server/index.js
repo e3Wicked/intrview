@@ -76,7 +76,9 @@ import {
   handleWebhook,
   createPortalSession,
   activateSubscription,
-  getAdvertiserPriceId
+  getAdvertiserPriceId,
+  scheduleDowngrade,
+  cancelScheduledDowngrade
 } from './stripe.js';
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
@@ -3341,11 +3343,62 @@ app.post('/api/stripe/upgrade-subscription', requireAuth, async (req, res) => {
     const newIndex = planOrder.indexOf(plan);
 
     if (newIndex <= currentIndex) {
-      return res.status(400).json({ error: 'Use the billing portal to downgrade your plan' });
+      return res.status(400).json({ error: 'Use the downgrade endpoint to downgrade your plan' });
+    }
+
+    // Cancel any pending downgrade before upgrading
+    if (req.user.scheduledDowngradePlan) {
+      await cancelScheduledDowngrade(req.user.id);
     }
 
     const updatedSub = await upgradeSubscription(req.user.id, plan, interval);
     res.json({ success: true, plan, subscriptionId: updatedSub.id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Schedule a subscription downgrade (paid → lower paid)
+app.post('/api/stripe/downgrade-subscription', requireAuth, async (req, res) => {
+  try {
+    const { plan, interval = 'month' } = req.body;
+
+    if (!PLANS[plan] || !PLANS[plan].price) {
+      return res.status(400).json({ error: 'Invalid plan' });
+    }
+
+    if (!['month', 'year'].includes(interval)) {
+      return res.status(400).json({ error: 'Invalid billing interval' });
+    }
+
+    if (plan === 'free') {
+      return res.status(400).json({ error: 'Use the billing portal to cancel your subscription' });
+    }
+
+    if (!req.user.stripeSubscriptionId || req.user.subscriptionStatus !== 'active') {
+      return res.status(400).json({ error: 'No active subscription' });
+    }
+
+    const planOrder = ['free', 'starter', 'pro', 'elite'];
+    const currentIndex = planOrder.indexOf(req.user.plan);
+    const newIndex = planOrder.indexOf(plan);
+
+    if (newIndex >= currentIndex) {
+      return res.status(400).json({ error: 'New plan must be a lower tier. Use upgrade for higher tiers.' });
+    }
+
+    const result = await scheduleDowngrade(req.user.id, plan, interval);
+    res.json({ success: true, scheduledPlan: result.scheduledPlan, effectiveDate: result.effectiveDate });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cancel a scheduled downgrade
+app.post('/api/stripe/cancel-downgrade', requireAuth, async (req, res) => {
+  try {
+    await cancelScheduledDowngrade(req.user.id);
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

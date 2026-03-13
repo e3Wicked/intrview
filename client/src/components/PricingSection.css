@@ -261,6 +261,23 @@
   background: var(--color-bg-secondary, #f4f2ee);
 }
 
+.pricing-cta.downgrade {
+  background: transparent;
+  color: #d97706;
+  border: 1px solid #d97706;
+}
+
+.pricing-cta.downgrade:hover {
+  background: #fffbeb;
+}
+
+.pricing-cta.downgrade-scheduled {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  cursor: default;
+}
+
 .pricing-card.current {
   border-color: var(--color-accent, #2563eb);
   box-shadow: 0 0 0 1px var(--color-accent, #2563eb);

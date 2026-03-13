@@ -345,7 +345,8 @@ export async function getUserFromSession(sessionToken) {
               s.training_credits_remaining, s.training_credits_monthly_allowance,
               s.is_lifetime_plan, s.credits_reset_at, s.grace_period_end,
               s.stripe_customer_id, s.stripe_subscription_id, s.status as subscription_status,
-              s.billing_interval, s.paused_at
+              s.billing_interval, s.paused_at,
+              s.scheduled_downgrade_plan, s.scheduled_downgrade_at
        FROM user_sessions us
        JOIN users u ON us.user_id = u.id
        LEFT JOIN subscriptions s ON u.id = s.user_id
@@ -395,6 +396,8 @@ export async function getUserFromSession(sessionToken) {
       gracePeriodEnd: user.grace_period_end || null,
       subscriptionStatus: user.subscription_status,
       billingInterval: user.billing_interval || 'month',
+      scheduledDowngradePlan: user.scheduled_downgrade_plan || null,
+      scheduledDowngradeAt: user.scheduled_downgrade_at || null,
       isAdmin: isAdmin
     };
   } catch (error) {

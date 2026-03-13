@@ -24,12 +24,30 @@ function SettingsPage({ user, setUser, onUpgrade, onLogout }) {
     }
   }
 
+  const [cancellingDowngrade, setCancellingDowngrade] = useState(false)
+
   const handleManageBilling = async () => {
     try {
       const res = await axios.post('/api/stripe/create-portal')
       window.location.href = res.data.url
     } catch (err) {
       console.error('Portal error:', err)
+    }
+  }
+
+  const handleCancelDowngrade = async () => {
+    setCancellingDowngrade(true)
+    try {
+      await axios.post('/api/stripe/cancel-downgrade')
+      const meRes = await axios.get('/api/auth/me')
+      if (meRes.data.user) {
+        setUser(meRes.data.user)
+      }
+    } catch (err) {
+      console.error('Cancel downgrade error:', err)
+      alert('Failed to cancel downgrade. Please try again.')
+    } finally {
+      setCancellingDowngrade(false)
     }
   }
 
@@ -88,6 +106,18 @@ function SettingsPage({ user, setUser, onUpgrade, onLogout }) {
             </span>
           </div>
         </div>
+        {user.scheduledDowngradePlan && (
+          <div className="settings-downgrade-notice">
+            <p>Downgrade to <strong>{user.scheduledDowngradePlan.charAt(0).toUpperCase() + user.scheduledDowngradePlan.slice(1)}</strong> scheduled. Your current plan features remain active until your next billing date.</p>
+            <button
+              className="settings-btn secondary"
+              onClick={handleCancelDowngrade}
+              disabled={cancellingDowngrade}
+            >
+              {cancellingDowngrade ? 'Cancelling...' : 'Cancel Downgrade'}
+            </button>
+          </div>
+        )}
         <div className="settings-plan-actions">
           {user.plan !== 'elite' && (
             <button className="settings-btn" onClick={onUpgrade}>Upgrade Plan</button>

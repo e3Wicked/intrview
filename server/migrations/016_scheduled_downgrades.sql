@@ -1,0 +1,3 @@
+ALTER TABLE subscriptions
+  ADD COLUMN IF NOT EXISTS scheduled_downgrade_plan VARCHAR(20) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS scheduled_downgrade_at TIMESTAMP DEFAULT NULL;

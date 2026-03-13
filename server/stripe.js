@@ -230,6 +230,94 @@ export async function upgradeSubscription(userId, newPlanKey, interval = 'month'
   }
 }
 
+// Schedule a downgrade for end of billing period
+export async function scheduleDowngrade(userId, newPlanKey, interval = 'month') {
+  const planDef = PLANS[newPlanKey];
+  if (!planDef || !planDef.price) throw new Error('Invalid plan');
+  if (newPlanKey === 'free') throw new Error('Use cancellation to downgrade to free');
+
+  const planOrder = ['free', 'starter', 'pro', 'elite'];
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const subResult = await client.query(
+      'SELECT stripe_subscription_id, plan FROM subscriptions WHERE user_id = $1 FOR UPDATE',
+      [userId]
+    );
+    const row = subResult.rows[0];
+    if (!row?.stripe_subscription_id) throw new Error('No active subscription');
+
+    if (planOrder.indexOf(newPlanKey) >= planOrder.indexOf(row.plan)) {
+      throw new Error('New plan must be a lower tier than current plan');
+    }
+
+    const currentSub = await stripe.subscriptions.retrieve(row.stripe_subscription_id);
+    const itemId = currentSub.items.data[0].id;
+    const newPriceId = await getPriceIdForPlan(newPlanKey, interval);
+
+    await stripe.subscriptions.update(row.stripe_subscription_id, {
+      items: [{ id: itemId, price: newPriceId }],
+      proration_behavior: 'none'
+    });
+
+    await client.query(
+      `UPDATE subscriptions
+       SET scheduled_downgrade_plan = $1, scheduled_downgrade_at = NOW(), updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $2`,
+      [newPlanKey, userId]
+    );
+
+    await client.query('COMMIT');
+    return {
+      scheduledPlan: newPlanKey,
+      effectiveDate: new Date(currentSub.current_period_end * 1000)
+    };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// Cancel a scheduled downgrade — revert Stripe to current plan price
+export async function cancelScheduledDowngrade(userId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const subResult = await client.query(
+      'SELECT stripe_subscription_id, plan, scheduled_downgrade_plan, billing_interval FROM subscriptions WHERE user_id = $1 FOR UPDATE',
+      [userId]
+    );
+    const row = subResult.rows[0];
+    if (!row?.scheduled_downgrade_plan) throw new Error('No scheduled downgrade to cancel');
+
+    const currentSub = await stripe.subscriptions.retrieve(row.stripe_subscription_id);
+    const itemId = currentSub.items.data[0].id;
+    const currentPriceId = await getPriceIdForPlan(row.plan, row.billing_interval || 'month');
+
+    await stripe.subscriptions.update(row.stripe_subscription_id, {
+      items: [{ id: itemId, price: currentPriceId }],
+      proration_behavior: 'none'
+    });
+
+    await client.query(
+      `UPDATE subscriptions
+       SET scheduled_downgrade_plan = NULL, scheduled_downgrade_at = NULL, updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $1`,
+      [userId]
+    );
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 // Handle webhook events
 export async function handleWebhook(event) {
   // Idempotency guard: skip already-processed events
@@ -346,6 +434,34 @@ async function handlePaymentSucceeded(invoice) {
         user_id
       ]
     );
+
+    // Apply scheduled downgrade if one exists
+    const downgradeResult = await pool.query(
+      'SELECT scheduled_downgrade_plan FROM subscriptions WHERE user_id = $1',
+      [user_id]
+    );
+    const scheduledPlan = downgradeResult.rows[0]?.scheduled_downgrade_plan;
+    if (scheduledPlan && PLANS[scheduledPlan]) {
+      const newPlanDef = PLANS[scheduledPlan];
+      const newJobAnalyses = newPlanDef.monthlyJobAnalyses === -1 ? 999999 : newPlanDef.monthlyJobAnalyses;
+      const newTrainingCredits = newPlanDef.monthlyTrainingCredits;
+
+      await pool.query(
+        `UPDATE subscriptions
+         SET plan = $1,
+             credits_remaining = $2,
+             credits_monthly_allowance = $2,
+             job_analyses_remaining = $3,
+             job_analyses_monthly_allowance = $4,
+             training_credits_remaining = $2,
+             training_credits_monthly_allowance = $2,
+             scheduled_downgrade_plan = NULL,
+             scheduled_downgrade_at = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $5`,
+        [scheduledPlan, newTrainingCredits, newJobAnalyses, newPlanDef.monthlyJobAnalyses, user_id]
+      );
+    }
   }
   // Check advertiser subscriptions
   else {
@@ -471,12 +587,44 @@ async function handleSubscriptionUpdated(subscription) {
 
     // Get current state
     const current = await pool.query(
-      'SELECT plan, training_credits_remaining FROM subscriptions WHERE stripe_subscription_id = $1',
+      'SELECT plan, training_credits_remaining, scheduled_downgrade_plan FROM subscriptions WHERE stripe_subscription_id = $1',
       [subscription.id]
     );
 
     if (current.rows.length > 0) {
       const currentRow = current.rows[0];
+
+      // If this webhook was triggered by our scheduleDowngrade call,
+      // only update billing dates/status — do NOT change plan or credits
+      if (currentRow.scheduled_downgrade_plan && currentRow.scheduled_downgrade_plan === resolved.plan) {
+        await pool.query(
+          `UPDATE subscriptions
+           SET billing_interval = $1,
+               current_period_start = to_timestamp($2),
+               current_period_end = to_timestamp($3),
+               status = $4,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE stripe_subscription_id = $5`,
+          [
+            resolved.interval,
+            subscription.current_period_start,
+            subscription.current_period_end,
+            subscription.status,
+            subscription.id
+          ]
+        );
+        return;
+      }
+
+      // If resolved plan differs from both current and scheduled — portal override, clear scheduled
+      if (currentRow.scheduled_downgrade_plan && resolved.plan !== currentRow.plan) {
+        // Portal changed the plan to something unexpected — clear scheduled downgrade
+        await pool.query(
+          `UPDATE subscriptions SET scheduled_downgrade_plan = NULL, scheduled_downgrade_at = NULL WHERE stripe_subscription_id = $1`,
+          [subscription.id]
+        );
+      }
+
       const isDowngrade = PLAN_ORDER.indexOf(resolved.plan) < PLAN_ORDER.indexOf(currentRow.plan);
       const newAllowance = planDef.monthlyTrainingCredits;
       const jobAnalyses = planDef.monthlyJobAnalyses === -1 ? 999999 : planDef.monthlyJobAnalyses;
@@ -499,6 +647,8 @@ async function handleSubscriptionUpdated(subscription) {
              job_analyses_monthly_allowance = $9,
              credits_remaining = $6,
              credits_monthly_allowance = $7,
+             scheduled_downgrade_plan = NULL,
+             scheduled_downgrade_at = NULL,
              updated_at = CURRENT_TIMESTAMP
          WHERE stripe_subscription_id = $10`,
         [

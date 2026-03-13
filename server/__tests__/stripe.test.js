@@ -50,6 +50,8 @@ const { pool } = await import('../db.js');
 const {
   createCheckoutSession,
   upgradeSubscription,
+  scheduleDowngrade,
+  cancelScheduledDowngrade,
   getPriceIdForPlan,
   handleWebhook,
 } = await import('../stripe.js');
@@ -687,5 +689,110 @@ describe('verify-checkout route logic', () => {
     const { PLANS } = await import('../auth.js');
 
     expect(PLANS[sessions.data[0].metadata.plan]).toBeUndefined();
+  });
+});
+
+describe('scheduleDowngrade', () => {
+  it('should throw on invalid plan', async () => {
+    await expect(scheduleDowngrade(1, 'invalid')).rejects.toThrow('Invalid plan');
+  });
+
+  it('should throw on free plan', async () => {
+    // free plan has no price, so it hits the 'Invalid plan' guard first
+    await expect(scheduleDowngrade(1, 'free')).rejects.toThrow('Invalid plan');
+  });
+
+  it('should throw when no active subscription', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // SELECT returns empty
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+    await expect(scheduleDowngrade(1, 'starter')).rejects.toThrow('No active subscription');
+  });
+
+  it('should throw if new plan is not lower tier', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ stripe_subscription_id: 'sub_1', plan: 'starter' }] }) // SELECT
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+    await expect(scheduleDowngrade(1, 'pro')).rejects.toThrow('New plan must be a lower tier');
+  });
+
+  it('should update Stripe subscription with proration_behavior none and store scheduled downgrade', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ stripe_subscription_id: 'sub_1', plan: 'elite' }] }) // SELECT
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE scheduled_downgrade_plan
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    mockStripe.subscriptions.retrieve.mockResolvedValueOnce({
+      id: 'sub_1',
+      items: { data: [{ id: 'si_1' }] },
+      current_period_end: 1702600000,
+    });
+
+    process.env.STRIPE_PRICE_ID_STARTER = 'price_starter';
+
+    mockStripe.subscriptions.update.mockResolvedValueOnce({ id: 'sub_1' });
+
+    const result = await scheduleDowngrade(1, 'starter');
+
+    expect(mockStripe.subscriptions.update).toHaveBeenCalledWith('sub_1', {
+      items: [{ id: 'si_1', price: 'price_starter' }],
+      proration_behavior: 'none',
+    });
+
+    const updateCall = mockClient.query.mock.calls.find(
+      (c) => typeof c[0] === 'string' && c[0].includes('scheduled_downgrade_plan')
+    );
+    expect(updateCall).toBeDefined();
+
+    expect(result.scheduledPlan).toBe('starter');
+
+    delete process.env.STRIPE_PRICE_ID_STARTER;
+  });
+});
+
+describe('cancelScheduledDowngrade', () => {
+  it('should throw when no scheduled downgrade', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ scheduled_downgrade_plan: null, stripe_subscription_id: 'sub_1', plan: 'pro' }] }) // SELECT
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+    await expect(cancelScheduledDowngrade(1)).rejects.toThrow('No scheduled downgrade to cancel');
+  });
+
+  it('should revert Stripe price and clear DB columns', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ stripe_subscription_id: 'sub_1', plan: 'pro', scheduled_downgrade_plan: 'starter', billing_interval: 'month' }] }) // SELECT
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE clear scheduled_downgrade
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    mockStripe.subscriptions.retrieve.mockResolvedValueOnce({
+      id: 'sub_1',
+      items: { data: [{ id: 'si_1' }] },
+    });
+
+    process.env.STRIPE_PRICE_ID_PRO = 'price_pro';
+
+    mockStripe.subscriptions.update.mockResolvedValueOnce({ id: 'sub_1' });
+
+    await cancelScheduledDowngrade(1);
+
+    expect(mockStripe.subscriptions.update).toHaveBeenCalledWith('sub_1', {
+      items: [{ id: 'si_1', price: 'price_pro' }],
+      proration_behavior: 'none',
+    });
+
+    const updateCall = mockClient.query.mock.calls.find(
+      (c) => typeof c[0] === 'string' && c[0].includes('scheduled_downgrade_plan = NULL')
+    );
+    expect(updateCall).toBeDefined();
+
+    delete process.env.STRIPE_PRICE_ID_PRO;
   });
 });
