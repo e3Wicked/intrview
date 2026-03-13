@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import { pool } from './db.js';
 import { createAdvertiserSubscription, getAdvertiserSubByStripeId, updateAdvertiserSubStatus, deactivateAdvertiserBySubId } from './db.js';
 import { PLANS } from './auth.js';
-import { sendPaymentFailedEmail, sendPaymentReminderEmail, sendPaymentFinalWarningEmail } from './email.js';
+import { sendPaymentFailedEmail, sendPaymentReminderEmail, sendPaymentFinalWarningEmail, sendCancellationConfirmationEmail, sendCancellationWinBackEmail } from './email.js';
 
 if (!process.env.STRIPE_SECRET_KEY) {
   console.warn('⚠️  STRIPE_SECRET_KEY not set. Stripe features will not work.');
@@ -210,6 +210,20 @@ export async function upgradeSubscription(userId, newPlanKey, interval = 'month'
     }
 
     const currentSub = await stripe.subscriptions.retrieve(row.stripe_subscription_id);
+
+    // Clear pending cancellation if user decides to upgrade instead
+    if (currentSub.cancel_at_period_end) {
+      await stripe.subscriptions.update(row.stripe_subscription_id, {
+        cancel_at_period_end: false
+      });
+      await client.query(
+        `UPDATE subscriptions
+         SET cancel_at_period_end = false, cancellation_reason = NULL,
+             cancellation_comment = NULL, cancelled_at = NULL
+         WHERE user_id = $1`,
+        [userId]
+      );
+    }
     const itemId = currentSub.items.data[0].id;
     const newPriceId = await getPriceIdForPlan(newPlanKey, interval);
     const updatedSub = await stripe.subscriptions.update(row.stripe_subscription_id, {
@@ -305,6 +319,115 @@ export async function cancelScheduledDowngrade(userId) {
     await client.query(
       `UPDATE subscriptions
        SET scheduled_downgrade_plan = NULL, scheduled_downgrade_at = NULL, updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $1`,
+      [userId]
+    );
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// Schedule cancellation at end of billing period
+export async function scheduleCancellation(userId, reason, comment) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const subResult = await client.query(
+      'SELECT stripe_subscription_id, plan, scheduled_downgrade_plan, billing_interval, current_period_end FROM subscriptions WHERE user_id = $1 FOR UPDATE',
+      [userId]
+    );
+    const row = subResult.rows[0];
+    if (!row?.stripe_subscription_id) throw new Error('No active subscription');
+
+    // If there's a scheduled downgrade, clear it first (cancellation supersedes)
+    if (row.scheduled_downgrade_plan) {
+      const currentSub = await stripe.subscriptions.retrieve(row.stripe_subscription_id);
+      const itemId = currentSub.items.data[0].id;
+      const currentPriceId = await getPriceIdForPlan(row.plan, row.billing_interval || 'month');
+      await stripe.subscriptions.update(row.stripe_subscription_id, {
+        items: [{ id: itemId, price: currentPriceId }],
+        proration_behavior: 'none'
+      });
+    }
+
+    // Set cancel_at_period_end on Stripe
+    await stripe.subscriptions.update(row.stripe_subscription_id, {
+      cancel_at_period_end: true
+    });
+
+    // Update our DB
+    await client.query(
+      `UPDATE subscriptions
+       SET cancel_at_period_end = true,
+           cancellation_reason = $1,
+           cancellation_comment = $2,
+           cancelled_at = NOW(),
+           scheduled_downgrade_plan = NULL,
+           scheduled_downgrade_at = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $3`,
+      [reason, comment || null, userId]
+    );
+
+    // Record in cancellation_reasons history table
+    await client.query(
+      `INSERT INTO cancellation_reasons (user_id, plan_at_cancellation, reason, comment)
+       VALUES ($1, $2, $3, $4)`,
+      [userId, row.plan, reason, comment || null]
+    );
+
+    await client.query('COMMIT');
+
+    // Send confirmation email (best-effort, outside transaction)
+    try {
+      const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+      const email = userResult.rows[0]?.email;
+      if (email) {
+        const planDef = PLANS[row.plan];
+        const appUrl = process.env.APP_URL || 'https://intrview.io';
+        await sendCancellationConfirmationEmail(email, planDef?.name || row.plan, row.current_period_end, appUrl);
+      }
+    } catch (emailErr) {
+      console.error('Failed to send cancellation confirmation email:', emailErr);
+    }
+
+    return { effectiveDate: row.current_period_end };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// Undo a pending cancellation
+export async function undoCancellation(userId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const subResult = await client.query(
+      'SELECT stripe_subscription_id, cancel_at_period_end FROM subscriptions WHERE user_id = $1 FOR UPDATE',
+      [userId]
+    );
+    const row = subResult.rows[0];
+    if (!row?.cancel_at_period_end) throw new Error('No pending cancellation');
+
+    await stripe.subscriptions.update(row.stripe_subscription_id, {
+      cancel_at_period_end: false
+    });
+
+    await client.query(
+      `UPDATE subscriptions
+       SET cancel_at_period_end = false,
+           cancellation_reason = NULL,
+           cancellation_comment = NULL,
+           cancelled_at = NULL,
+           updated_at = CURRENT_TIMESTAMP
        WHERE user_id = $1`,
       [userId]
     );
@@ -557,6 +680,16 @@ async function handlePaymentFailed(invoice) {
 
 async function handleSubscriptionDeleted(subscription) {
   const freePlan = PLANS.free;
+
+  // Get user info before downgrading (for win-back email)
+  const userResult = await pool.query(
+    `SELECT s.user_id, s.plan, u.email
+     FROM subscriptions s JOIN users u ON s.user_id = u.id
+     WHERE s.stripe_subscription_id = $1`,
+    [subscription.id]
+  );
+  const userRow = userResult.rows[0];
+
   await pool.query(
     `UPDATE subscriptions
      SET plan = 'free',
@@ -568,16 +701,47 @@ async function handleSubscriptionDeleted(subscription) {
          training_credits_remaining = $3,
          training_credits_monthly_allowance = 0,
          is_lifetime_plan = true,
+         cancel_at_period_end = false,
+         cancellation_reason = NULL,
+         cancellation_comment = NULL,
+         cancelled_at = NULL,
          updated_at = CURRENT_TIMESTAMP
      WHERE stripe_subscription_id = $4`,
     [freePlan.lifetimeTrainingCredits, freePlan.lifetimeJobAnalyses, freePlan.lifetimeTrainingCredits, subscription.id]
   );
+
+  // Send win-back email (best-effort)
+  if (userRow?.email) {
+    try {
+      const planDef = PLANS[userRow.plan];
+      const appUrl = process.env.APP_URL || 'https://intrview.io';
+      await sendCancellationWinBackEmail(userRow.email, planDef?.name || userRow.plan, appUrl);
+    } catch (emailErr) {
+      console.error('Failed to send win-back email:', emailErr);
+    }
+  }
 
   // Also check advertiser subscriptions
   await deactivateAdvertiserBySubId(subscription.id);
 }
 
 async function handleSubscriptionUpdated(subscription) {
+  // Sync cancel_at_period_end state from Stripe (handles portal cancellations/reversals)
+  if (subscription.cancel_at_period_end) {
+    await pool.query(
+      `UPDATE subscriptions SET cancel_at_period_end = true, updated_at = CURRENT_TIMESTAMP
+       WHERE stripe_subscription_id = $1 AND cancel_at_period_end = false`,
+      [subscription.id]
+    );
+  } else {
+    await pool.query(
+      `UPDATE subscriptions SET cancel_at_period_end = false, cancellation_reason = NULL,
+       cancellation_comment = NULL, cancelled_at = NULL, updated_at = CURRENT_TIMESTAMP
+       WHERE stripe_subscription_id = $1 AND cancel_at_period_end = true`,
+      [subscription.id]
+    );
+  }
+
   const priceId = subscription.items?.data?.[0]?.price?.id;
   const resolved = priceId ? PRICE_ID_TO_PLAN[priceId] : null;
 

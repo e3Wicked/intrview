@@ -1,0 +1,311 @@
+.cancel-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  overflow-y: auto;
+  padding: 32px;
+}
+
+.cancel-modal {
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 12px;
+  padding: 32px;
+  width: 100%;
+  max-width: 480px;
+  position: relative;
+  margin: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+}
+
+.cancel-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 28px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+  z-index: 10;
+}
+
+.cancel-modal-close:hover {
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.cancel-step {
+  padding: 8px 0;
+}
+
+.cancel-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.cancel-header h2 {
+  color: var(--color-text-primary, #1a1a1a);
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 6px 0;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.cancel-header p {
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 14px;
+  margin: 0;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+/* Reason selection */
+.cancel-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.cancel-reason-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 8px;
+  background: var(--color-bg, #faf9f6);
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.cancel-reason-btn:hover {
+  background: var(--color-bg-secondary, #f5f3ef);
+}
+
+.cancel-reason-btn.active {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.cancel-comment-field {
+  margin-bottom: 20px;
+}
+
+.cancel-comment {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 8px;
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 14px;
+  color: var(--color-text-primary, #1a1a1a);
+  background: var(--color-bg, #faf9f6);
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.cancel-comment:focus {
+  border-color: var(--color-primary, #2563eb);
+}
+
+/* Suggestion step */
+.cancel-suggestion {
+  background: var(--color-bg-secondary, #f5f3ef);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.cancel-suggestion p {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: var(--color-text-primary, #1a1a1a);
+  line-height: 1.5;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.cancel-suggestion p:last-child {
+  margin-bottom: 0;
+}
+
+.cancel-btn--suggestion {
+  display: inline-block;
+  padding: 10px 24px;
+  background: var(--color-primary, #2563eb);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.cancel-btn--suggestion:hover {
+  opacity: 0.9;
+}
+
+/* Confirmation step */
+.cancel-summary {
+  background: var(--color-bg-secondary, #f5f3ef);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.cancel-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.cancel-summary-row + .cancel-summary-row {
+  border-top: 1px solid var(--color-border, #e6e3de);
+}
+
+.cancel-summary-label {
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.cancel-summary-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.cancel-losing {
+  margin-bottom: 16px;
+}
+
+.cancel-losing-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #dc2626;
+  margin: 0 0 8px 0;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.cancel-losing-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b6b6b);
+  line-height: 1.8;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.cancel-reassurance {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+}
+
+.cancel-reassurance p {
+  margin: 0;
+  font-size: 13px;
+  color: #166534;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.cancel-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #dc2626;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+/* Action buttons */
+.cancel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cancel-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, sans-serif;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.cancel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cancel-btn--primary {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+}
+
+.cancel-btn--primary:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.cancel-btn--danger {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+}
+
+.cancel-btn--danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.cancel-btn--secondary {
+  background: transparent;
+  color: var(--color-text-secondary, #6b6b6b);
+  border: 1px solid var(--color-border, #e6e3de);
+}
+
+.cancel-btn--secondary:hover:not(:disabled) {
+  background: var(--color-bg-secondary, #f5f3ef);
+}
+
+.cancel-btn--continue-cancel {
+  background: transparent;
+  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  font-size: 14px;
+}
+
+.cancel-btn--continue-cancel:hover {
+  background: rgba(220, 38, 38, 0.05);
+}

@@ -1,0 +1,14 @@
+ALTER TABLE subscriptions
+  ADD COLUMN IF NOT EXISTS cancel_at_period_end BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS cancellation_reason VARCHAR(50) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS cancellation_comment TEXT DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP DEFAULT NULL;
+
+CREATE TABLE IF NOT EXISTS cancellation_reasons (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  plan_at_cancellation VARCHAR(50),
+  reason VARCHAR(50) NOT NULL,
+  comment TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

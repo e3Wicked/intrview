@@ -227,6 +227,26 @@
   font-family: 'Inter', -apple-system, sans-serif;
 }
 
+.settings-cancel-notice {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-cancel-notice p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-primary, #1a1a1a);
+  line-height: 1.5;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
 .settings-status-badge {
   display: inline-block;
   font-size: 12px;

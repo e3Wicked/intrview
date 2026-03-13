@@ -48,6 +48,10 @@ export const api = {
     deleteAllAnalyses: () => axios.delete('/api/user/analyses'),
     updateProfile: (data) => axios.put('/api/user/profile', data),
   },
+  subscription: {
+    cancel: (data) => axios.post('/api/stripe/cancel-subscription', data),
+    undoCancel: () => axios.post('/api/stripe/undo-cancellation'),
+  },
   admin: {
     getAnalytics: () => axios.get('/api/admin/analytics'),
   },

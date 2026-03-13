@@ -129,6 +129,64 @@ export async function sendPaymentReminderEmail(email, planName, daysRemaining, a
   }
 }
 
+export async function sendCancellationConfirmationEmail(email, planName, effectiveDate, appUrl) {
+  try {
+    const formattedDate = effectiveDate
+      ? new Date(effectiveDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      : 'end of your billing period';
+    const mailOptions = {
+      from: process.env.SMTP_FROM || 'intrview.io <noreply@intrview.io>',
+      to: email,
+      subject: 'Your intrview.io subscription has been cancelled',
+      html: `
+        <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e5e5e5; padding: 32px; border-radius: 8px;">
+          <h2 style="color: #fff; margin-bottom: 16px;">Subscription cancelled</h2>
+          <p style="color: #b0b0b0; margin-bottom: 24px;">Your <strong style="color: #fff;">${planName}</strong> plan has been cancelled.</p>
+          <p style="color: #b0b0b0; margin-bottom: 24px;">You'll keep all your current features until <strong style="color: #f59e0b;">${formattedDate}</strong>. After that, your account will switch to the Free plan.</p>
+          <p style="color: #b0b0b0; margin-bottom: 24px;">Your study plans and progress data will be preserved.</p>
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${appUrl}/settings" style="background: #f59e0b; color: #000; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold;">Changed your mind? Resubscribe</a>
+          </div>
+          <p style="color: #666; font-size: 12px; text-align: center; margin-top: 24px;">You can undo the cancellation anytime before ${formattedDate}.</p>
+        </div>
+      `,
+      text: `Your intrview.io ${planName} plan has been cancelled. You'll keep all features until ${formattedDate}. Visit ${appUrl}/settings to undo.`,
+    };
+    const transporter = getTransporter();
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Cancellation confirmation email sent to ${email}`);
+  } catch (error) {
+    console.error('❌ Error sending cancellation confirmation email:', error);
+  }
+}
+
+export async function sendCancellationWinBackEmail(email, planName, appUrl) {
+  try {
+    const mailOptions = {
+      from: process.env.SMTP_FROM || 'intrview.io <noreply@intrview.io>',
+      to: email,
+      subject: 'We miss you at intrview.io',
+      html: `
+        <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e5e5e5; padding: 32px; border-radius: 8px;">
+          <h2 style="color: #fff; margin-bottom: 16px;">Your ${planName} plan has ended</h2>
+          <p style="color: #b0b0b0; margin-bottom: 24px;">Your subscription has ended and your account is now on the Free plan.</p>
+          <p style="color: #b0b0b0; margin-bottom: 24px;">Your study plans, progress, and data are still here waiting for you. Resubscribe anytime to pick up where you left off.</p>
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${appUrl}/settings" style="background: #f59e0b; color: #000; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold;">Resubscribe</a>
+          </div>
+          <p style="color: #666; font-size: 12px; text-align: center; margin-top: 24px;">Thank you for being a part of intrview.io.</p>
+        </div>
+      `,
+      text: `Your intrview.io ${planName} plan has ended. Your data is preserved. Resubscribe anytime at ${appUrl}/settings.`,
+    };
+    const transporter = getTransporter();
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Win-back email sent to ${email}`);
+  } catch (error) {
+    console.error('❌ Error sending win-back email:', error);
+  }
+}
+
 export async function sendPaymentFinalWarningEmail(email, planName, appUrl) {
   try {
     const mailOptions = {

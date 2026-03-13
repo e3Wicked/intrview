@@ -43,6 +43,18 @@ vi.mock('../db.js', () => ({
   deactivateAdvertiserBySubId: vi.fn(),
 }));
 
+const mockSendCancellationConfirmationEmail = vi.fn().mockResolvedValue(undefined);
+const mockSendCancellationWinBackEmail = vi.fn().mockResolvedValue(undefined);
+
+vi.mock('../email.js', () => ({
+  sendVerificationCode: vi.fn(),
+  sendPaymentFailedEmail: vi.fn(),
+  sendPaymentReminderEmail: vi.fn(),
+  sendPaymentFinalWarningEmail: vi.fn(),
+  sendCancellationConfirmationEmail: (...args) => mockSendCancellationConfirmationEmail(...args),
+  sendCancellationWinBackEmail: (...args) => mockSendCancellationWinBackEmail(...args),
+}));
+
 // Set env so stripe initializes
 process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
 
@@ -52,6 +64,8 @@ const {
   upgradeSubscription,
   scheduleDowngrade,
   cancelScheduledDowngrade,
+  scheduleCancellation,
+  undoCancellation,
   getPriceIdForPlan,
   handleWebhook,
 } = await import('../stripe.js');
@@ -461,7 +475,9 @@ describe('handleWebhook', () => {
   it('should handle customer.subscription.updated', async () => {
     // First call: idempotency INSERT
     pool.query.mockResolvedValueOnce({ rows: [] });
-    // Second call: UPDATE period
+    // cancel_at_period_end sync
+    pool.query.mockResolvedValueOnce({ rowCount: 0 });
+    // UPDATE period
     pool.query.mockResolvedValueOnce({ rows: [] });
 
     await handleWebhook({
@@ -510,6 +526,7 @@ describe('handleWebhook — customer.subscription.updated with plan resolution',
     // Instead, we test the resolved branch by checking that when price item IS present but NOT in
     // the map, the handler falls through to the pause detection / fallback path.
     pool.query.mockResolvedValueOnce({ rows: [] }); // idempotency INSERT
+    pool.query.mockResolvedValueOnce({ rowCount: 0 }); // cancel_at_period_end sync
     // Fallback date-only UPDATE
     pool.query.mockResolvedValueOnce({ rows: [] });
 
@@ -550,6 +567,7 @@ describe('handleWebhook — customer.subscription.updated with plan resolution',
     // the fallback case only (price not in map) and confirm credits are NOT clamped (correct).
 
     pool.query.mockResolvedValueOnce({ rows: [] }); // idempotency INSERT
+    pool.query.mockResolvedValueOnce({ rowCount: 0 }); // cancel_at_period_end sync
     pool.query.mockResolvedValueOnce({ rows: [] }); // fallback UPDATE
 
     await handleWebhook({
@@ -566,13 +584,14 @@ describe('handleWebhook — customer.subscription.updated with plan resolution',
       },
     });
 
-    // Without a registered price, no plan-resolution UPDATE fires — only the fallback
+    // Without a registered price, no plan-resolution UPDATE fires — only the cancel sync + fallback
     const updateCalls = pool.query.mock.calls.filter(
       (c) => typeof c[0] === 'string' && c[0].includes('UPDATE subscriptions')
     );
-    expect(updateCalls.length).toBe(1);
-    // Verify it's the simple date-only fallback, not the plan-resolution UPDATE
-    expect(updateCalls[0][0]).not.toContain('plan = $1');
+    expect(updateCalls.length).toBe(2);
+    // Last call should be the simple date-only fallback, not the plan-resolution UPDATE
+    const fallbackCall = updateCalls[updateCalls.length - 1];
+    expect(fallbackCall[0]).not.toContain('plan = $1');
   });
 });
 
@@ -794,5 +813,440 @@ describe('cancelScheduledDowngrade', () => {
     expect(updateCall).toBeDefined();
 
     delete process.env.STRIPE_PRICE_ID_PRO;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// scheduleCancellation
+// ---------------------------------------------------------------------------
+
+describe('scheduleCancellation', () => {
+  it('should throw when no active subscription', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // SELECT returns empty
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+    await expect(scheduleCancellation(1, 'too_expensive', null)).rejects.toThrow(
+      'No active subscription'
+    );
+
+    const rollbackCall = mockClient.query.mock.calls.find((c) => c[0] === 'ROLLBACK');
+    expect(rollbackCall).toBeDefined();
+    expect(mockClient.release).toHaveBeenCalled();
+  });
+
+  it('should set cancel_at_period_end on Stripe and update DB — happy path', async () => {
+    // Query sequence: BEGIN, SELECT FOR UPDATE, UPDATE subscriptions, INSERT cancellation_reasons, COMMIT
+    mockClient.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({
+        rows: [{
+          stripe_subscription_id: 'sub_cancel',
+          plan: 'pro',
+          scheduled_downgrade_plan: null,
+          billing_interval: 'month',
+          current_period_end: 1702600000,
+        }],
+      }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE subscriptions (cancel flags)
+      .mockResolvedValueOnce({ rows: [] }) // INSERT cancellation_reasons
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    // pool.query used post-COMMIT for email lookup
+    pool.query.mockResolvedValueOnce({ rows: [{ email: 'user@example.com' }] });
+
+    mockStripe.subscriptions.update.mockResolvedValueOnce({ id: 'sub_cancel' });
+
+    const result = await scheduleCancellation(1, 'too_expensive', 'Going with a cheaper option');
+
+    // Stripe must be called with cancel_at_period_end: true
+    expect(mockStripe.subscriptions.update).toHaveBeenCalledWith('sub_cancel', {
+      cancel_at_period_end: true,
+    });
+
+    // DB UPDATE must set cancel_at_period_end = true and record reason/comment
+    const updateCall = mockClient.query.mock.calls.find(
+      (c) => typeof c[0] === 'string' && c[0].includes('cancel_at_period_end = true')
+    );
+    expect(updateCall).toBeDefined();
+    expect(updateCall[1][0]).toBe('too_expensive');
+    expect(updateCall[1][1]).toBe('Going with a cheaper option');
+    expect(updateCall[1][2]).toBe(1); // userId
+
+    // INSERT into cancellation_reasons history
+    const insertCall = mockClient.query.mock.calls.find(
+      (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO cancellation_reasons')
+    );
+    expect(insertCall).toBeDefined();
+    expect(insertCall[1]).toEqual([1, 'pro', 'too_expensive', 'Going with a cheaper option']);
+
+    // Returns the effective date from current_period_end
+    expect(result).toEqual({ effectiveDate: 1702600000 });
+
+    // Confirmation email should be sent
+    expect(mockSendCancellationConfirmationEmail).toHaveBeenCalledWith(
+      'user@example.com',
+      expect.any(String), // plan display name
+      1702600000,
+      expect.any(String)  // appUrl
+    );
+  });
+
+  it('should clear a scheduled downgrade before setting cancel_at_period_end', async () => {
+    // When scheduled_downgrade_plan is present, scheduleCancellation must first
+    // revert the Stripe price to the current plan, then set cancel_at_period_end.
+    process.env.STRIPE_PRICE_ID_PRO = 'price_pro';
+
+    mockClient.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({
+        rows: [{
+          stripe_subscription_id: 'sub_with_downgrade',
+          plan: 'pro',
+          scheduled_downgrade_plan: 'starter', // <-- downgrade exists
+          billing_interval: 'month',
+          current_period_end: 1702600000,
+        }],
+      }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE subscriptions (cancel flags + clear downgrade cols)
+      .mockResolvedValueOnce({ rows: [] }) // INSERT cancellation_reasons
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    pool.query.mockResolvedValueOnce({ rows: [] }); // email lookup (no email row → skip send)
+
+    // First subscriptions.retrieve call is for clearing the downgrade
+    mockStripe.subscriptions.retrieve.mockResolvedValueOnce({
+      id: 'sub_with_downgrade',
+      items: { data: [{ id: 'si_1' }] },
+    });
+
+    // First update: revert price (clear downgrade), second update: cancel_at_period_end: true
+    mockStripe.subscriptions.update
+      .mockResolvedValueOnce({ id: 'sub_with_downgrade' }) // clear downgrade
+      .mockResolvedValueOnce({ id: 'sub_with_downgrade' }); // set cancel
+
+    await scheduleCancellation(1, 'switching_service', null);
+
+    // Should have been called twice: once to revert price, once to cancel
+    expect(mockStripe.subscriptions.update).toHaveBeenCalledTimes(2);
+
+    // First call reverts to current plan price
+    expect(mockStripe.subscriptions.update).toHaveBeenNthCalledWith(1, 'sub_with_downgrade', {
+      items: [{ id: 'si_1', price: 'price_pro' }],
+      proration_behavior: 'none',
+    });
+
+    // Second call sets cancel_at_period_end
+    expect(mockStripe.subscriptions.update).toHaveBeenNthCalledWith(2, 'sub_with_downgrade', {
+      cancel_at_period_end: true,
+    });
+
+    // DB UPDATE should clear scheduled_downgrade_plan columns
+    const updateCall = mockClient.query.mock.calls.find(
+      (c) => typeof c[0] === 'string' && c[0].includes('scheduled_downgrade_plan = NULL')
+    );
+    expect(updateCall).toBeDefined();
+
+    delete process.env.STRIPE_PRICE_ID_PRO;
+  });
+
+  it('should rollback transaction and rethrow on Stripe API failure', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({
+        rows: [{
+          stripe_subscription_id: 'sub_err',
+          plan: 'pro',
+          scheduled_downgrade_plan: null,
+          billing_interval: 'month',
+          current_period_end: 1702600000,
+        }],
+      }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+    mockStripe.subscriptions.update.mockRejectedValueOnce(new Error('Stripe unavailable'));
+
+    await expect(scheduleCancellation(1, 'too_expensive', null)).rejects.toThrow(
+      'Stripe unavailable'
+    );
+
+    const rollbackCall = mockClient.query.mock.calls.find((c) => c[0] === 'ROLLBACK');
+    expect(rollbackCall).toBeDefined();
+    expect(mockClient.release).toHaveBeenCalled();
+  });
+
+  it('should store null comment when no comment provided', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({
+        rows: [{
+          stripe_subscription_id: 'sub_nocomment',
+          plan: 'starter',
+          scheduled_downgrade_plan: null,
+          billing_interval: 'month',
+          current_period_end: 1702600000,
+        }],
+      }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE subscriptions
+      .mockResolvedValueOnce({ rows: [] }) // INSERT cancellation_reasons
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    pool.query.mockResolvedValueOnce({ rows: [] }); // email lookup
+
+    mockStripe.subscriptions.update.mockResolvedValueOnce({ id: 'sub_nocomment' });
+
+    await scheduleCancellation(1, 'too_expensive', undefined);
+
+    // INSERT should pass null as comment (4th param)
+    const insertCall = mockClient.query.mock.calls.find(
+      (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO cancellation_reasons')
+    );
+    expect(insertCall).toBeDefined();
+    expect(insertCall[1][3]).toBeNull();
+
+    // UPDATE should also pass null as comment (2nd param)
+    const updateCall = mockClient.query.mock.calls.find(
+      (c) => typeof c[0] === 'string' && c[0].includes('cancel_at_period_end = true')
+    );
+    expect(updateCall).toBeDefined();
+    expect(updateCall[1][1]).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// undoCancellation
+// ---------------------------------------------------------------------------
+
+describe('undoCancellation', () => {
+  it('should clear cancel_at_period_end on Stripe and in DB — happy path', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({
+        rows: [{
+          stripe_subscription_id: 'sub_undo',
+          cancel_at_period_end: true,
+        }],
+      }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE subscriptions (clear cancel fields)
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    mockStripe.subscriptions.update.mockResolvedValueOnce({ id: 'sub_undo' });
+
+    await undoCancellation(1);
+
+    // Stripe must receive cancel_at_period_end: false
+    expect(mockStripe.subscriptions.update).toHaveBeenCalledWith('sub_undo', {
+      cancel_at_period_end: false,
+    });
+
+    // DB UPDATE should clear all cancellation tracking fields
+    const updateCall = mockClient.query.mock.calls.find(
+      (c) => typeof c[0] === 'string' && c[0].includes('cancel_at_period_end = false')
+    );
+    expect(updateCall).toBeDefined();
+    expect(updateCall[0]).toContain('cancellation_reason = NULL');
+    expect(updateCall[0]).toContain('cancellation_comment = NULL');
+    expect(updateCall[0]).toContain('cancelled_at = NULL');
+    expect(updateCall[1][0]).toBe(1); // userId param
+
+    // Transaction should commit
+    const commitCall = mockClient.query.mock.calls.find((c) => c[0] === 'COMMIT');
+    expect(commitCall).toBeDefined();
+    expect(mockClient.release).toHaveBeenCalled();
+  });
+
+  it('should throw when there is no pending cancellation', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({
+        rows: [{
+          stripe_subscription_id: 'sub_active',
+          cancel_at_period_end: false, // not scheduled for cancellation
+        }],
+      }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+    await expect(undoCancellation(1)).rejects.toThrow('No pending cancellation');
+
+    const rollbackCall = mockClient.query.mock.calls.find((c) => c[0] === 'ROLLBACK');
+    expect(rollbackCall).toBeDefined();
+    expect(mockClient.release).toHaveBeenCalled();
+  });
+
+  it('should throw when user has no subscription row', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // SELECT returns empty (no subscription)
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+    await expect(undoCancellation(99)).rejects.toThrow('No pending cancellation');
+
+    const rollbackCall = mockClient.query.mock.calls.find((c) => c[0] === 'ROLLBACK');
+    expect(rollbackCall).toBeDefined();
+  });
+
+  it('should rollback transaction and rethrow on Stripe API failure', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({
+        rows: [{
+          stripe_subscription_id: 'sub_fail_undo',
+          cancel_at_period_end: true,
+        }],
+      }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+    mockStripe.subscriptions.update.mockRejectedValueOnce(new Error('Network error'));
+
+    await expect(undoCancellation(1)).rejects.toThrow('Network error');
+
+    const rollbackCall = mockClient.query.mock.calls.find((c) => c[0] === 'ROLLBACK');
+    expect(rollbackCall).toBeDefined();
+    expect(mockClient.release).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleWebhook — cancel_at_period_end sync via customer.subscription.updated
+// ---------------------------------------------------------------------------
+
+describe('handleWebhook — cancel_at_period_end sync', () => {
+  it('should sync cancel_at_period_end: true from Stripe via subscription.updated webhook', async () => {
+    // idempotency INSERT
+    pool.query.mockResolvedValueOnce({ rows: [] });
+    // cancel_at_period_end sync UPDATE (rowCount > 0 means the row was updated)
+    pool.query.mockResolvedValueOnce({ rowCount: 1 });
+    // fallback date-only UPDATE
+    pool.query.mockResolvedValueOnce({ rows: [] });
+
+    await handleWebhook({
+      id: 'evt_cancel_sync',
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_cancelling',
+          cancel_at_period_end: true, // Stripe says cancellation is pending
+          current_period_start: 1700000000,
+          current_period_end: 1702600000,
+          status: 'active',
+        },
+      },
+    });
+
+    // The cancel_at_period_end=true sync query must be executed
+    const cancelSyncCall = pool.query.mock.calls.find(
+      (c) =>
+        typeof c[0] === 'string' &&
+        c[0].includes('cancel_at_period_end = true') &&
+        Array.isArray(c[1]) &&
+        c[1].includes('sub_cancelling')
+    );
+    expect(cancelSyncCall).toBeDefined();
+    // Only update rows where cancel_at_period_end is currently false (idempotent)
+    expect(cancelSyncCall[0]).toContain('cancel_at_period_end = false');
+  });
+
+  it('should sync cancel_at_period_end: false (reversal) from Stripe via subscription.updated webhook', async () => {
+    // idempotency INSERT
+    pool.query.mockResolvedValueOnce({ rows: [] });
+    // cancel_at_period_end=false sync UPDATE
+    pool.query.mockResolvedValueOnce({ rowCount: 1 });
+    // fallback date-only UPDATE
+    pool.query.mockResolvedValueOnce({ rows: [] });
+
+    await handleWebhook({
+      id: 'evt_cancel_reversal',
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_reinstated',
+          cancel_at_period_end: false, // reversal from Stripe portal
+          current_period_start: 1700000000,
+          current_period_end: 1702600000,
+          status: 'active',
+        },
+      },
+    });
+
+    // The cancel_at_period_end=false sync + field clearing query must be executed
+    const clearCall = pool.query.mock.calls.find(
+      (c) =>
+        typeof c[0] === 'string' &&
+        c[0].includes('cancel_at_period_end = false') &&
+        c[0].includes('cancellation_reason = NULL') &&
+        Array.isArray(c[1]) &&
+        c[1].includes('sub_reinstated')
+    );
+    expect(clearCall).toBeDefined();
+    // Only update rows where cancel_at_period_end is currently true (idempotent)
+    expect(clearCall[0]).toContain('cancel_at_period_end = true');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleWebhook — customer.subscription.deleted clears cancellation fields
+// ---------------------------------------------------------------------------
+
+describe('handleWebhook — subscription.deleted clears cancellation tracking', () => {
+  it('should reset cancel_at_period_end and cancellation fields when subscription is deleted', async () => {
+    // idempotency INSERT
+    pool.query.mockResolvedValueOnce({ rows: [] });
+    // SELECT user info for win-back email
+    pool.query.mockResolvedValueOnce({
+      rows: [{ user_id: 42, plan: 'pro', email: 'churned@example.com' }],
+    });
+    // UPDATE to free plan (this is the main assertion target)
+    pool.query.mockResolvedValueOnce({ rows: [] });
+
+    mockSendCancellationWinBackEmail.mockResolvedValueOnce(undefined);
+
+    await handleWebhook({
+      id: 'evt_sub_deleted_cancel',
+      type: 'customer.subscription.deleted',
+      data: { object: { id: 'sub_deleted' } },
+    });
+
+    // Find the UPDATE that downgrades to free
+    const freeUpdateCall = pool.query.mock.calls.find(
+      (c) => typeof c[0] === 'string' && c[0].includes("plan = 'free'")
+    );
+    expect(freeUpdateCall).toBeDefined();
+
+    // The query must explicitly reset cancellation tracking columns
+    expect(freeUpdateCall[0]).toContain('cancel_at_period_end = false');
+    expect(freeUpdateCall[0]).toContain('cancellation_reason = NULL');
+    expect(freeUpdateCall[0]).toContain('cancellation_comment = NULL');
+    expect(freeUpdateCall[0]).toContain('cancelled_at = NULL');
+
+    // sub_deleted must be the bound parameter
+    expect(freeUpdateCall[1]).toContain('sub_deleted');
+
+    // Win-back email should be sent
+    expect(mockSendCancellationWinBackEmail).toHaveBeenCalledWith(
+      'churned@example.com',
+      expect.any(String),
+      expect.any(String)
+    );
+  });
+
+  it('should not throw if no user row found for the subscription on deletion', async () => {
+    // idempotency INSERT
+    pool.query.mockResolvedValueOnce({ rows: [] });
+    // SELECT user info — no matching row (advertiser-only sub or already cleaned up)
+    pool.query.mockResolvedValueOnce({ rows: [] });
+    // UPDATE to free plan
+    pool.query.mockResolvedValueOnce({ rows: [] });
+
+    await expect(
+      handleWebhook({
+        id: 'evt_sub_deleted_no_user',
+        type: 'customer.subscription.deleted',
+        data: { object: { id: 'sub_orphan' } },
+      })
+    ).resolves.not.toThrow();
+
+    // Win-back email should NOT be sent when there is no user email
+    expect(mockSendCancellationWinBackEmail).not.toHaveBeenCalled();
   });
 });

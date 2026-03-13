@@ -78,7 +78,9 @@ import {
   activateSubscription,
   getAdvertiserPriceId,
   scheduleDowngrade,
-  cancelScheduledDowngrade
+  cancelScheduledDowngrade,
+  scheduleCancellation,
+  undoCancellation
 } from './stripe.js';
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
@@ -3398,6 +3400,38 @@ app.post('/api/stripe/downgrade-subscription', requireAuth, async (req, res) => 
 app.post('/api/stripe/cancel-downgrade', requireAuth, async (req, res) => {
   try {
     await cancelScheduledDowngrade(req.user.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cancel subscription (schedule cancellation at period end)
+const VALID_CANCELLATION_REASONS = ['too_expensive', 'not_using_enough', 'missing_features', 'switching_competitor', 'temporary_break', 'other'];
+
+app.post('/api/stripe/cancel-subscription', requireAuth, async (req, res) => {
+  try {
+    const { reason, comment } = req.body;
+    if (!reason || !VALID_CANCELLATION_REASONS.includes(reason)) {
+      return res.status(400).json({ error: 'Invalid cancellation reason' });
+    }
+    if (!req.user.stripeSubscriptionId || req.user.plan === 'free') {
+      return res.status(400).json({ error: 'No active subscription to cancel' });
+    }
+    const result = await scheduleCancellation(req.user.id, reason, comment);
+    res.json({ success: true, effectiveDate: result.effectiveDate });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Undo a pending cancellation
+app.post('/api/stripe/undo-cancellation', requireAuth, async (req, res) => {
+  try {
+    if (!req.user.cancelAtPeriodEnd) {
+      return res.status(400).json({ error: 'No pending cancellation' });
+    }
+    await undoCancellation(req.user.id);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
