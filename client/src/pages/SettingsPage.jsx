@@ -8,6 +8,7 @@ function SettingsPage({ user, setUser, onUpgrade, onLogout }) {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
 
+
   const handleSaveName = async () => {
     setSaving(true)
     setSaveMsg('')
@@ -65,6 +66,11 @@ function SettingsPage({ user, setUser, onUpgrade, onLogout }) {
         <h2 className="settings-section-title">Subscription</h2>
         <div className="settings-plan-row">
           <span className="settings-plan-badge">{planLabel}</span>
+          {user.billingInterval && user.plan !== 'free' && (
+            <span className="settings-billing-interval">
+              Billed {user.billingInterval === 'year' ? 'annually' : 'monthly'}
+            </span>
+          )}
         </div>
         <div className="settings-usage">
           <div className="settings-usage-row">

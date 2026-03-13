@@ -85,6 +85,12 @@ function CreditBar({ user }) {
         )}
       </div>
 
+      {user.creditsResetAt && !user.isLifetimePlan && (
+        <div className="credit-reset-info">
+          Resets {new Date(user.creditsResetAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        </div>
+      )}
+
       {showTooltip && (
         <div className="credit-tooltip" style={{ top: tooltipPos.top, left: tooltipPos.left }}>
           Analyses are used for job postings. Training credits power chat, quizzes, and practice.

@@ -3,10 +3,18 @@ import axios from 'axios'
 import PricingSection from './PricingSection'
 import './UpgradeModal.css'
 
-function UpgradeModal({ isOpen, onClose, user, onLoginRequired, onUserUpdate }) {
-  const [loading, setLoading] = useState(null)
+const PLAN_INFO = {
+  free:    { name: 'Free',    price: 0,  jobAnalyses: '3 lifetime',  trainingCredits: '15 lifetime' },
+  starter: { name: 'Starter', price: 9,  jobAnalyses: '10 / mo',     trainingCredits: '150 / mo' },
+  pro:     { name: 'Pro',     price: 19, jobAnalyses: '30 / mo',     trainingCredits: '400 / mo' },
+  elite:   { name: 'Elite',   price: 39, jobAnalyses: 'Unlimited',   trainingCredits: '800 / mo' },
+}
 
-  const handleSelectPlan = async (planKey) => {
+function UpgradeModal({ isOpen, onClose, user, onLoginRequired, onUserUpdate, onUpgradeSuccess }) {
+  const [loading, setLoading] = useState(null)
+  const [confirmingPlan, setConfirmingPlan] = useState(null)
+
+  const handleSelectPlan = async (planKey, interval) => {
     // Check if user needs to login first
     try {
       const meResponse = await axios.get('/api/auth/me')
@@ -25,29 +33,21 @@ function UpgradeModal({ isOpen, onClose, user, onLoginRequired, onUserUpdate }) 
       return
     }
 
-    setLoading(planKey)
+    // Paid user with active subscription → show confirmation step
+    if (user?.subscriptionStatus === 'active' && user?.stripeSubscriptionId) {
+      setConfirmingPlan({ planKey, interval })
+      return
+    }
 
+    // Free user → go to Stripe Checkout (has its own review page)
+    setLoading(planKey)
     try {
-      // Paid user with active subscription → use upgrade endpoint (instant, no redirect)
-      if (user?.subscriptionStatus === 'active' && user?.stripeSubscriptionId) {
-        const response = await axios.post('/api/stripe/upgrade-subscription', { plan: planKey })
-        if (response.data.success) {
-          // Refresh user data to reflect the new plan
-          const meRes = await axios.get('/api/auth/me')
-          if (meRes.data.user && onUserUpdate) {
-            onUserUpdate(meRes.data.user)
-          }
-          onClose()
-        }
-      } else {
-        // Free user → use checkout (needs payment info)
-        const response = await axios.post('/api/stripe/create-checkout', { plan: planKey })
-        if (response.data.url) {
-          window.location.href = response.data.url
-        }
+      const response = await axios.post('/api/stripe/create-checkout', { plan: planKey, interval })
+      if (response.data.url) {
+        window.location.href = response.data.url
       }
     } catch (error) {
-      console.error('Error upgrading:', error)
+      console.error('Error starting checkout:', error)
       if (error.response?.status === 401) {
         onClose()
         if (onLoginRequired) {
@@ -56,6 +56,40 @@ function UpgradeModal({ isOpen, onClose, user, onLoginRequired, onUserUpdate }) 
       } else {
         alert(error.response?.data?.error || 'Failed to start checkout. Please try again.')
         setLoading(null)
+      }
+    }
+  }
+
+  const handleConfirmUpgrade = async () => {
+    if (!confirmingPlan) return
+    const { planKey, interval } = confirmingPlan
+    const previousPlan = user?.plan || 'free'
+    setLoading(planKey)
+
+    try {
+      const response = await axios.post('/api/stripe/upgrade-subscription', { plan: planKey, interval })
+      if (response.data.success) {
+        const meRes = await axios.get('/api/auth/me')
+        if (meRes.data.user && onUserUpdate) {
+          onUserUpdate(meRes.data.user)
+        }
+        if (onUpgradeSuccess) {
+          onUpgradeSuccess(previousPlan, planKey)
+        }
+        setConfirmingPlan(null)
+        setLoading(null)
+        onClose()
+      }
+    } catch (error) {
+      console.error('Error upgrading:', error)
+      setLoading(null)
+      if (error.response?.status === 401) {
+        onClose()
+        if (onLoginRequired) {
+          onLoginRequired()
+        }
+      } else {
+        alert(error.response?.data?.error || 'Failed to upgrade. Please try again.')
       }
     }
   }
@@ -69,32 +103,110 @@ function UpgradeModal({ isOpen, onClose, user, onLoginRequired, onUserUpdate }) 
     }
   }
 
+  const handleClose = () => {
+    setConfirmingPlan(null)
+    setLoading(null)
+    onClose()
+  }
+
   if (!isOpen) return null
 
+  const currentPlanKey = user?.plan || 'free'
+  const currentInfo = PLAN_INFO[currentPlanKey] || PLAN_INFO.free
+  const newInfo = confirmingPlan ? PLAN_INFO[confirmingPlan.planKey] : null
+
   return (
-    <div className="upgrade-modal-overlay" onClick={onClose}>
-      <div className="upgrade-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="upgrade-modal-close" onClick={onClose}>×</button>
+    <div className="upgrade-modal-overlay" onClick={handleClose}>
+      <div className={`upgrade-modal ${confirmingPlan ? 'upgrade-modal--confirm' : ''}`} onClick={(e) => e.stopPropagation()}>
+        <button className="upgrade-modal-close" onClick={handleClose}>×</button>
 
-        <div className="upgrade-modal-header">
-          <h2>Upgrade Your Plan</h2>
-          <p>Choose a plan that fits your interview journey</p>
-        </div>
+        {confirmingPlan ? (
+          // Confirmation view for paid→paid upgrade
+          <div className="upgrade-confirm">
+            <div className="upgrade-confirm-header">
+              <h2>Confirm Your Upgrade</h2>
+              <p>Review the changes to your plan</p>
+            </div>
 
-        <div className="upgrade-modal-content">
-          <PricingSection
-            onSelectPlan={handleSelectPlan}
-            currentPlan={user?.plan}
-            onManageBilling={handleManageBilling}
-          />
-        </div>
+            <div className="upgrade-confirm-plans">
+              <div className="upgrade-confirm-plan">
+                <span className="upgrade-confirm-plan-label">Current</span>
+                <span className="upgrade-confirm-plan-name">{currentInfo.name}</span>
+              </div>
+              <div className="upgrade-confirm-arrow">&rarr;</div>
+              <div className="upgrade-confirm-plan upgrade-confirm-plan--new">
+                <span className="upgrade-confirm-plan-label">New</span>
+                <span className="upgrade-confirm-plan-name">{newInfo.name}</span>
+              </div>
+            </div>
 
-        {loading && (
-          <div className="upgrade-loading">
-            {user?.subscriptionStatus === 'active' && user?.stripeSubscriptionId
-              ? 'Upgrading your plan...'
-              : 'Redirecting to checkout...'}
+            <div className="upgrade-confirm-comparison">
+              <table className="upgrade-confirm-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>Current</th>
+                    <th>New</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Job Analyses</td>
+                    <td>{currentInfo.jobAnalyses}</td>
+                    <td className="upgrade-confirm-highlight">{newInfo.jobAnalyses}</td>
+                  </tr>
+                  <tr>
+                    <td>Training Credits</td>
+                    <td>{currentInfo.trainingCredits}</td>
+                    <td className="upgrade-confirm-highlight">{newInfo.trainingCredits}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="upgrade-confirm-billing">
+              <p>You'll be charged <strong>immediately</strong> for the prorated amount covering the remainder of your current billing period. Starting next cycle: <strong>${newInfo.price}/mo</strong>.</p>
+            </div>
+
+            <div className="upgrade-confirm-actions">
+              <button
+                className="upgrade-confirm-btn upgrade-confirm-btn--primary"
+                onClick={handleConfirmUpgrade}
+                disabled={loading}
+              >
+                {loading ? 'Upgrading...' : 'Confirm Upgrade'}
+              </button>
+              <button
+                className="upgrade-confirm-btn upgrade-confirm-btn--secondary"
+                onClick={() => setConfirmingPlan(null)}
+                disabled={loading}
+              >
+                Go Back
+              </button>
+            </div>
           </div>
+        ) : (
+          // Plan selection view (existing)
+          <>
+            <div className="upgrade-modal-header">
+              <h2>Upgrade Your Plan</h2>
+              <p>Choose a plan that fits your interview journey</p>
+            </div>
+
+            <div className="upgrade-modal-content">
+              <PricingSection
+                onSelectPlan={handleSelectPlan}
+                currentPlan={user?.plan}
+                onManageBilling={handleManageBilling}
+              />
+            </div>
+
+            {loading && (
+              <div className="upgrade-loading">
+                Redirecting to checkout...
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

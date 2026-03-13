@@ -1080,6 +1080,70 @@ async function getAllDrillSessions(userId) {
   }
 }
 
+// Advertiser subscription CRUD
+async function createAdvertiserSubscription(advertiserId, contactEmail, stripeCustomerId, stripeSubscriptionId, periodStart, periodEnd) {
+  const result = await pool.query(
+    `INSERT INTO advertiser_subscriptions
+     (advertiser_id, contact_email, stripe_customer_id, stripe_subscription_id,
+      current_period_start, current_period_end, status)
+     VALUES ($1, $2, $3, $4, to_timestamp($5), to_timestamp($6), 'active')
+     RETURNING *`,
+    [advertiserId, contactEmail, stripeCustomerId, stripeSubscriptionId, periodStart, periodEnd]
+  );
+  return result.rows[0];
+}
+
+async function getAdvertiserSubByStripeId(stripeSubscriptionId) {
+  const result = await pool.query(
+    `SELECT asub.*, a.name as advertiser_name, a.domain as advertiser_domain
+     FROM advertiser_subscriptions asub
+     JOIN advertisers a ON a.id = asub.advertiser_id
+     WHERE asub.stripe_subscription_id = $1`,
+    [stripeSubscriptionId]
+  );
+  return result.rows[0] || null;
+}
+
+async function updateAdvertiserSubStatus(stripeSubscriptionId, fields) {
+  const sets = [];
+  const vals = [];
+  let i = 1;
+  for (const [key, value] of Object.entries(fields)) {
+    sets.push(`${key} = $${i}`);
+    vals.push(value);
+    i++;
+  }
+  sets.push(`updated_at = CURRENT_TIMESTAMP`);
+  vals.push(stripeSubscriptionId);
+  await pool.query(
+    `UPDATE advertiser_subscriptions SET ${sets.join(', ')} WHERE stripe_subscription_id = $${i}`,
+    vals
+  );
+}
+
+async function deactivateAdvertiserBySubId(stripeSubscriptionId) {
+  const sub = await getAdvertiserSubByStripeId(stripeSubscriptionId);
+  if (!sub) return;
+  await pool.query(
+    `UPDATE advertiser_subscriptions SET status = 'canceled', updated_at = CURRENT_TIMESTAMP WHERE stripe_subscription_id = $1`,
+    [stripeSubscriptionId]
+  );
+  await pool.query(
+    `UPDATE advertisers SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+    [sub.advertiser_id]
+  );
+}
+
+async function getAdvertiserSubscriptions() {
+  const result = await pool.query(
+    `SELECT asub.*, a.name as advertiser_name, a.domain as advertiser_domain
+     FROM advertiser_subscriptions asub
+     JOIN advertisers a ON a.id = asub.advertiser_id
+     ORDER BY asub.created_at DESC`
+  );
+  return result.rows;
+}
+
 export {
   pool,
   getOrCreateCompany,
@@ -1115,6 +1179,11 @@ export {
   findSimilarUserTopic,
   saveDrillSession,
   getDrillSessions,
-  getAllDrillSessions
+  getAllDrillSessions,
+  createAdvertiserSubscription,
+  getAdvertiserSubByStripeId,
+  updateAdvertiserSubStatus,
+  deactivateAdvertiserBySubId,
+  getAdvertiserSubscriptions
 };
 

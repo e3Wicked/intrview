@@ -89,18 +89,6 @@ export const TRAINING_CREDIT_COSTS = {
   studyPlan: 5,
 };
 
-// Keep old CREDIT_COSTS as alias for backwards compat during migration
-export const CREDIT_COSTS = {
-  jobAnalysis: 5,
-  companyInfo: 2,
-  studyPlan: TRAINING_CREDIT_COSTS.studyPlan,
-  companyResearch: TRAINING_CREDIT_COSTS.companyResearch,
-  quizEvaluation: TRAINING_CREDIT_COSTS.quizEvaluation,
-  voiceEvaluation: TRAINING_CREDIT_COSTS.voiceEvaluation,
-  chatPractice: TRAINING_CREDIT_COSTS.chatPractice,
-  focusChat: TRAINING_CREDIT_COSTS.focusChat,
-};
-
 // Generate 6-digit verification code
 export function generateVerificationCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -355,8 +343,9 @@ export async function getUserFromSession(sessionToken) {
       `SELECT u.*, s.plan, s.credits_remaining, s.credits_monthly_allowance,
               s.job_analyses_remaining, s.job_analyses_monthly_allowance,
               s.training_credits_remaining, s.training_credits_monthly_allowance,
-              s.is_lifetime_plan, s.credits_reset_at,
-              s.stripe_customer_id, s.stripe_subscription_id, s.status as subscription_status
+              s.is_lifetime_plan, s.credits_reset_at, s.grace_period_end,
+              s.stripe_customer_id, s.stripe_subscription_id, s.status as subscription_status,
+              s.billing_interval, s.paused_at
        FROM user_sessions us
        JOIN users u ON us.user_id = u.id
        LEFT JOIN subscriptions s ON u.id = s.user_id
@@ -403,7 +392,9 @@ export async function getUserFromSession(sessionToken) {
       stripeCustomerId: user.stripe_customer_id,
       stripeSubscriptionId: user.stripe_subscription_id,
       creditsResetAt: user.is_lifetime_plan ? null : (user.credits_reset_at || null),
+      gracePeriodEnd: user.grace_period_end || null,
       subscriptionStatus: user.subscription_status,
+      billingInterval: user.billing_interval || 'month',
       isAdmin: isAdmin
     };
   } catch (error) {
@@ -422,56 +413,6 @@ const ADMIN_EMAILS = [
 // Check if user is admin
 export function isAdminUser(email) {
   return ADMIN_EMAILS.includes(email?.toLowerCase());
-}
-
-// Check if user has enough credits
-export async function checkCredits(userId, actionCost) {
-  // Get user email to check if admin
-  const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
-  if (userResult.rows.length > 0 && isAdminUser(userResult.rows[0].email)) {
-    return { hasCredits: true, remaining: 999999 }; // Admin users have unlimited credits
-  }
-  
-  const result = await pool.query(
-    'SELECT credits_remaining FROM subscriptions WHERE user_id = $1',
-    [userId]
-  );
-
-  if (result.rows.length === 0) {
-    return { hasCredits: false, remaining: 0 };
-  }
-
-  const remaining = result.rows[0].credits_remaining || 0;
-  return {
-    hasCredits: remaining >= actionCost,
-    remaining
-  };
-}
-
-// Deduct credits
-export async function deductCredits(userId, amount) {
-  // Get user email to check if admin
-  const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
-  if (userResult.rows.length > 0 && isAdminUser(userResult.rows[0].email)) {
-    // Admin users don't have credits deducted
-    const adminSub = await pool.query('SELECT credits_remaining FROM subscriptions WHERE user_id = $1', [userId]);
-    return adminSub.rows[0]?.credits_remaining || 999999;
-  }
-  
-  const result = await pool.query(
-    `UPDATE subscriptions 
-     SET credits_remaining = credits_remaining - $2,
-         updated_at = CURRENT_TIMESTAMP
-     WHERE user_id = $1 AND credits_remaining >= $2
-     RETURNING credits_remaining`,
-    [userId, amount]
-  );
-  
-  if (result.rows.length === 0) {
-    throw new Error('Failed to deduct credits - user subscription not found or insufficient credits');
-  }
-  
-  return result.rows[0].credits_remaining;
 }
 
 // Check feature access
@@ -521,29 +462,6 @@ export function requireAdmin(req, res, next) {
   }).catch(() => {
     res.status(500).json({ error: 'Authentication error' });
   });
-}
-
-// Middleware to require credits (legacy — kept for any routes not yet migrated)
-export function requireCredits(actionCost) {
-  return async (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    const { hasCredits, remaining } = await checkCredits(req.user.id, actionCost);
-
-    if (!hasCredits) {
-      return res.status(402).json({
-        error: 'Insufficient credits',
-        remaining,
-        required: actionCost,
-        upgradeRequired: true
-      });
-    }
-
-    req.creditCost = actionCost;
-    next();
-  };
 }
 
 // ==================== TWO-BUCKET CREDIT SYSTEM ====================
@@ -667,10 +585,51 @@ export async function deductTrainingCredits(userId, cost) {
   return result.rows[0].training_credits_remaining;
 }
 
+// Check grace period and auto-downgrade if expired
+export async function checkAndEnforceGracePeriod(userId) {
+  const result = await pool.query(
+    'SELECT status, grace_period_end, plan FROM subscriptions WHERE user_id = $1',
+    [userId]
+  );
+  if (result.rows.length === 0) return { downgraded: false };
+
+  const { status, grace_period_end, plan } = result.rows[0];
+  if (status !== 'past_due' || !grace_period_end) return { downgraded: false };
+  if (new Date(grace_period_end) > new Date()) return { downgraded: false };
+
+  // Grace period expired — downgrade to free
+  const freePlan = PLANS.free;
+  await pool.query(
+    `UPDATE subscriptions
+     SET plan = 'free',
+         status = 'canceled',
+         credits_remaining = $1,
+         credits_monthly_allowance = 0,
+         job_analyses_remaining = $2,
+         job_analyses_monthly_allowance = 0,
+         training_credits_remaining = $3,
+         training_credits_monthly_allowance = 0,
+         is_lifetime_plan = true,
+         payment_failed_at = NULL,
+         grace_period_end = NULL,
+         dunning_emails_sent = 0,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE user_id = $4`,
+    [freePlan.lifetimeTrainingCredits, freePlan.lifetimeJobAnalyses, freePlan.lifetimeTrainingCredits, userId]
+  );
+
+  return { downgraded: true };
+}
+
 // Middleware: require a job analysis
 export function requireJobAnalysis() {
   return async (req, res, next) => {
     if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+
+    const graceCheck = await checkAndEnforceGracePeriod(req.user.id);
+    if (graceCheck.downgraded) {
+      return res.status(402).json({ error: 'Subscription canceled due to payment failure', downgraded: true, upgradeRequired: true });
+    }
 
     const { hasAnalyses, remaining } = await checkJobAnalyses(req.user.id);
     if (!hasAnalyses) {
@@ -689,6 +648,11 @@ export function requireJobAnalysis() {
 export function requireTrainingCredits(action) {
   return async (req, res, next) => {
     if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+
+    const graceCheck = await checkAndEnforceGracePeriod(req.user.id);
+    if (graceCheck.downgraded) {
+      return res.status(402).json({ error: 'Subscription canceled due to payment failure', downgraded: true, upgradeRequired: true });
+    }
 
     const cost = TRAINING_CREDIT_COSTS[action];
     if (cost === undefined) return res.status(500).json({ error: `Unknown action: ${action}` });

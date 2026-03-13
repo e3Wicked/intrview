@@ -1,0 +1,4 @@
+ALTER TABLE subscriptions
+  ADD COLUMN IF NOT EXISTS payment_failed_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS grace_period_end TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS dunning_emails_sent INTEGER DEFAULT 0;

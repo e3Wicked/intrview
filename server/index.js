@@ -40,7 +40,8 @@ import {
   normalizeTopicName,
   saveDrillSession,
   getDrillSessions,
-  getAllDrillSessions
+  getAllDrillSessions,
+  getAdvertiserSubByStripeId
 } from './db.js';
 import {
   createUser,
@@ -48,14 +49,10 @@ import {
   createOrGetUser,
   createSession,
   getUserFromSession,
-  checkCredits,
-  deductCredits,
   hasFeatureAccess,
   requireAuth,
   requireAdmin,
-  requireCredits,
   isAdminUser,
-  CREDIT_COSTS,
   PLANS,
   generateVerificationCode,
   createUserWithoutPassword,
@@ -77,7 +74,9 @@ import {
   createCheckoutSession,
   upgradeSubscription,
   handleWebhook,
-  createPortalSession
+  createPortalSession,
+  activateSubscription,
+  getAdvertiserPriceId
 } from './stripe.js';
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
@@ -3287,10 +3286,14 @@ Format as JSON:
 // Create checkout session
 app.post('/api/stripe/create-checkout', requireAuth, async (req, res) => {
   try {
-    const { plan } = req.body;
-    
+    const { plan, interval = 'month' } = req.body;
+
     if (!PLANS[plan] || !PLANS[plan].price) {
       return res.status(400).json({ error: 'Invalid plan' });
+    }
+
+    if (!['month', 'year'].includes(interval)) {
+      return res.status(400).json({ error: 'Invalid billing interval' });
     }
 
     if (req.user.plan === plan && req.user.subscriptionStatus === 'active') {
@@ -3303,9 +3306,9 @@ app.post('/api/stripe/create-checkout', requireAuth, async (req, res) => {
 
     const successUrl = `${req.headers.origin || 'http://localhost:5173'}/dashboard?upgraded=true`;
     const cancelUrl = `${req.headers.origin || 'http://localhost:5173'}/dashboard`;
-    
-    const session = await createCheckoutSession(req.user.id, plan, successUrl, cancelUrl);
-    
+
+    const session = await createCheckoutSession(req.user.id, plan, successUrl, cancelUrl, interval);
+
     res.json({ sessionId: session.id, url: session.url });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -3315,10 +3318,14 @@ app.post('/api/stripe/create-checkout', requireAuth, async (req, res) => {
 // Upgrade existing subscription (paid → paid)
 app.post('/api/stripe/upgrade-subscription', requireAuth, async (req, res) => {
   try {
-    const { plan } = req.body;
+    const { plan, interval = 'month' } = req.body;
 
     if (!PLANS[plan] || !PLANS[plan].price) {
       return res.status(400).json({ error: 'Invalid plan' });
+    }
+
+    if (!['month', 'year'].includes(interval)) {
+      return res.status(400).json({ error: 'Invalid billing interval' });
     }
 
     if (req.user.plan === plan) {
@@ -3337,7 +3344,7 @@ app.post('/api/stripe/upgrade-subscription', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Use the billing portal to downgrade your plan' });
     }
 
-    const updatedSub = await upgradeSubscription(req.user.id, plan);
+    const updatedSub = await upgradeSubscription(req.user.id, plan, interval);
     res.json({ success: true, plan, subscriptionId: updatedSub.id });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -3350,10 +3357,10 @@ app.post('/api/stripe/create-portal', requireAuth, async (req, res) => {
     if (!req.user.stripeCustomerId) {
       return res.status(400).json({ error: 'No active subscription' });
     }
-    
+
     const returnUrl = `${req.headers.origin || 'http://localhost:5173'}/settings`;
     const session = await createPortalSession(req.user.stripeCustomerId, returnUrl);
-    
+
     res.json({ url: session.url });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -3406,39 +3413,8 @@ app.get('/api/stripe/verify-checkout', requireAuth, async (req, res) => {
     }
 
     // Webhook hasn't fired yet — update DB directly
-    const planDef = PLANS[planKey];
-    const jobAnalyses = planDef.monthlyJobAnalyses === -1 ? 999999 : planDef.monthlyJobAnalyses;
-    const trainingCredits = planDef.monthlyTrainingCredits;
-
-    await pool.query(
-      `UPDATE subscriptions
-       SET plan = $1,
-           stripe_subscription_id = $2,
-           status = 'active',
-           current_period_start = to_timestamp($3),
-           current_period_end = to_timestamp($4),
-           credits_remaining = $5,
-           credits_monthly_allowance = $5,
-           credits_reset_at = to_timestamp($4),
-           job_analyses_remaining = $6,
-           job_analyses_monthly_allowance = $7,
-           training_credits_remaining = $8,
-           training_credits_monthly_allowance = $8,
-           is_lifetime_plan = false,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE user_id = $9`,
-      [
-        planKey,
-        stripeSub.id,
-        stripeSub.current_period_start,
-        stripeSub.current_period_end,
-        trainingCredits,
-        jobAnalyses,
-        planDef.monthlyJobAnalyses,
-        trainingCredits,
-        req.user.id
-      ]
-    );
+    await activateSubscription(req.user.id, planKey, stripeSub.id,
+      stripeSub.current_period_start, stripeSub.current_period_end);
 
     res.json({ plan: planKey, updated: true });
   } catch (error) {
@@ -3454,34 +3430,52 @@ app.post('/api/stripe/create-advertiser-checkout', async (req, res) => {
       return res.status(500).json({ error: 'Stripe not configured' });
     }
 
-    const { companyName, email } = req.body;
-    
+    const { companyName, email, domain, description, websiteUrl } = req.body;
+    if (!companyName || !email) {
+      return res.status(400).json({ error: 'companyName and email are required' });
+    }
+
+    // Get or create the advertiser in DB
+    const advertiser = await getOrCreateAdvertiser(
+      companyName,
+      domain || companyName.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com',
+      description || null,
+      websiteUrl || null
+    );
+
+    // Get or create Stripe customer for this advertiser
+    let customerId;
+    const existingResult = await pool.query(
+      'SELECT stripe_customer_id FROM advertiser_subscriptions WHERE advertiser_id = $1 AND stripe_customer_id IS NOT NULL ORDER BY created_at DESC LIMIT 1',
+      [advertiser.id]
+    );
+    if (existingResult.rows.length > 0 && existingResult.rows[0].stripe_customer_id) {
+      customerId = existingResult.rows[0].stripe_customer_id;
+    } else {
+      const customer = await stripe.customers.create({
+        email,
+        name: companyName,
+        metadata: { advertiserId: advertiser.id.toString(), type: 'advertiser' }
+      });
+      customerId = customer.id;
+    }
+
+    const priceId = await getAdvertiserPriceId();
+
     const session = await stripe.checkout.sessions.create({
+      customer: customerId,
       payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: 'intrview.io Advertiser Spot',
-            description: 'Monthly advertising spot - Next month reservation' + (companyName ? ` (${companyName})` : '')
-          },
-          recurring: {
-            interval: 'month'
-          },
-          unit_amount: 99900 // $999 in cents
-        },
-        quantity: 1
-      }],
+      line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: `${req.headers.origin || 'http://localhost:5000'}/advertiser-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.origin || 'http://localhost:5000'}/advertiser-cancel`,
-      customer_email: email,
+      success_url: `${req.headers.origin || 'http://localhost:5173'}/advertiser-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${req.headers.origin || 'http://localhost:5173'}/advertiser-cancel`,
       metadata: {
         type: 'advertiser',
-        company: companyName || 'Unknown'
+        advertiserId: advertiser.id.toString(),
+        company: companyName
       }
     });
-    
+
     res.json({ url: session.url, sessionId: session.id });
   } catch (error) {
     console.error('Error creating advertiser checkout:', error);
@@ -3710,6 +3704,120 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
     res.json({ users, total: users.length });
   } catch (error) {
     console.error('Admin users error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: subscription analytics
+app.get('/api/admin/analytics', requireAdmin, async (req, res) => {
+  try {
+    const [subscriberCounts, mrrData, advertiserStats, growth, churn, recentEvents] = await Promise.all([
+      // 1. Subscriber counts by plan and status
+      pool.query(`
+        SELECT plan, status, COUNT(*) as count
+        FROM subscriptions
+        WHERE plan != 'free'
+        GROUP BY plan, status
+      `),
+      // 2. MRR calculation
+      pool.query(`
+        SELECT
+          plan,
+          billing_interval,
+          COUNT(*) as count,
+          SUM(CASE
+            WHEN billing_interval = 'year' THEN
+              CASE plan
+                WHEN 'starter' THEN 86.0 / 12
+                WHEN 'pro' THEN 182.0 / 12
+                WHEN 'elite' THEN 374.0 / 12
+                ELSE 0
+              END
+            ELSE
+              CASE plan
+                WHEN 'starter' THEN 9
+                WHEN 'pro' THEN 19
+                WHEN 'elite' THEN 39
+                ELSE 0
+              END
+          END) as mrr
+        FROM subscriptions
+        WHERE status = 'active' AND plan != 'free'
+        GROUP BY plan, billing_interval
+      `),
+      // 3. Advertiser stats
+      pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE status = 'active') as active_count,
+          COUNT(*) as total_count,
+          COUNT(*) FILTER (WHERE status = 'active') * 999 as monthly_revenue
+        FROM advertiser_subscriptions
+      `),
+      // 4. Growth - new signups by month (last 6 months)
+      pool.query(`
+        SELECT
+          DATE_TRUNC('month', created_at) as month,
+          COUNT(*) as signups
+        FROM users
+        WHERE created_at >= NOW() - INTERVAL '6 months'
+        GROUP BY DATE_TRUNC('month', created_at)
+        ORDER BY month
+      `),
+      // 5. Churn - cancellations in last 30 days
+      pool.query(`
+        SELECT COUNT(*) as churned
+        FROM subscriptions
+        WHERE status = 'canceled' AND updated_at >= NOW() - INTERVAL '30 days' AND plan != 'free'
+      `),
+      // 6. Recent webhook events
+      pool.query(`
+        SELECT event_id, event_type, created_at
+        FROM webhook_events
+        ORDER BY created_at DESC
+        LIMIT 50
+      `)
+    ]);
+
+    // Calculate total MRR
+    const userMrr = mrrData.rows.reduce((sum, r) => sum + parseFloat(r.mrr || 0), 0);
+    const advStats = advertiserStats.rows[0] || { active_count: 0, total_count: 0, monthly_revenue: 0 };
+    const totalMrr = userMrr + parseFloat(advStats.monthly_revenue || 0);
+
+    // Build subscriber breakdown
+    const subscribers = {};
+    for (const row of subscriberCounts.rows) {
+      if (!subscribers[row.plan]) subscribers[row.plan] = { active: 0, past_due: 0, canceled: 0 };
+      subscribers[row.plan][row.status] = parseInt(row.count);
+    }
+
+    // Build MRR breakdown
+    const mrrBreakdown = {};
+    for (const row of mrrData.rows) {
+      if (!mrrBreakdown[row.plan]) mrrBreakdown[row.plan] = 0;
+      mrrBreakdown[row.plan] += parseFloat(row.mrr || 0);
+    }
+
+    res.json({
+      mrr: {
+        total: Math.round(totalMrr * 100) / 100,
+        user: Math.round(userMrr * 100) / 100,
+        advertiser: parseFloat(advStats.monthly_revenue || 0),
+        breakdown: mrrBreakdown
+      },
+      subscribers,
+      advertisers: {
+        active: parseInt(advStats.active_count || 0),
+        total: parseInt(advStats.total_count || 0)
+      },
+      growth: growth.rows.map(r => ({
+        month: r.month,
+        signups: parseInt(r.signups)
+      })),
+      churn: parseInt(churn.rows[0]?.churned || 0),
+      recentEvents: recentEvents.rows
+    });
+  } catch (error) {
+    console.error('Analytics error:', error);
     res.status(500).json({ error: error.message });
   }
 });

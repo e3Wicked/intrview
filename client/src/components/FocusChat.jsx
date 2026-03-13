@@ -152,11 +152,15 @@ function FocusChat({ skill, user }) {
       })
 
       if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: 'Request failed' }))
+        const errData = await response.json().catch(() => ({ error: 'Request failed' }))
         if (response.status === 402) {
-          setError('No training credits remaining. Upgrade your plan to continue.')
+          if (errData.downgraded) {
+            setError('Your plan was downgraded due to a payment issue. Please update your payment or choose a new plan.');
+          } else {
+            setError(`Not enough training credits (need ${errData.required || '?'}, have ${errData.remaining || 0}). Upgrade your plan to continue.`);
+          }
         } else {
-          setError(err.error || 'Request failed')
+          setError(errData.error || 'Request failed')
         }
         setMessages(updatedMessages)
         messagesRef.current = updatedMessages

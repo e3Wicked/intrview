@@ -1,0 +1,106 @@
+.success-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  backdrop-filter: blur(4px);
+  padding: 32px;
+}
+
+.success-modal {
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 12px;
+  padding: 40px 32px 32px;
+  width: 100%;
+  max-width: 480px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+}
+
+.success-modal-check {
+  margin-bottom: 20px;
+}
+
+.success-modal-heading {
+  color: var(--color-text-primary, #1a1a1a);
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 6px 0;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.success-modal-subtitle {
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 14px;
+  margin: 0 0 24px 0;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.success-modal-comparison {
+  background: var(--color-bg-secondary, #f5f3ef);
+  border-radius: 10px;
+  padding: 4px 0;
+  margin-bottom: 28px;
+  text-align: left;
+}
+
+.success-modal-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-family: 'Inter', -apple-system, sans-serif;
+  color: var(--color-text-secondary, #6b6b6b);
+  border-bottom: 1px solid var(--color-border, #e6e3de);
+}
+
+.success-modal-row:last-child {
+  border-bottom: none;
+}
+
+.success-modal-row--header {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary, #6b6b6b);
+}
+
+.success-modal-row span:first-child {
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.success-modal-row--header span:first-child {
+  color: var(--color-text-secondary, #6b6b6b);
+}
+
+.success-modal-new {
+  color: var(--color-accent, #2563eb);
+  font-weight: 600;
+}
+
+.success-modal-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  background: var(--color-accent, #2563eb);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, sans-serif;
+  transition: background 0.2s;
+}
+
+.success-modal-btn:hover {
+  background: var(--color-accent-hover, #1d4ed8);
+}

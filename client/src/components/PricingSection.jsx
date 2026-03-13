@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import './PricingSection.css'
 
 function PricingSection({ onSelectPlan, currentPlan, onManageBilling }) {
+  const [billingInterval, setBillingInterval] = useState('month')
   const planOrder = ['free', 'starter', 'pro', 'elite']
   const currentIndex = planOrder.indexOf(currentPlan || 'free')
 
@@ -62,6 +64,21 @@ function PricingSection({ onSelectPlan, currentPlan, onManageBilling }) {
         <p>Choose a plan that fits your interview journey.</p>
       </div>
 
+      <div className="pricing-toggle">
+        <span className={`pricing-toggle-label ${billingInterval === 'month' ? 'active' : ''}`}>Monthly</span>
+        <button
+          className={`pricing-toggle-switch ${billingInterval === 'year' ? 'active' : ''}`}
+          onClick={() => setBillingInterval(prev => prev === 'month' ? 'year' : 'month')}
+          aria-label="Toggle billing interval"
+        >
+          <span className="pricing-toggle-knob" />
+        </button>
+        <span className={`pricing-toggle-label ${billingInterval === 'year' ? 'active' : ''}`}>
+          Annual
+          <span className="pricing-save-badge">Save 20%</span>
+        </span>
+      </div>
+
       <div className="pricing-cards">
         {plans.map((plan) => {
           const planIndex = planOrder.indexOf(plan.key)
@@ -82,10 +99,20 @@ function PricingSection({ onSelectPlan, currentPlan, onManageBilling }) {
 
               <div className="pricing-card-header">
                 <h3>{plan.name}</h3>
-                <div className="pricing-price">
-                  <span className="pricing-amount">${plan.price}</span>
-                  <span className="pricing-period">/month</span>
-                </div>
+                {billingInterval === 'month' ? (
+                  <div className="pricing-price">
+                    <span className="pricing-amount">${plan.price}</span>
+                    <span className="pricing-period">/month</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="pricing-price">
+                      <span className="pricing-amount">${Math.round(plan.price * 12 * 0.8 / 12)}</span>
+                      <span className="pricing-period">/mo</span>
+                    </div>
+                    <div className="pricing-annual-total">${Math.round(plan.price * 12 * 0.8)}/year</div>
+                  </>
+                )}
               </div>
 
               <div className="pricing-details">
@@ -127,7 +154,7 @@ function PricingSection({ onSelectPlan, currentPlan, onManageBilling }) {
               ) : (
                 <button
                   className="pricing-cta"
-                  onClick={() => onSelectPlan(plan.key)}
+                  onClick={() => onSelectPlan(plan.key, billingInterval)}
                 >
                   {plan.cta}
                 </button>

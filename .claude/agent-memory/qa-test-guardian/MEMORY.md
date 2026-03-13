@@ -7,13 +7,13 @@
 - **Database**: PostgreSQL via Docker (port 5435), plain SQL via `pg` — no ORM
 - **ESM throughout**: both `client/` and `server/` use `"type": "module"`. Exception: `server/routes/advertisers.js` uses CommonJS.
 
-## Test Suite Status
+## Test Suite
 
-**No test suite is currently configured.** There is no vitest, jest, or testing library set up.
-
-- When reviewing changes, note regressions via code analysis and manual verification steps
-- If a feature warrants tests, recommend vitest (aligned with Vite ecosystem) and scaffold starter test files
-- Do not assume `npm test` works — it does not
+- **Framework**: vitest (installed, working). Run with `npm test` from `server/`.
+- Test files: `server/__tests__/auth.test.js`, `server/__tests__/stripe.test.js`.
+- Import pattern: top-level `await import(...)` after `vi.mock(...)` declarations (ESM vitest pattern).
+- `beforeEach(() => vi.clearAllMocks())` used globally and per-suite.
+- Mock both `pool.query` AND `pool.connect` — transactional code uses `pool.connect()` + client methods.
 
 ## Key Areas to Watch for Regressions
 
@@ -55,3 +55,6 @@
   renders a near-empty section for users with zero streak/XP who dismissed the nudge.
   Always fold the dismiss flag into the parent guard. Fixed in MissionDashboard line 145:
   `hasTrainingData = ... || (weaknessNudge && !nudgeDismissed)`
+- **pool.connect not mocked causes regression**: `upgradeSubscription` uses a transaction
+  (`pool.connect()` → `client.query(BEGIN/COMMIT/ROLLBACK)` → `client.release()`). The db mock
+  must include both `pool.query` and `pool.connect` (returning a mock client with `query`/`release`).

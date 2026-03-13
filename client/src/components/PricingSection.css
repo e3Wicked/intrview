@@ -25,6 +25,76 @@
   font-family: 'Inter', -apple-system, sans-serif;
 }
 
+.pricing-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.pricing-toggle-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b6b6b);
+  transition: color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pricing-toggle-label.active {
+  color: var(--color-text-primary, #1a1a1a);
+  font-weight: 600;
+}
+
+.pricing-toggle-switch {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  background: var(--color-border, #e6e3de);
+  border: none;
+  border-radius: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+}
+
+.pricing-toggle-switch.active {
+  background: var(--color-accent, #2563eb);
+}
+
+.pricing-toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.pricing-toggle-switch.active .pricing-toggle-knob {
+  transform: translateX(22px);
+}
+
+.pricing-save-badge {
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.pricing-annual-total {
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
 .pricing-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));

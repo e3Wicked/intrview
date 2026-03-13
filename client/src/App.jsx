@@ -6,6 +6,7 @@ import HomePage from './pages/HomePage'
 import SignInPrompt from './components/SignInPrompt'
 import Sidebar from './components/Sidebar'
 import { api } from './utils/api'
+import PaymentFailedBanner from './components/PaymentFailedBanner'
 
 // Lazy-loaded pages (not needed on initial homepage load)
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
@@ -21,9 +22,10 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const LoadingOverlay = lazy(() => import('./components/LoadingOverlay'))
 const LoginModal = lazy(() => import('./components/LoginModal'))
 const UpgradeModal = lazy(() => import('./components/UpgradeModal'))
+const UpgradeSuccessModal = lazy(() => import('./components/UpgradeSuccessModal'))
 
 // Layout component with header and sidebars
-function Layout({ children, user, setUser, showLoginModal, setShowLoginModal, loginModalMode, setLoginModalMode, showUpgradeModal, setShowUpgradeModal, handleSelectPlan, handleLoginSuccess, handleLogout }) {
+function Layout({ children, user, setUser, showLoginModal, setShowLoginModal, loginModalMode, setLoginModalMode, showUpgradeModal, setShowUpgradeModal, handleSelectPlan, handleLoginSuccess, handleLogout, onUpgradeSuccess, upgradeSuccess, setUpgradeSuccess }) {
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -37,6 +39,7 @@ function Layout({ children, user, setUser, showLoginModal, setShowLoginModal, lo
         <div className="app-body">
           <Sidebar user={user} onLogout={handleLogout} onUpgrade={() => setShowUpgradeModal(true)} isAdmin={user?.isAdmin} />
           <main className="main-content">
+            <PaymentFailedBanner user={user} />
             {children}
           </main>
         </div>
@@ -64,6 +67,12 @@ function Layout({ children, user, setUser, showLoginModal, setShowLoginModal, lo
           onSelectPlan={handleSelectPlan}
           onLoginRequired={() => setShowLoginModal(true)}
           onUserUpdate={setUser}
+          onUpgradeSuccess={onUpgradeSuccess}
+        />
+
+        <UpgradeSuccessModal
+          upgradeInfo={upgradeSuccess}
+          onClose={() => setUpgradeSuccess(null)}
         />
       </Suspense>
     </div>
@@ -81,6 +90,7 @@ function App() {
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [loginModalMode, setLoginModalMode] = useState('signin')
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [upgradeSuccess, setUpgradeSuccess] = useState(null)
   const [jdHistory, setJdHistory] = useState([])
   const [selectedJdId, setSelectedJdId] = useState(null)
   const navigate = useNavigate()
@@ -106,6 +116,7 @@ function App() {
           const res = await axios.get('/api/auth/me')
           if (res.data.user && res.data.user.plan !== 'free') {
             setUser(res.data.user)
+            setUpgradeSuccess({ previousPlan: 'free', newPlan: res.data.user.plan })
             navigate(location.pathname, { replace: true })
             return
           }
@@ -142,6 +153,17 @@ function App() {
       setResult(null)
     }
   }, [user])
+
+  // Listen for 402 subscription errors from the global axios interceptor
+  useEffect(() => {
+    const handler = (e) => {
+      const { downgraded } = e.detail;
+      if (downgraded) checkAuth();
+      setShowUpgradeModal(true);
+    };
+    window.addEventListener('subscription-error', handler);
+    return () => window.removeEventListener('subscription-error', handler);
+  }, [])
 
   const checkAuth = async () => {
     try {
@@ -245,9 +267,7 @@ function App() {
     } catch (err) {
       if (err.response?.status === 401) {
         setShowLoginModal(true)
-      } else if (err.response?.status === 402) {
-        setShowUpgradeModal(true)
-      } else {
+      } else if (err.response?.status !== 402) {
         setError(err.response?.data?.error || 'An error occurred. Please try again.')
       }
     } finally {
@@ -352,6 +372,9 @@ function App() {
       handleSelectPlan={handleSelectPlan}
       handleLoginSuccess={handleLoginSuccess}
       handleLogout={handleLogout}
+      onUpgradeSuccess={(prev, next) => setUpgradeSuccess({ previousPlan: prev, newPlan: next })}
+      upgradeSuccess={upgradeSuccess}
+      setUpgradeSuccess={setUpgradeSuccess}
     >
       <Suspense fallback={null}>
         <LoadingOverlay loading={loading} />

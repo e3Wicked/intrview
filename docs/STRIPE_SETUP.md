@@ -17,9 +17,13 @@ All variables live in `server/.env`.
 |---|---|---|
 | `STRIPE_SECRET_KEY` | Yes | API secret key (`sk_test_` for dev, `sk_live_` for prod) |
 | `STRIPE_WEBHOOK_SECRET` | Yes | Webhook signing secret (`whsec_...`) |
-| `STRIPE_PRICE_ID_STARTER` | No | Price ID for Starter plan — auto-created if missing |
-| `STRIPE_PRICE_ID_PRO` | No | Price ID for Pro plan — auto-created if missing |
-| `STRIPE_PRICE_ID_ELITE` | No | Price ID for Elite plan — auto-created if missing |
+| `STRIPE_PRICE_ID_STARTER` | No | Price ID for Starter monthly plan — auto-created if missing |
+| `STRIPE_PRICE_ID_PRO` | No | Price ID for Pro monthly plan — auto-created if missing |
+| `STRIPE_PRICE_ID_ELITE` | No | Price ID for Elite monthly plan — auto-created if missing |
+| `STRIPE_PRICE_ID_STARTER_ANNUAL` | No | Price ID for Starter annual plan — auto-created if missing |
+| `STRIPE_PRICE_ID_PRO_ANNUAL` | No | Price ID for Pro annual plan — auto-created if missing |
+| `STRIPE_PRICE_ID_ELITE_ANNUAL` | No | Price ID for Elite annual plan — auto-created if missing |
+| `STRIPE_PRICE_ID_ADVERTISER` | No | Price ID for Advertiser monthly spot ($999/mo) — auto-created if missing |
 
 > Without `STRIPE_SECRET_KEY`, the server logs `⚠️  STRIPE_SECRET_KEY not set. Stripe features will not work.` and all Stripe endpoints return 500.
 
@@ -27,14 +31,16 @@ All variables live in `server/.env`.
 
 Defined in `server/auth.js` → `PLANS`:
 
-| Plan | Price | Job Analyses | Training Credits | Lifetime? |
-|---|---|---|---|---|
-| Free | $0 | 3 | 15 | Yes (one-time) |
-| Starter | $9/mo | 10/mo | 150/mo | No |
-| Pro | $19/mo | 30/mo | 400/mo | No |
-| Elite | $39/mo | Unlimited | 800/mo | No |
+| Plan | Monthly Price | Annual Price | Job Analyses | Training Credits | Lifetime? |
+|---|---|---|---|---|---|
+| Free | $0 | — | 3 | 15 | Yes (one-time) |
+| Starter | $9/mo | $86/yr ($7/mo) | 10/mo | 150/mo | No |
+| Pro | $19/mo | $182/yr ($15/mo) | 30/mo | 400/mo | No |
+| Elite | $39/mo | $374/yr ($31/mo) | Unlimited | 800/mo | No |
 
 **Free plan** credits are lifetime (non-renewing). Paid plans reset monthly on invoice payment.
+
+Annual billing is monthly price × 12 × 0.80 (20% discount). The `billing_interval` column tracks `'month'` or `'year'`.
 
 ## Training Credit Costs
 
@@ -156,6 +162,18 @@ In [Stripe Dashboard → Webhooks](https://dashboard.stripe.com/webhooks):
 
 Either set `STRIPE_PRICE_ID_*` env vars with live price IDs, or let auto-creation handle it on first checkout (same as dev).
 
+## Smart Retries
+
+Enable **Smart Retries** in Stripe Dashboard → Settings → Subscriptions and emails → Manage failed payments → Smart Retries. This uses ML to retry failed payments at optimal times. No code change required.
+
+## Receipt Emails
+
+Enable in Stripe Dashboard → Settings → Emails → Customer emails:
+- **Successful payments** — sends a receipt after each charge
+- **Refunds** (optional) — sends confirmation on refunds
+
+No code change required. Stripe handles email delivery and formatting.
+
 ## API Endpoints
 
 | Method | Path | Auth | Description |
@@ -163,6 +181,8 @@ Either set `STRIPE_PRICE_ID_*` env vars with live price IDs, or let auto-creatio
 | POST | `/api/stripe/create-checkout` | `requireAuth` | Creates a Stripe Checkout session for a plan |
 | POST | `/api/stripe/webhook` | None (signature verified) | Receives Stripe webhook events |
 | POST | `/api/stripe/create-portal` | `requireAuth` | Creates a customer portal session |
+| POST | `/api/stripe/upgrade-subscription` | `requireAuth` | Upgrades an existing paid subscription |
+| GET | `/api/stripe/verify-checkout` | `requireAuth` | Verifies checkout completion (post-redirect) |
 | POST | `/api/stripe/create-advertiser-checkout` | None | Creates a $999/mo advertiser checkout session |
 
 ## DB Schema
@@ -187,6 +207,24 @@ The `subscriptions` table (from migrations `001` + `009`):
 | `training_credits_remaining` | INTEGER | Current training credit balance |
 | `training_credits_monthly_allowance` | INTEGER | Monthly training credit quota |
 | `is_lifetime_plan` | BOOLEAN | True for free plan (no monthly reset) |
+| `created_at` | TIMESTAMP | |
+| `updated_at` | TIMESTAMP | |
+
+### `advertiser_subscriptions` table (from migration `015`):
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | SERIAL PK | |
+| `advertiser_id` | INTEGER (FK -> advertisers) | Links to advertiser record |
+| `stripe_customer_id` | VARCHAR(255) | Stripe Customer ID |
+| `stripe_subscription_id` | VARCHAR(255) UNIQUE | Stripe Subscription ID |
+| `contact_email` | VARCHAR(255) | Billing contact email |
+| `status` | VARCHAR(50) | `active`, `past_due`, `canceled` |
+| `current_period_start` | TIMESTAMP | Billing period start |
+| `current_period_end` | TIMESTAMP | Billing period end |
+| `payment_failed_at` | TIMESTAMP | First payment failure timestamp |
+| `grace_period_end` | TIMESTAMP | End of grace period after payment failure |
+| `dunning_emails_sent` | INTEGER | Count of dunning emails sent |
 | `created_at` | TIMESTAMP | |
 | `updated_at` | TIMESTAMP | |
 
