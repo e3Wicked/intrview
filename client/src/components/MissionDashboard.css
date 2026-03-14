@@ -74,6 +74,292 @@
   font-family: 'Inter', -apple-system, sans-serif;
 }
 
+/* ========== Analyze CTA Button ========== */
+.analyze-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--color-text-primary, #1a1a1a);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.analyze-cta-btn:hover {
+  background: #333;
+}
+
+/* ========== Stat Cards Row ========== */
+.dash-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.dash-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+
+.dash-stat-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.dash-stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dash-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+  line-height: 1.1;
+}
+
+.dash-stat-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+/* ========== Full-Width Topics ========== */
+.dash-topics-card {
+  margin-bottom: 24px;
+}
+
+.dash-topics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dash-topic-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.dash-topic-row:hover {
+  background: var(--color-bg-surface, #f8f7f5);
+}
+
+.dash-topic-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 180px;
+  max-width: 220px;
+}
+
+.dash-topic-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-topic-category {
+  font-size: 11px;
+  color: var(--color-text-tertiary, #999);
+  text-transform: capitalize;
+}
+
+.dash-topic-bar-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.dash-topic-bar {
+  height: 6px;
+  background: var(--color-border, #e6e3de);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.dash-topic-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.dash-topic-row.mastered .dash-topic-bar-fill { background: #22c55e; }
+.dash-topic-row.progress .dash-topic-bar-fill { background: #f59e0b; }
+.dash-topic-row.weak .dash-topic-bar-fill { background: #ef4444; }
+.dash-topic-row.not-started .dash-topic-bar-fill { background: var(--color-border, #e6e3de); }
+
+.dash-topic-score {
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 40px;
+  text-align: right;
+  font-family: 'Inter', -apple-system, sans-serif;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.dash-topic-row.mastered .dash-topic-score { color: #16a34a; }
+.dash-topic-row.progress .dash-topic-score { color: #d97706; }
+.dash-topic-row.weak .dash-topic-score { color: #dc2626; }
+.dash-topic-row.not-started .dash-topic-score { color: var(--color-text-tertiary, #999); }
+
+.dash-topic-drills {
+  font-size: 12px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
+  min-width: 70px;
+  text-align: right;
+}
+
+/* ========== Jobs List (full-width bottom row) ========== */
+.jobs-company-group {
+  margin-bottom: 12px;
+}
+
+.jobs-company-group:last-child {
+  margin-bottom: 0;
+}
+
+.jobs-company-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  margin-bottom: 4px;
+}
+
+.jobs-company-logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--color-bg-secondary, #f4f2ee);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.jobs-company-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.jobs-company-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.jobs-company-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-tertiary, #999);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.jobs-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 12px 8px 34px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.jobs-list-item:hover {
+  background: var(--color-bg-surface, #f8f7f5);
+}
+
+.jobs-list-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.jobs-list-item-role {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jobs-list-item-date {
+  font-size: 11px;
+  color: var(--color-text-tertiary, #999);
+}
+
+.jobs-list-item-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.jobs-list-progress-bar {
+  width: 60px;
+  height: 4px;
+  background: var(--color-border, #e6e3de);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.jobs-list-progress-fill {
+  height: 100%;
+  background: var(--color-accent, #47aafd);
+  border-radius: 2px;
+}
+
+.jobs-list-progress-text {
+  font-size: 11px;
+  color: var(--color-text-secondary, #6b6b6b);
+  min-width: 28px;
+  text-align: right;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.empty-state-inline {
+  text-align: center;
+  padding: 20px 16px;
+}
+
+.empty-state-inline p {
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+
 /* ========== Two-Column Layout ========== */
 .dash-columns {
   display: grid;
@@ -808,6 +1094,20 @@
 
   .dash-title {
     font-size: 26px;
+  }
+
+  .dash-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .dash-topic-name {
+    min-width: 120px;
+    max-width: 150px;
+  }
+
+  .dash-bottom-row {
+    grid-template-columns: 1fr;
   }
 
   .dash-summary-stats {
