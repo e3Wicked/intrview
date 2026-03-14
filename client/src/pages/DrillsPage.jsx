@@ -49,12 +49,15 @@ function DrillsPage({ user }) {
   const [activeTab, setActiveTab] = useState('practice')
   const [historyLimit, setHistoryLimit] = useState(15)
   const [progressFilter, setProgressFilter] = useState('all')
+  const [jobs, setJobs] = useState([])
+  const [jobFilter, setJobFilter] = useState('all')
 
   const fetchData = async () => {
     try {
-      let [topicsRes, sessionsRes] = await Promise.all([
+      let [topicsRes, sessionsRes, jobsRes] = await Promise.all([
         api.topics.getAllTopics(),
         api.drills.getAllSessions().catch(() => ({ data: [] })),
+        api.user.getAnalyses().catch(() => ({ data: [] })),
       ])
       let data = topicsRes.data || []
 
@@ -74,6 +77,7 @@ function DrillsPage({ user }) {
 
       setTopics(data)
       setDrillSessions(sessionsRes.data || [])
+      setJobs(jobsRes.data || [])
     } catch (err) {
       console.error('Error fetching data:', err)
     } finally {
@@ -174,6 +178,10 @@ function DrillsPage({ user }) {
     if (filter === 'all') filtered = topics
     else filtered = topics.filter(t => t.category === filter)
 
+    if (jobFilter !== 'all') {
+      filtered = filtered.filter(t => (t.job_hashes || []).includes(jobFilter))
+    }
+
     return [...filtered].sort((a, b) => {
       const aActive = getSavedSession(a.topic_name) ? 1 : 0
       const bActive = getSavedSession(b.topic_name) ? 1 : 0
@@ -183,7 +191,7 @@ function DrillsPage({ user }) {
       if (bP !== aP) return bP - aP
       return (a.topic_name || '').localeCompare(b.topic_name || '')
     })
-  }, [topics, filter])
+  }, [topics, filter, jobFilter])
 
   const sortedSessions = useMemo(() => {
     return [...drillSessions].sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at))
@@ -220,7 +228,7 @@ function DrillsPage({ user }) {
       <div className="drills-header">
         <div className="drills-header-left">
           <h1>Drills</h1>
-          <p>Practice questions on specific topics to build mastery.</p>
+          <p>Scored questions to test and track your mastery on each topic.</p>
         </div>
         {activeTab === 'practice' && (
           <div className="drills-header-config">
@@ -237,7 +245,7 @@ function DrillsPage({ user }) {
       {/* Tab bar */}
       <div className="drills-tabs">
         <button className={`drills-tab ${activeTab === 'practice' ? 'active' : ''}`} onClick={() => setActiveTab('practice')}>Practice</button>
-        <button className={`drills-tab ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>Question History</button>
+        <button className={`drills-tab ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>Drill History</button>
         <button className={`drills-tab ${activeTab === 'progress' ? 'active' : ''}`} onClick={() => setActiveTab('progress')}>Progress</button>
       </div>
 
@@ -256,23 +264,6 @@ function DrillsPage({ user }) {
             </div>
           ) : (
             <>
-              {/* Weakness nudge */}
-              {summary.weakest && Number(summary.weakest.score) < 60 && (
-                <div className="drills-nudge">
-                  <div className="drills-nudge-text">
-                    <span className="drills-nudge-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                      </svg>
-                    </span>
-                    Your weakest topic is <strong>{summary.weakest.topic_name}</strong> ({Math.round(summary.weakest.score)}% mastery)
-                  </div>
-                  <button className="drills-nudge-btn" onClick={() => handlePractice(summary.weakest.topic_name)}>
-                    Practice Now
-                  </button>
-                </div>
-              )}
-
               {/* Filter groups */}
               <div className="drills-filter-groups">
                 <div className="drills-filter-group">
@@ -286,22 +277,38 @@ function DrillsPage({ user }) {
                       {opt.label}
                     </button>
                   ))}
-                </div>
-                <div className="drills-filter-group">
-                  <span className="drills-filter-group-label">Category</span>
-                  <button className={`drills-filter ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
-                    All Categories
-                  </button>
-                  {categoryNames.map(cat => (
-                    <button
-                      key={cat}
-                      className={`drills-filter ${filter === cat ? 'active' : ''}`}
-                      onClick={() => setFilter(cat)}
+                  {jobs.length > 0 && (
+                    <select
+                      className="drills-job-filter-select"
+                      value={jobFilter}
+                      onChange={e => setJobFilter(e.target.value)}
                     >
-                      {cat.replace('_', ' ')}
-                    </button>
-                  ))}
+                      <option value="all">All Jobs</option>
+                      {jobs.map(job => (
+                        <option key={job.job_description_hash} value={job.job_description_hash}>
+                          {job.role_title || 'Unknown Role'}{job.company_name ? ` — ${job.company_name}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
+                {categoryNames.length > 1 && categoryNames.length < topics.length && (
+                  <div className="drills-filter-group">
+                    <span className="drills-filter-group-label">Category</span>
+                    <button className={`drills-filter ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
+                      All Categories
+                    </button>
+                    {categoryNames.map(cat => (
+                      <button
+                        key={cat}
+                        className={`drills-filter ${filter === cat ? 'active' : ''}`}
+                        onClick={() => setFilter(cat)}
+                      >
+                        {cat.replace('_', ' ')}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Topic list */}
@@ -337,14 +344,14 @@ function DrillsPage({ user }) {
                             {session && <span className="drills-active-dot" title="Active session" />}
                             <span className="drills-row-name">{topic.topic_name}</span>
                           </div>
-                          {topic.category && (
+                          {topic.category && categoryNames.length > 1 && categoryNames.length < topics.length && (
                             <span className="drills-row-category">{topic.category.replace('_', ' ')}</span>
                           )}
                           {session && (
                             <span className="drills-session-info">
                               {session.exchangeCount} {session.exchangeCount === 1 ? 'answer' : 'answers'}
                               {sessionAvg !== null && (
-                                <> &middot; avg <strong className={sessionAvg >= 70 ? 'score-good' : sessionAvg >= 40 ? 'score-mid' : 'score-low'}>{sessionAvg}%</strong></>
+                                <> &middot; avg <strong className={sessionAvg >= 70 ? 'score-good' : sessionAvg >= 50 ? 'score-mid' : 'score-low'}>{sessionAvg}%</strong></>
                               )}
                               {session.sessionXp > 0 && (
                                 <> &middot; +{session.sessionXp} XP</>
@@ -355,7 +362,7 @@ function DrillsPage({ user }) {
                         <div className="drills-col-stat">
                           <div className="drills-row-bar">
                             <div
-                              className={`drills-row-bar-fill ${score >= 80 ? 'high' : score >= 40 ? 'mid' : 'low'}`}
+                              className={`drills-row-bar-fill ${score >= 80 ? 'high' : score >= 50 ? 'mid' : 'low'}`}
                               style={{ width: `${Math.min(100, Math.max(attempts > 0 ? 3 : 0, score))}%` }}
                             />
                           </div>
@@ -371,7 +378,7 @@ function DrillsPage({ user }) {
                             <div className="drills-last-session">
                               <span className="drills-last-session-label">
                                 {lastSession.avg_score !== null && (
-                                  <strong className={lastSession.avg_score >= 70 ? 'score-good' : lastSession.avg_score >= 40 ? 'score-mid' : 'score-low'}>
+                                  <strong className={lastSession.avg_score >= 70 ? 'score-good' : lastSession.avg_score >= 50 ? 'score-mid' : 'score-low'}>
                                     {Math.round(lastSession.avg_score)}%
                                   </strong>
                                 )}
@@ -418,7 +425,7 @@ function DrillsPage({ user }) {
                               <span className="drills-detail-stat-label">Total Drills</span>
                             </div>
                             <div className="drills-detail-stat">
-                              <span className={`drills-detail-stat-value ${score >= 80 ? 'high' : score >= 40 ? 'mid' : 'low'}`}>
+                              <span className={`drills-detail-stat-value ${score >= 80 ? 'high' : score >= 50 ? 'mid' : 'low'}`}>
                                 {attempts > 0 ? `${score}%` : '--'}
                               </span>
                               <span className="drills-detail-stat-label">Mastery</span>
@@ -447,7 +454,7 @@ function DrillsPage({ user }) {
                                       <span className="drills-history-date">{timeAgo(s.completed_at) || 'Unknown'}</span>
                                       <span className="drills-history-answers">{s.answers} {s.answers === 1 ? 'answer' : 'answers'}</span>
                                       {sAvg !== null && (
-                                        <span className={`drills-history-score ${sAvg >= 70 ? 'high' : sAvg >= 40 ? 'mid' : 'low'}`}>
+                                        <span className={`drills-history-score ${sAvg >= 70 ? 'high' : sAvg >= 50 ? 'mid' : 'low'}`}>
                                           {sAvg}%
                                         </span>
                                       )}
@@ -457,7 +464,7 @@ function DrillsPage({ user }) {
                                           {sScores.map((sc, j) => (
                                             <div
                                               key={j}
-                                              className={`drills-history-bar ${sc >= 70 ? 'high' : sc >= 40 ? 'mid' : 'low'}`}
+                                              className={`drills-history-bar ${sc >= 70 ? 'high' : sc >= 50 ? 'mid' : 'low'}`}
                                               style={{ height: `${Math.max(4, sc * 0.2)}px` }}
                                               title={`Q${j + 1}: ${sc}%`}
                                             />
@@ -512,7 +519,7 @@ function DrillsPage({ user }) {
                     <span className="drills-history-date-cell">{timeAgo(session.completed_at)}</span>
                     <span className="drills-history-topic">{session.topic_name}</span>
                     <span className="drills-history-answers-cell">{session.answers}</span>
-                    <span className={`drills-history-score-cell ${session.avg_score >= 80 ? 'high' : session.avg_score >= 40 ? 'mid' : 'low'}`}>
+                    <span className={`drills-history-score-cell ${session.avg_score >= 80 ? 'high' : session.avg_score >= 50 ? 'mid' : 'low'}`}>
                       {Math.round(session.avg_score)}%
                     </span>
                   </div>
@@ -566,8 +573,8 @@ function DrillsPage({ user }) {
                 ))}
               </div>
 
-              {/* Mastery by Category */}
-              {summary.categories.length > 0 && (
+              {/* Mastery by Category — only show if categories actually group multiple topics */}
+              {summary.categories.length > 1 && summary.categories.length < summary.total && (
                 <div className="drills-progress-section">
                   <h3 className="drills-progress-section-title">Mastery by Category</h3>
                   <div className="drills-progress-categories">
@@ -579,7 +586,7 @@ function DrillsPage({ user }) {
                         </div>
                         <div className="drills-progress-category-bar-wrap">
                           <div className="drills-row-bar" style={{ flex: 1 }}>
-                            <div className={`drills-row-bar-fill ${cat.mastery >= 80 ? 'high' : cat.mastery >= 40 ? 'mid' : 'low'}`} style={{ width: `${cat.mastery}%` }} />
+                            <div className={`drills-row-bar-fill ${cat.mastery >= 80 ? 'high' : cat.mastery >= 50 ? 'mid' : 'low'}`} style={{ width: `${cat.mastery}%` }} />
                           </div>
                           <span className="drills-row-score">{cat.mastery}%</span>
                         </div>
@@ -603,7 +610,7 @@ function DrillsPage({ user }) {
                           <span className="drills-progress-topic-category">{(topic.category || 'general').replace('_', ' ')}</span>
                           <div className="drills-row-bar" style={{ flex: 1, maxWidth: 120 }}>
                             <div
-                              className={`drills-row-bar-fill ${score >= 80 ? 'high' : score >= 40 ? 'mid' : 'low'}`}
+                              className={`drills-row-bar-fill ${score >= 80 ? 'high' : score >= 50 ? 'mid' : 'low'}`}
                               style={{ width: `${Math.min(100, Math.max(attempts > 0 ? 3 : 0, score))}%` }}
                             />
                           </div>

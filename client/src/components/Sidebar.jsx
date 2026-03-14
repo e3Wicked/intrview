@@ -25,8 +25,8 @@ function Sidebar({ user, onLogout, onUpgrade, isAdmin }) {
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: 'grid' },
     { path: '/focus-chat', label: 'Chat', icon: 'message' },
-    { path: '/study/mock-interview', label: 'Mock Interview', icon: 'mic' },
     { path: '/study/drills', label: 'Drills', icon: 'zap' },
+    { path: '/study/mock-interview', label: 'Mock Interview', icon: 'mic' },
   ]
 
   const renderIcon = (name) => {

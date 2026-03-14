@@ -57,18 +57,11 @@ const ROUND_TYPES = [
   },
 ]
 
-const VOICES = [
-  { id: 'XrExE9yKIg1WjnnlVkGX', name: 'Matilda', style: 'Professional' },
-  { id: 'iP95p4xoKVk53GoZ742B', name: 'Chris', style: 'Casual' },
-  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', style: 'Steady' },
-]
-
-function MockInterviewSetup({ user, onStart }) {
+function MockInterviewSetup({ user, selectedVoice, onStart }) {
   const navigate = useNavigate()
   const [jobs, setJobs] = useState([])
   const [selectedJob, setSelectedJob] = useState(null)
   const [selectedRound, setSelectedRound] = useState(null)
-  const [selectedVoice, setSelectedVoice] = useState(VOICES[0].id)
   const [loading, setLoading] = useState(true)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState(null)
@@ -216,27 +209,6 @@ function MockInterviewSetup({ user, onStart }) {
                 </div>
               </button>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Voice Picker — compact inline, only after selecting a job */}
-      {selectedJob && (
-        <div className="dash-card mock-setup-card">
-          <div className="mock-setup-voice-row">
-            <span className="mock-setup-voice-label">Voice</span>
-            <div className="mock-setup-voices">
-              {VOICES.map((voice) => (
-                <button
-                  key={voice.id}
-                  className={`mock-setup-voice-chip ${selectedVoice === voice.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedVoice(voice.id)}
-                >
-                  {voice.name}
-                  <span className="mock-setup-voice-chip-style">{voice.style}</span>
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       )}

@@ -17,7 +17,7 @@
 .dash-header-text { flex: 1; }
 
 .dash-title {
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 700;
   color: var(--color-text-primary, #1a1a1a);
   margin: 0 0 4px;
@@ -337,7 +337,7 @@
 
 .jobs-list-progress-fill {
   height: 100%;
-  background: var(--color-accent, #47aafd);
+  background: var(--color-accent, #2563eb);
   border-radius: 2px;
 }
 
@@ -406,8 +406,8 @@
 .dash-card-count {
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-accent, #47aafd);
-  background: rgba(71, 170, 253, 0.08);
+  color: var(--color-accent, #2563eb);
+  background: rgba(37, 99, 235, 0.08);
   padding: 2px 10px;
   border-radius: 99px;
 }
@@ -467,6 +467,52 @@
   letter-spacing: 0.5px;
   color: var(--color-text-secondary, #6b6b6b);
   font-family: 'Inter', -apple-system, sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.dash-info-tooltip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-border, #e6e3de);
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 9px;
+  font-weight: 700;
+  font-style: italic;
+  cursor: help;
+  text-transform: none;
+  letter-spacing: 0;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.dash-info-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  font-style: normal;
+  line-height: 1.4;
+  padding: 6px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 10;
+}
+
+.dash-info-tooltip:hover::after {
+  opacity: 1;
 }
 
 .dash-summary-stat-value {
@@ -537,6 +583,29 @@
   transition: height 0.3s;
 }
 
+.dash-activity-bar-stack {
+  width: 80%;
+  max-width: 48px;
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+  transition: height 0.3s;
+  display: flex;
+  flex-direction: column-reverse;
+  overflow: hidden;
+}
+
+.dash-activity-bar-drills {
+  background: #2563eb;
+}
+
+.dash-activity-bar-chats {
+  background: #94a3b8;
+}
+
+.dash-activity-bar-mocks {
+  background: #f59e0b;
+}
+
 .dash-activity-day {
   font-size: 12px;
   color: var(--color-text-secondary, #6b6b6b);
@@ -550,9 +619,134 @@
   font-family: 'Inter', -apple-system, sans-serif;
 }
 
+/* ========== Activity Legend ========== */
+.dash-activity-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border-subtle, #f0eeea);
+}
+
+.dash-activity-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.dash-activity-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ========== Summary Secondary Line ========== */
+.dash-summary-secondary {
+  font-size: 12px;
+  color: var(--color-text-tertiary, #999);
+  font-family: 'Inter', -apple-system, sans-serif;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border-subtle, #f0eeea);
+}
+
+/* ========== Practice Streak Card ========== */
+.dash-streak-card {
+  padding: 16px 20px;
+}
+
+.dash-streak-card .dash-card-title {
+  margin-bottom: 12px;
+}
+
+.dash-streak-main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dash-streak-value {
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+  line-height: 1;
+}
+
+.dash-streak-unit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.dash-streak-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dash-streak-best {
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.dash-streak-today {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.dash-streak-today.done {
+  color: #16a34a;
+}
+
+.dash-streak-today.not-done {
+  color: #dc2626;
+}
+
 /* ========== Skill Heatmap ========== */
 .dash-heatmap-card {
   padding: 20px 24px;
+}
+
+.dash-card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dash-heatmap-toggle {
+  display: flex;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.dash-heatmap-toggle-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: none;
+  border: none;
+  color: var(--color-text-secondary, #6b6b6b);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.dash-heatmap-toggle-btn.active {
+  background: var(--color-text-primary, #1a1a1a);
+  color: #ffffff;
 }
 
 .dash-heatmap-empty {
@@ -564,20 +758,23 @@
 }
 
 .dash-heatmap-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
 }
 
 .dash-heatmap-cell {
-  padding: 14px 12px;
-  border-radius: 10px;
+  padding: 6px 14px;
+  border-radius: 8px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 2px;
   transition: transform 0.15s, box-shadow 0.15s;
   border: 1px solid transparent;
+  min-width: 0;
 }
 
 .dash-heatmap-cell:hover {
@@ -601,19 +798,22 @@
 }
 
 .dash-heatmap-name {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--color-text-primary, #1a1a1a);
   font-family: 'Inter', -apple-system, sans-serif;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: center;
+  max-width: 100px;
 }
 
 .dash-heatmap-score {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 700;
   font-family: 'Inter', -apple-system, sans-serif;
+  text-align: center;
 }
 
 .dash-heatmap-cell.high .dash-heatmap-score { color: #16a34a; }
@@ -942,7 +1142,7 @@
 }
 
 .dash-sidebar-company-name:hover {
-  color: var(--color-accent, #47aafd);
+  color: var(--color-accent, #2563eb);
 }
 
 .dash-sidebar-job-row {
@@ -988,7 +1188,7 @@
 
 .dash-sidebar-progress-fill {
   height: 100%;
-  background: var(--color-accent, #47aafd);
+  background: var(--color-accent, #2563eb);
   border-radius: 2px;
 }
 
@@ -1036,15 +1236,15 @@
 }
 
 .dash-sidebar-analyze-btn:hover {
-  border-color: var(--color-accent, #47aafd);
-  color: var(--color-accent, #47aafd);
-  background: rgba(71, 170, 253, 0.04);
+  border-color: var(--color-accent, #2563eb);
+  color: var(--color-accent, #2563eb);
+  background: rgba(37, 99, 235, 0.04);
 }
 
 /* ========== Empty States ========== */
 .empty-state-cta {
   padding: 8px 16px;
-  background: var(--color-accent, #47aafd);
+  background: var(--color-accent, #2563eb);
   color: #ffffff;
   border: none;
   border-radius: 6px;
@@ -1129,7 +1329,7 @@
   }
 
   .dash-heatmap-grid {
-    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
   }
 
   .dash-sidebar {
@@ -1151,7 +1351,6 @@
   }
 
   .dash-heatmap-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    gap: 6px;
   }
 }

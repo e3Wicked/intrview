@@ -650,13 +650,13 @@ async function saveJobUrlCache(url, logoUrl, roleTitle, companyName) {
 }
 
 // Track job analysis
-async function trackJobAnalysis(userId, url, jobDescriptionHash, companyName, roleTitle) {
+async function trackJobAnalysis(userId, url, jobDescriptionHash, companyName, roleTitle, jobDescriptionText) {
   try {
     const result = await pool.query(
-      `INSERT INTO job_analyses (user_id, url, job_description_hash, company_name, role_title, created_at)
-       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+      `INSERT INTO job_analyses (user_id, url, job_description_hash, company_name, role_title, job_description_text, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
        RETURNING id`,
-      [userId, url, jobDescriptionHash, companyName || null, roleTitle || null]
+      [userId, url, jobDescriptionHash, companyName || null, roleTitle || null, jobDescriptionText || null]
     );
     console.log(`✅ Tracked job analysis: ${companyName || 'Unknown'} - ${roleTitle || 'No role'} (ID: ${result.rows[0]?.id})`);
     return result.rows[0]?.id || null;
@@ -891,7 +891,8 @@ async function getAllUserTopics(userId) {
               COALESCE(uts.correct_count, 0) as correct_count,
               uts.last_practiced_at,
               COUNT(DISTINCT jt.job_description_hash) as job_count,
-              array_agg(DISTINCT ja.role_title) FILTER (WHERE ja.role_title IS NOT NULL) as role_titles
+              array_agg(DISTINCT ja.role_title) FILTER (WHERE ja.role_title IS NOT NULL) as role_titles,
+              array_agg(DISTINCT jt.job_description_hash) FILTER (WHERE jt.job_description_hash IS NOT NULL) as job_hashes
        FROM topics t
        JOIN job_topics jt ON jt.topic_id = t.id
        JOIN job_analyses ja ON ja.job_description_hash = jt.job_description_hash

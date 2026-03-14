@@ -57,7 +57,7 @@
 }
 
 .pricing-interval-option.active {
-  background: var(--color-accent, #47aafd);
+  background: var(--color-accent, #2563eb);
   color: #ffffff;
 }
 
@@ -104,7 +104,7 @@
 }
 
 .pricing-card.popular {
-  border-color: var(--color-accent, #47aafd);
+  border-color: var(--color-accent, #2563eb);
   background: var(--color-bg-card, #ffffff);
 }
 
@@ -113,7 +113,7 @@
   top: -12px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--color-accent, #47aafd);
+  background: var(--color-accent, #2563eb);
   color: #ffffff;
   padding: 6px 16px;
   border-radius: 20px;
@@ -196,7 +196,7 @@
 }
 
 .feature-check {
-  color: var(--color-accent, #47aafd);
+  color: var(--color-accent, #2563eb);
   font-weight: 600;
   flex-shrink: 0;
 }
@@ -231,7 +231,7 @@
 }
 
 .pricing-card.popular .pricing-cta {
-  background: var(--color-accent, #47aafd);
+  background: var(--color-accent, #2563eb);
   color: #ffffff;
 }
 

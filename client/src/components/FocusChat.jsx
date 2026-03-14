@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import Markdown from 'react-markdown'
 import { api } from '../utils/api'
 import './FocusChat.css'
 
@@ -23,19 +24,6 @@ function clearChatSession(skill) {
   try { sessionStorage.removeItem(STORAGE_KEY(skill)) } catch {}
 }
 
-function saveCompletedSession(skill, { exchangeCount, scores }) {
-  const avgScore = scores.length > 0
-    ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-    : null
-  // Save to DB (primary)
-  api.drills.saveDrillSession({
-    skill,
-    answers: exchangeCount,
-    avgScore,
-    scores,
-  }).catch(err => console.error('[Drill] Failed to save session to DB:', err))
-}
-
 const SENIORITY_OPTIONS = [
   { value: 'intern', label: 'Intern' },
   { value: 'junior', label: 'Junior' },
@@ -56,7 +44,6 @@ function FocusChat({ skill, user, seniorityLevel = 'mid', onSeniorityChange, que
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
   const [exchangeCount, setExchangeCount] = useState(saved.current?.exchangeCount || 0)
-  const [scores, setScores] = useState(saved.current?.scores || [])
   const [sessionId, setSessionId] = useState(saved.current?.sessionId || null)
   const [showEndSummary, setShowEndSummary] = useState(false)
   const [error, setError] = useState(null)
@@ -68,7 +55,6 @@ function FocusChat({ skill, user, seniorityLevel = 'mid', onSeniorityChange, que
   const startedRef = useRef(!!saved.current)
   const sessionIdRef = useRef(saved.current?.sessionId || null)
   const messagesRef = useRef(saved.current?.messages || [])
-  const scoresRef = useRef(saved.current?.scores || [])
   const exchangeCountRef = useRef(saved.current?.exchangeCount || 0)
 
   const scrollToBottom = useCallback(() => {
@@ -87,21 +73,19 @@ function FocusChat({ skill, user, seniorityLevel = 'mid', onSeniorityChange, que
 
   // Keep refs in sync with state
   useEffect(() => { messagesRef.current = messages }, [messages])
-  useEffect(() => { scoresRef.current = scores }, [scores])
   useEffect(() => { exchangeCountRef.current = exchangeCount }, [exchangeCount])
 
   // Save chat state to sessionStorage whenever it changes
   useEffect(() => {
     if (messages.length > 0 && !showEndSummary) {
       saveChatSession(skill, {
-        messages: messages.filter(m => m.content), // skip empty streaming messages
+        messages: messages.filter(m => m.content),
         exchangeCount,
-        scores,
         sessionId: sessionIdRef.current,
         questionTarget,
       })
     }
-  }, [messages, exchangeCount, scores, skill, showEndSummary, questionTarget])
+  }, [messages, exchangeCount, skill, showEndSummary, questionTarget])
 
   // Auto-stop when question target reached
   useEffect(() => {
@@ -120,7 +104,7 @@ function FocusChat({ skill, user, seniorityLevel = 'mid', onSeniorityChange, que
 
   const initSession = async () => {
     try {
-      const res = await api.practice.startSession({ jobDescriptionHash: '', mode: 'focus' })
+      const res = await api.practice.startSession({ jobDescriptionHash: '', mode: 'focus', skill })
       setSessionId(res.data.sessionId)
       sessionIdRef.current = res.data.sessionId
     } catch (e) {
@@ -136,8 +120,14 @@ function FocusChat({ skill, user, seniorityLevel = 'mid', onSeniorityChange, que
     initSession()
   }, [skill])
 
-  // On unmount: DON'T end the session — we're saving state for resume.
-  // Session gets ended explicitly via "End Session" button.
+  // End session on unmount so it shows in history
+  useEffect(() => {
+    return () => {
+      if (sessionIdRef.current) {
+        api.practice.endSession({ sessionId: sessionIdRef.current, questionsAttempted: exchangeCountRef.current || 0 }).catch(() => {})
+      }
+    }
+  }, [])
 
   const doSendMessage = async (userText) => {
     const currentMessages = messagesRef.current
@@ -221,20 +211,7 @@ function FocusChat({ skill, user, seniorityLevel = 'mid', onSeniorityChange, que
               return updated
             })
           } else if (event.type === 'done') {
-            if (event.evaluation) {
-              setMessages(prev => {
-                const updated = [...prev]
-                updated[updated.length - 1] = {
-                  ...updated[updated.length - 1],
-                  evaluation: event.evaluation
-                }
-                messagesRef.current = updated
-                return updated
-              })
-              if (typeof event.evaluation.score === 'number') {
-                setScores(prev => [...prev, event.evaluation.score])
-              }
-            }
+            // Session complete, no scoring in learn mode
           } else if (event.type === 'error') {
             setMessages(prev => {
               const updated = [...prev]
@@ -280,13 +257,9 @@ function FocusChat({ skill, user, seniorityLevel = 'mid', onSeniorityChange, que
   const handleEndChat = () => {
     if (abortRef.current) abortRef.current.abort()
     if (sessionIdRef.current) {
-      api.practice.endSession({ sessionId: sessionIdRef.current }).catch(() => {})
+      api.practice.endSession({ sessionId: sessionIdRef.current, questionsAttempted: exchangeCount }).catch(() => {})
+      sessionIdRef.current = null
     }
-    // Use refs to ensure we get the latest values (not stale closure)
-    saveCompletedSession(skill, {
-      exchangeCount: exchangeCountRef.current,
-      scores: scoresRef.current,
-    })
     clearChatSession(skill)
     setShowEndSummary(true)
   }
@@ -295,9 +268,8 @@ function FocusChat({ skill, user, seniorityLevel = 'mid', onSeniorityChange, que
     setAutoStopTriggered(false)
     setQuestionTarget(prev => prev + 5)
     setShowEndSummary(false)
-    // Start a new server session but keep messages/scores
     try {
-      const res = await api.practice.startSession({ jobDescriptionHash: '', mode: 'focus' })
+      const res = await api.practice.startSession({ jobDescriptionHash: '', mode: 'focus', skill })
       setSessionId(res.data.sessionId)
       sessionIdRef.current = res.data.sessionId
     } catch (e) { /* non-critical */ }
@@ -309,10 +281,6 @@ function FocusChat({ skill, user, seniorityLevel = 'mid', onSeniorityChange, que
     navigate(returnTo)
   }
 
-  const avgScore = scores.length > 0
-    ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-    : null
-
   if (showEndSummary) {
     return (
       <div className="focus-chat-summary">
@@ -323,36 +291,9 @@ function FocusChat({ skill, user, seniorityLevel = 'mid', onSeniorityChange, que
         <div className="focus-summary-stats">
           <div className="focus-summary-stat">
             <span className="focus-stat-value">{exchangeCount}</span>
-            <span className="focus-stat-label">Questions Answered</span>
+            <span className="focus-stat-label">Messages</span>
           </div>
-          {avgScore !== null && (
-            <div className="focus-summary-stat">
-              <span className={`focus-stat-value ${avgScore >= 70 ? 'score-good' : avgScore >= 40 ? 'score-mid' : 'score-low'}`}>
-                {avgScore}%
-              </span>
-              <span className="focus-stat-label">Avg Score</span>
-            </div>
-          )}
         </div>
-        {scores.length > 0 && (
-          <div className="focus-summary-breakdown">
-            <h4>Score Breakdown</h4>
-            <div className="focus-summary-scores">
-              {scores.map((s, i) => (
-                <div key={i} className="focus-score-dot-row">
-                  <span className="focus-score-dot-label">Q{i + 1}</span>
-                  <div className="focus-score-dot-bar">
-                    <div
-                      className={`focus-score-dot-fill ${s >= 70 ? 'high' : s >= 40 ? 'mid' : 'low'}`}
-                      style={{ width: `${Math.min(100, s)}%` }}
-                    />
-                  </div>
-                  <span className="focus-score-dot-value">{s}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
         <div className="focus-summary-actions">
           {autoStopTriggered && (
             <button className="focus-continue-btn" onClick={handleContinueMore}>
@@ -367,8 +308,6 @@ function FocusChat({ skill, user, seniorityLevel = 'mid', onSeniorityChange, que
             messagesRef.current = []
             setExchangeCount(0)
             exchangeCountRef.current = 0
-            setScores([])
-            scoresRef.current = []
             setShowEndSummary(false)
             setAutoStopTriggered(false)
             setQuestionTarget(questionGoal)
@@ -398,7 +337,6 @@ function FocusChat({ skill, user, seniorityLevel = 'mid', onSeniorityChange, que
           <span className="focus-header-tag">{seniorityLabel}</span>
           <span className="focus-exchange-count">
             {exchangeCount}/{questionTarget}
-            {avgScore !== null && <> &middot; avg {avgScore}%</>}
           </span>
         </div>
         <div className="focus-header-right">
@@ -445,17 +383,9 @@ function FocusChat({ skill, user, seniorityLevel = 'mid', onSeniorityChange, que
               <div className="focus-message-role">
                 {msg.role === 'coach' ? 'Coach' : msg.role === 'user' ? 'You' : 'System'}
               </div>
-              <div className="focus-message-text">{msg.content}</div>
-              {msg.evaluation && (
-                <div className="focus-evaluation">
-                  <span className={`focus-eval-badge ${msg.evaluation.score >= 70 ? 'good' : msg.evaluation.score >= 40 ? 'mid' : 'low'}`}>
-                    {msg.evaluation.score}/100
-                  </span>
-                  {msg.evaluation.feedback && (
-                    <span className="focus-eval-feedback">{msg.evaluation.feedback}</span>
-                  )}
-                </div>
-              )}
+              <div className="focus-message-text">
+                {msg.role === 'coach' ? <Markdown>{msg.content}</Markdown> : msg.content}
+              </div>
             </div>
           </div>
         ))}

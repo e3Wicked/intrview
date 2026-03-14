@@ -420,7 +420,8 @@ export async function getUserFromSession(sessionToken) {
 const ADMIN_EMAILS = [
   'admin@intrview.io',
   'test@intrview.io',
-  'alberto@intrview.io' // Add your email here
+  'alberto@intrview.io',
+  'a.cuenca.granados@gmail.com'
 ];
 
 // Check if user is admin

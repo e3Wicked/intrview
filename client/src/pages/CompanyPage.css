@@ -1,5 +1,6 @@
 .company-page {
   width: 100%;
+  padding: 24px 32px;
 }
 
 .company-page-loading,
@@ -643,6 +644,12 @@
 }
 
 /* -- Mobile responsive -- */
+@media (max-width: 600px) {
+  .company-page {
+    padding: 16px;
+  }
+}
+
 @media (max-width: 640px) {
   .company-page-header {
     padding: 8px 0 16px 0;

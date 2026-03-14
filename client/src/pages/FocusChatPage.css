@@ -1,49 +1,49 @@
 .focus-chat-page {
-  padding: 32px;
+  padding: 24px 32px;
   max-width: 100%;
   margin: 0 auto;
 }
 
-.focus-chat-picker h1 {
+/* --- Page header (matches DrillsPage) --- */
+.focus-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  gap: 16px;
+}
+
+.focus-page-header-left {
+  flex: 1;
+}
+
+.focus-page-header h1 {
   font-size: 28px;
   font-weight: 700;
-  color: #1a1a1a;
-  margin: 0 0 8px;
-}
-
-.focus-chat-picker > p {
-  color: #6b6b6b;
-  font-size: 15px;
-  margin: 0 0 32px;
-}
-
-/* --- Session config bar --- */
-.focus-chat-config {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.focus-chat-config-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.focus-chat-config-item label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #6b6b6b;
+  color: var(--color-text-primary, #1a1a1a);
+  margin: 0 0 4px;
   font-family: 'Inter', -apple-system, sans-serif;
 }
 
-.focus-chat-config-item select {
-  padding: 5px 10px;
-  background: #f8f7f5;
-  border: 1px solid #e6e3de;
-  border-radius: 6px;
-  color: #1a1a1a;
+.focus-page-header p {
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 14px;
+  margin: 0;
+}
+
+.focus-page-header-config {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.focus-page-header-config select {
+  padding: 6px 12px;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 8px;
+  color: var(--color-text-primary, #1a1a1a);
   font-size: 13px;
   font-weight: 500;
   font-family: 'Inter', -apple-system, sans-serif;
@@ -52,9 +52,73 @@
   transition: border-color 0.15s;
 }
 
-.focus-chat-config-item select:hover,
-.focus-chat-config-item select:focus {
-  border-color: #2563eb;
+.focus-page-header-config select:hover,
+.focus-page-header-config select:focus {
+  border-color: var(--color-accent, #47aafd);
+}
+
+/* --- Filters --- */
+.focus-page-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.focus-page-filter-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+  min-width: 70px;
+}
+
+.focus-page-filter {
+  padding: 6px 14px;
+  background: none;
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 8px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, sans-serif;
+  transition: all 0.15s;
+  text-transform: capitalize;
+}
+
+.focus-page-filter:hover {
+  border-color: #d0cdc7;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.focus-page-filter.active {
+  background: var(--color-text-primary, #1a1a1a);
+  color: #fff;
+  border-color: var(--color-text-primary, #1a1a1a);
+}
+
+/* --- Job filter dropdown --- */
+.focus-job-filter-select {
+  margin-left: auto;
+  padding: 6px 12px;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 8px;
+  color: var(--color-text-primary, #1a1a1a);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Inter', -apple-system, sans-serif;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+  max-width: 260px;
+}
+
+.focus-job-filter-select:hover,
+.focus-job-filter-select:focus {
+  border-color: var(--color-accent, #47aafd);
 }
 
 .focus-chat-loading {
@@ -63,145 +127,184 @@
   text-align: center;
 }
 
-.focus-chat-section {
-  margin-bottom: 32px;
+/* --- Topic List Table (matches DrillsPage) --- */
+.focus-topic-list {
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
 }
 
-.focus-chat-section h2 {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin: 0 0 12px;
-}
-
-.focus-chat-topics-grid {
+.focus-topic-list-header {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: 1fr 60px 110px 100px;
   gap: 12px;
+  padding: 12px 20px;
+  background: var(--color-bg-secondary, #f4f2ee);
+  border-bottom: 1px solid var(--color-border, #e6e3de);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b6b6b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.focus-chat-topic-card {
+.focus-topic-list-row {
+  display: grid;
+  grid-template-columns: 1fr 60px 110px 100px;
+  gap: 12px;
+  padding: 14px 20px;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-bottom: 1px solid var(--color-border-subtle, #f0eeea);
+}
+
+.focus-topic-list-row:last-child {
+  border-bottom: none;
+}
+
+.focus-topic-list-row:hover {
+  background: var(--color-bg-hover, #f8f7f5);
+}
+
+.focus-topic-list-row.has-session {
+  background: rgba(71, 170, 253, 0.03);
+  border-left: 3px solid var(--color-accent, #47aafd);
+}
+
+.focus-col-name {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 16px;
-  background: #ffffff;
-  border: 1px solid #e6e3de;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.15s;
-  text-align: left;
-  font-family: 'Inter', -apple-system, sans-serif;
+  gap: 2px;
+  min-width: 0;
 }
 
-.focus-chat-topic-card:hover {
-  border-color: #2563eb;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+.focus-row-name-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
-.focus-chat-topic-name {
+.focus-active-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-accent, #47aafd);
+  flex-shrink: 0;
+  animation: focus-pulse 2s ease-in-out infinite;
+}
+
+@keyframes focus-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.focus-row-name {
   font-size: 14px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--color-text-primary, #1a1a1a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.focus-chat-topic-category {
-  font-size: 12px;
-  color: #999;
+.focus-row-category {
+  font-size: 11px;
+  color: var(--color-text-secondary, #6b6b6b);
   text-transform: capitalize;
 }
 
-/* --- Topic pills --- */
-.focus-chat-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.focus-session-info {
+  font-size: 11px;
+  color: var(--color-accent, #47aafd);
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
-.focus-chat-pill {
-  padding: 7px 14px;
-  background: #f0f4ff;
-  border: 1px solid #d4ddf7;
-  border-radius: 20px;
-  color: #2563eb;
+.focus-col-chats {
+  text-align: center;
+}
+
+.focus-row-value {
   font-size: 13px;
   font-weight: 500;
+  color: var(--color-text-secondary, #6b6b6b);
+}
+
+.focus-col-status {
+  display: flex;
+  align-items: center;
+}
+
+.focus-row-active-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-accent, #47aafd);
+  background: rgba(71, 170, 253, 0.08);
+  padding: 2px 8px;
+  border-radius: 10px;
   font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.focus-row-last {
+  font-size: 12px;
+  color: var(--color-text-tertiary, #999);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.focus-row-last.has-date {
+  color: var(--color-text-secondary, #6b6b6b);
+}
+
+.focus-col-action {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+
+.focus-practice-btn {
+  padding: 6px 14px;
+  background: var(--color-accent, #47aafd);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
+  font-family: 'Inter', -apple-system, sans-serif;
   transition: all 0.15s;
   white-space: nowrap;
 }
 
-.focus-chat-pill:hover {
-  background: #2563eb;
+.focus-practice-btn:hover {
+  background: var(--color-accent-hover, #2d96f0);
+}
+
+.focus-practice-btn.continue {
+  background: transparent;
+  color: var(--color-accent, #47aafd);
+  border: 1px solid var(--color-accent, #47aafd);
+}
+
+.focus-practice-btn.continue:hover {
+  background: var(--color-accent, #47aafd);
   color: #fff;
-  border-color: #2563eb;
 }
 
-/* --- Job accordion --- */
-.focus-chat-jobs-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.focus-chat-job-accordion {
-  background: #ffffff;
-  border: 1px solid #e6e3de;
-  border-radius: 10px;
-  overflow: hidden;
-  transition: border-color 0.15s;
-}
-
-.focus-chat-job-accordion.expanded {
-  border-color: #2563eb;
-}
-
-.focus-chat-job-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 14px 16px;
-  background: none;
+.focus-practice-btn.resume {
+  background: var(--color-accent, #47aafd);
+  color: #fff;
   border: none;
-  cursor: pointer;
-  font-family: 'Inter', -apple-system, sans-serif;
-  text-align: left;
-  transition: background 0.1s;
 }
 
-.focus-chat-job-header:hover {
-  background: #fafafa;
+.focus-practice-btn.resume:hover {
+  background: var(--color-accent-hover, #2d96f0);
 }
 
-.focus-chat-job-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.focus-chat-chevron {
-  color: #999;
-  flex-shrink: 0;
-  transition: transform 0.2s;
-}
-
-.focus-chat-chevron.rotated {
-  transform: rotate(180deg);
-}
-
-.focus-chat-job-topics {
-  padding: 0 16px 14px;
-}
-
-.focus-chat-job-topics-loading,
-.focus-chat-job-topics-empty {
-  display: block;
-  font-size: 13px;
-  color: #999;
-}
-
+/* --- Empty & No results --- */
 .focus-chat-empty {
   padding: 40px;
   text-align: center;
@@ -211,60 +314,226 @@
   border-radius: 12px;
 }
 
-.focus-chat-custom {
-  display: flex;
-  gap: 10px;
-}
-
-.focus-chat-custom input {
-  flex: 1;
-  padding: 11px 14px;
-  background: #ffffff;
-  border: 1px solid #e6e3de;
-  border-radius: 8px;
-  color: #1a1a1a;
+.focus-no-results {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--color-text-secondary, #6b6b6b);
   font-size: 14px;
-  font-family: 'Inter', -apple-system, sans-serif;
 }
 
-.focus-chat-custom input:focus {
-  outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+/* --- Custom topic row (inside table) --- */
+.focus-custom-row {
+  border-top: 1px dashed var(--color-border, #e6e3de);
+  background: var(--color-bg-card, #ffffff);
 }
 
-.focus-chat-custom input::placeholder {
-  color: #aaa;
-}
-
-.focus-chat-custom button {
-  padding: 11px 20px;
-  background: #2563eb;
+.focus-custom-input {
+  width: 100%;
+  padding: 0;
+  background: none;
   border: none;
-  border-radius: 8px;
-  color: #fff;
+  color: var(--color-text-primary, #1a1a1a);
   font-size: 14px;
   font-weight: 600;
   font-family: 'Inter', -apple-system, sans-serif;
+  outline: none;
+}
+
+.focus-custom-input::placeholder {
+  color: var(--color-text-tertiary, #999);
+  font-weight: 400;
+}
+
+/* --- Tabs --- */
+.focus-page-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--color-border, #e6e3de);
+  margin-bottom: 24px;
+}
+
+.focus-page-tab {
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b6b6b);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
   cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s;
+  font-family: 'Inter', -apple-system, sans-serif;
+  transition: color 0.15s;
+  margin-bottom: -1px;
 }
 
-.focus-chat-custom button:hover {
-  background: #1d4ed8;
+.focus-page-tab:hover {
+  color: var(--color-text-primary, #1a1a1a);
 }
 
-@media (max-width: 600px) {
+.focus-page-tab.active {
+  color: var(--color-text-primary, #1a1a1a);
+  border-bottom-color: var(--color-text-primary, #1a1a1a);
+  font-weight: 600;
+}
+
+/* --- Chat History Tab --- */
+.focus-history-list {
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
+}
+
+.focus-history-header {
+  display: grid;
+  grid-template-columns: 100px 1fr 80px 80px;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--color-bg-secondary, #f4f2ee);
+  border-bottom: 1px solid var(--color-border, #e6e3de);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b6b6b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.focus-history-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 80px 80px;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--color-border-subtle, #f0eeea);
+  align-items: center;
+}
+
+.focus-history-row:last-child {
+  border-bottom: none;
+}
+
+.focus-history-date {
+  font-size: 12px;
+  color: var(--color-text-tertiary, #999);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.focus-history-topic {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.focus-history-answers {
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b6b6b);
+  text-align: center;
+}
+
+.focus-history-duration {
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.focus-tab-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 14px;
+}
+
+.focus-load-more {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  margin-top: 12px;
+  background: none;
+  border: 1px dashed var(--color-border, #e6e3de);
+  border-radius: 8px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.focus-load-more:hover {
+  border-color: var(--color-accent, #47aafd);
+  color: var(--color-accent, #47aafd);
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
   .focus-chat-page {
-    padding: 20px 16px;
+    padding: 16px;
   }
 
-  .focus-chat-topics-grid {
-    grid-template-columns: 1fr;
+  .focus-page-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .focus-page-filters {
+    flex-wrap: wrap;
+  }
+
+  .focus-page-filter {
+    flex-shrink: 0;
+  }
+
+  .focus-job-filter-select {
+    margin-left: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .focus-topic-list-header {
+    display: none;
+  }
+
+  .focus-topic-list-row {
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    padding: 14px 16px;
+  }
+
+  .focus-col-chats,
+  .focus-col-status {
+    display: none;
+  }
+
+  .focus-col-action {
+    grid-column: 2;
+    grid-row: 1;
   }
 
   .focus-chat-custom {
     flex-direction: column;
+  }
+
+  .focus-page-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .focus-page-tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .focus-history-header {
+    display: none;
+  }
+
+  .focus-history-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .focus-history-date,
+  .focus-history-answers {
+    display: none;
   }
 }

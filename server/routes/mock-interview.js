@@ -100,6 +100,7 @@ async function ensureMockInterviewTables() {
       `ALTER TABLE mock_interview_responses ADD COLUMN IF NOT EXISTS score INTEGER`,
       `ALTER TABLE mock_interview_responses ADD COLUMN IF NOT EXISTS brief TEXT`,
       `ALTER TABLE mock_interview_sessions ADD COLUMN IF NOT EXISTS overall_score INTEGER`,
+      `ALTER TABLE mock_interview_sessions ADD COLUMN IF NOT EXISTS interviewer_persona JSONB`,
     ];
     for (const stmt of alterStatements) {
       try { await pool.query(stmt); } catch (e) { /* column may already exist */ }
@@ -281,20 +282,96 @@ Return ONLY the JSON array, no other text.`;
         return res.status(500).json({ error: 'Failed to generate interview questions' });
       }
 
-      // 6. Build opening text and synthesize speech
+      // 6. Generate interviewer persona (name must match the selected voice gender)
+      const VOICE_GENDER = {
+        'XrExE9yKIg1WjnnlVkGX': 'female', // Matilda
+        'iP95p4xoKVk53GoZ742B': 'male',   // Chris
+        'onwK4e9ZLuTAKqWW03F9': 'male',   // Daniel
+      };
+      const voiceGender = VOICE_GENDER[voiceId] || 'male';
+
+      let persona = { name: voiceGender === 'female' ? 'Sarah' : 'Alex', title: 'Hiring Manager', tone: 'warm' };
+      try {
+        const personaCompletion = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: 'Return ONLY valid JSON, no markdown.' },
+            {
+              role: 'user',
+              content: `Generate a realistic interviewer persona for a ${roundType.replace('-', ' ')} interview at ${companyName} for a ${jobTitle} role.
+
+IMPORTANT — Gender: The interviewer's name MUST be a ${voiceGender} name because the voice is ${voiceGender}.
+
+IMPORTANT — Match the interviewer to the round type:
+- "phone screen" → ALWAYS a recruiter or HR person (e.g. "Talent Acquisition Partner", "Senior Recruiter", "People Operations Manager"). NEVER a department head or hiring manager — they don't do phone screens.
+- "behavioral" → Can be HR, a peer on the team, or a hiring manager.
+- "role-specific" → A senior IC or manager in the same domain (e.g. "Staff Engineer", "Senior Product Manager").
+- "situational" → A manager or senior leader in the relevant area.
+- "comprehensive" → A hiring manager or team lead.
+
+Return JSON: { "name": "a realistic ${voiceGender} first name", "title": "their job title at the company", "tone": "warm" or "direct" or "casual" or "formal" }. Make it realistic for ${companyName}'s culture.`,
+            },
+          ],
+          temperature: 0.9,
+          max_tokens: 100,
+        });
+        const personaText = personaCompletion.choices[0].message.content.trim();
+        const personaMatch = personaText.match(/\{[\s\S]*\}/);
+        if (personaMatch) persona = JSON.parse(personaMatch[0]);
+      } catch (e) {
+        console.error('Persona generation failed, using default:', e.message);
+      }
+
+      // 7. Build opening text and synthesize speech
       const firstQuestion = questions[0].text;
-      const openingText = `Hi there! Welcome to your ${roundType.replace('-', ' ')} interview for the ${jobTitle} role at ${companyName}. Let's get started. ${firstQuestion}`;
+
+      let openingText;
+      try {
+        const openingCompletion = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are writing the opening lines for a job interview. Be natural and conversational. No markdown.',
+            },
+            {
+              role: 'user',
+              content: `You are ${persona.name}, ${persona.title} at ${companyName}, opening a ${roundType.replace('-', ' ')} interview for ${jobTitle}.
+
+Write what you'd ACTUALLY say in the first 30 seconds of a real call. Follow this flow:
+
+1. Quick intro: "Hey! I'm ${persona.name}, ${persona.title} here at ${companyName}." (casual, like a real person)
+2. Tiny bit of warmup — "How's your day going?" or "Thanks for hopping on, I know scheduling these is always a pain" — ONE line max.
+3. Brief context about yourself or the team — e.g. "I've been here about 2 years, I run the [team] team" or "I work closely with the team you'd be joining" — something real.
+4. Quick word about what to expect: "${questions.length} questions or so, pretty conversational, probably about 30 minutes."
+5. Then ask the candidate to introduce themselves: "But before we dive in, why don't you tell me a bit about yourself and what got you interested in this role?"
+
+IMPORTANT:
+- Do NOT jump into technical questions yet. The first question "${firstQuestion}" should come AFTER the candidate introduces themselves — do NOT include it in this opening.
+- Never say "Welcome to your interview" or "Let's get started" — those sound scripted.
+- Tone: ${persona.tone}. Sound like a human on a video call.
+- Keep it to 4-6 sentences total.`,
+            },
+          ],
+          temperature: 0.9,
+          max_tokens: 300,
+        });
+        openingText = openingCompletion.choices[0].message.content.trim();
+      } catch (e) {
+        openingText = `Hey! I'm ${persona.name}, ${persona.title} here at ${companyName}. Thanks for making time for this — I know scheduling these calls is always a bit of a puzzle. I'll be running your ${roundType.replace('-', ' ')} today, we've got about ${questions.length} questions lined up, pretty conversational. But before we dive in, tell me a bit about yourself and what got you interested in this role?`;
+      }
 
       // Deduct credits now that we're committed to the session
       await deductTrainingCredits(req.user.id, TRAINING_CREDIT_COSTS.mockInterview);
 
       const openingAudioBase64 = await synthesizeSpeech(openingText, voiceId);
 
-      // 7. Create session
+      // 8. Create session
       const sessionResult = await pool.query(
         `INSERT INTO mock_interview_sessions
-           (user_id, job_description_hash, job_title, company_name, round_type, voice_id, questions, current_question_index)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 0)
+           (user_id, job_description_hash, job_title, company_name, round_type, voice_id, questions, current_question_index, interviewer_persona)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8)
          RETURNING id`,
         [
           req.user.id,
@@ -304,6 +381,7 @@ Return ONLY the JSON array, no other text.`;
           roundType,
           voiceId,
           JSON.stringify(questions),
+          JSON.stringify(persona),
         ]
       );
 
@@ -315,6 +393,7 @@ Return ONLY the JSON array, no other text.`;
         openingAudioBase64,
         openingText,
         firstQuestionText: firstQuestion,
+        interviewerPersona: persona,
       });
     } catch (error) {
       console.error('Error in POST /api/mock-interview/start:', error);
@@ -331,7 +410,7 @@ Return ONLY the JSON array, no other text.`;
 router.post(
   '/respond',
   requireAuth,
-  express.json({ limit: '10mb' }),
+  express.json({ limit: '50mb' }),
   async (req, res) => {
     let tempFilePath = null;
     try {
@@ -407,7 +486,7 @@ router.post(
       // 4. Evaluate answer with GPT-4o-mini
       const isLastPregenerated = currentIndex >= questions.length - 1;
 
-      const evalPrompt = `You are a real interviewer (not an AI) conducting a ${session.round_type.replace('-', ' ')} interview for the role of ${session.job_title} at ${session.company_name}.
+      const evalPrompt = `You are ${session.interviewer_persona?.name || 'the interviewer'}, ${session.interviewer_persona?.title || 'a hiring manager'} at ${session.company_name}. You are conducting a ${session.round_type.replace('-', ' ')} interview for the role of ${session.job_title}.
 
 Current question: "${currentQuestion.text}"
 Candidate's answer: "${transcript}"
@@ -446,8 +525,7 @@ Return ONLY valid JSON:
       const evalMessages = [
         {
           role: 'system',
-          content:
-            'You are a real human interviewer — natural, conversational, never robotic. Vary your tone and transitions. Score HARSHLY and realistically — vague or generic answers score low. Return only valid JSON.',
+          content: `You are ${session.interviewer_persona?.name || 'an interviewer'}, ${session.interviewer_persona?.title || 'a hiring manager'} — natural, conversational, never robotic. Vary your tone and transitions. Be ${session.interviewer_persona?.tone || 'professional'}. Score HARSHLY and realistically — vague or generic answers score low. Return only valid JSON.`,
         },
         ...conversationHistory,
         { role: 'assistant', content: currentQuestion.text },
@@ -659,7 +737,10 @@ Generate a detailed scorecard. Return ONLY valid JSON:
 Important:
 - communicationSkills should assess clarity (how clear and articulate), confidence (how assured and decisive), relevance (how on-topic and focused), and structure (how well-organized the responses were).
 - keyMoments.bestAnswer.questionIndex and keyMoments.weakestAnswer.questionIndex are 0-based indices into questionResults.
-- modelAnswer for each question should describe what an excellent response would include for THIS seniority level, not a generic template.`;
+- modelAnswer for each question should describe what an excellent response would include for THIS seniority level, not a generic template.
+- CRITICAL: The "question" field in each questionResults entry MUST be the EXACT question text from the transcript above. Do NOT rephrase, summarize, or generate new questions. Copy the question text verbatim.
+- The "transcript" field MUST be the EXACT candidate answer from above. Do NOT paraphrase.
+- questionResults must ONLY include questions that were actually asked and answered — do NOT include unanswered questions.`;
 
     const scorecardCompletion = await openai.chat.completions.create({
       model: 'gpt-4o',

@@ -2,7 +2,7 @@
   width: 100%;
   max-width: 100%;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 32px;
   font-family: 'Inter', -apple-system, sans-serif;
 }
 
@@ -154,8 +154,8 @@
 }
 
 .jb-tab.active {
-  color: var(--color-accent, #2563eb);
-  border-bottom-color: var(--color-accent, #2563eb);
+  color: var(--color-text-primary, #1a1a1a);
+  border-bottom-color: var(--color-text-primary, #1a1a1a);
 }
 
 .jb-tab-content {
@@ -578,6 +578,12 @@
 }
 
 /* ========== Responsive ========== */
+@media (max-width: 600px) {
+  .job-brief {
+    padding: 16px;
+  }
+}
+
 @media (max-width: 768px) {
   .jb-intel-grid {
     grid-template-columns: 1fr;

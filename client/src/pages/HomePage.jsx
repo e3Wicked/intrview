@@ -13,6 +13,7 @@ function HomePage({ user, onLoginSuccess }) {
   const [step, setStep] = useState('email')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [billingInterval, setBillingInterval] = useState('monthly')
   const featuresRef = useRef(null)
   const pricingRef = useRef(null)
   const googleBtnContainerRef = useRef(null)
@@ -201,10 +202,19 @@ function HomePage({ user, onLoginSuccess }) {
     },
   ]
 
+  const pricing = {
+    starter: { monthly: 9, quarterly: 24, annual: 86 },
+    pro:     { monthly: 19, quarterly: 51, annual: 182 },
+    elite:   { monthly: 39, quarterly: 105, annual: 374 },
+  }
+
+  const periodLabel = billingInterval === 'monthly' ? '/mo' : billingInterval === 'quarterly' ? '/qtr' : '/yr'
+
   const plans = [
     { name: 'Free', price: '$0', period: '/forever', features: ['3 job analyses', '15 training credits', 'Study plans & flashcards', 'Progress tracking'], cta: 'Get Started' },
-    { name: 'Starter', price: '$9', period: '/month', features: ['10 job analyses/mo', '150 training credits/mo', 'AI study chat', 'Company research', 'Smart practice ordering'], cta: 'Start Free Trial', popular: true },
-    { name: 'Pro', price: '$19', period: '/month', features: ['30 job analyses/mo', '400 training credits/mo', 'Voice practice', 'Priority AI speed', 'PDF export'], cta: 'Start Free Trial' },
+    { name: 'Starter', price: `$${pricing.starter[billingInterval]}`, period: periodLabel, features: ['10 job analyses/mo', '150 training credits/mo', 'AI study chat', 'Company research', 'Smart practice ordering'], cta: 'Start Free Trial' },
+    { name: 'Pro', price: `$${pricing.pro[billingInterval]}`, period: periodLabel, features: ['30 job analyses/mo', '400 training credits/mo', 'Voice practice & mock interviews', 'Priority AI speed', 'PDF export'], cta: 'Start Free Trial', popular: true },
+    { name: 'Elite', price: `$${pricing.elite[billingInterval]}`, period: periodLabel, features: ['Unlimited job analyses', '800 training credits/mo', 'Everything in Pro', 'Advanced company insights', 'Early access to new features'], cta: 'Start Free Trial' },
   ]
 
   return (
@@ -325,6 +335,19 @@ function HomePage({ user, onLoginSuccess }) {
           <span className="landing-section-label animate-on-scroll">Pricing</span>
           <h2 className="landing-section-title animate-on-scroll">Simple, transparent pricing</h2>
           <p className="landing-section-subtitle animate-on-scroll">Start free. Upgrade when you're ready to go all in.</p>
+          <div className="landing-billing-toggle animate-on-scroll">
+            {['monthly', 'quarterly', 'annual'].map((opt) => (
+              <button
+                key={opt}
+                className={`landing-billing-option ${billingInterval === opt ? 'active' : ''}`}
+                onClick={() => setBillingInterval(opt)}
+              >
+                {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                {opt === 'quarterly' && <span className="landing-billing-save">-10%</span>}
+                {opt === 'annual' && <span className="landing-billing-save">-20%</span>}
+              </button>
+            ))}
+          </div>
           <div className="landing-pricing-grid">
             {plans.map((plan, i) => (
               <div key={i} className={`landing-pricing-card animate-on-scroll ${plan.popular ? 'popular' : ''}`} style={{ transitionDelay: `${i * 80}ms` }}>

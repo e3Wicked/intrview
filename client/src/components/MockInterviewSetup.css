@@ -217,64 +217,6 @@
   line-height: 1.4;
 }
 
-/* Voice Picker — compact inline */
-.mock-setup-voice-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.mock-setup-voice-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-secondary, #6b6b6b);
-  font-family: 'Inter', -apple-system, sans-serif;
-  white-space: nowrap;
-}
-
-.mock-setup-voices {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.mock-setup-voice-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  background: var(--color-bg-card, #ffffff);
-  border: 1px solid var(--color-border, #e6e3de);
-  border-radius: 20px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-primary, #1a1a1a);
-  font-family: 'Inter', -apple-system, sans-serif;
-  transition: all 0.15s ease;
-}
-
-.mock-setup-voice-chip:hover {
-  border-color: var(--color-text-secondary, #999);
-}
-
-.mock-setup-voice-chip.selected {
-  border-color: var(--color-accent, #f59e0b);
-  background: rgba(245, 158, 11, 0.06);
-  color: var(--color-accent, #f59e0b);
-}
-
-.mock-setup-voice-chip-style {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--color-text-secondary, #6b6b6b);
-}
-
-.mock-setup-voice-chip.selected .mock-setup-voice-chip-style {
-  color: var(--color-accent, #f59e0b);
-  opacity: 0.7;
-}
-
 /* Footer */
 .mock-setup-footer {
   display: flex;
@@ -379,12 +321,6 @@
 
 /* Responsive */
 @media (max-width: 600px) {
-  .mock-setup-voice-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
   .mock-setup-footer {
     flex-direction: column;
     align-items: stretch;

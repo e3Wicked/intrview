@@ -199,10 +199,10 @@ router.post('/api/progress/migrate', requireAuth, async (req, res) => {
 router.post('/api/practice/start-session', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { jobDescriptionHash, mode } = req.body;
+    const { jobDescriptionHash, mode, skill } = req.body;
 
-    if (!jobDescriptionHash) {
-      return res.status(400).json({ error: 'jobDescriptionHash is required' });
+    if (!jobDescriptionHash && !skill) {
+      return res.status(400).json({ error: 'jobDescriptionHash or skill is required' });
     }
 
     // Auto-end any previous active session for this user
@@ -212,10 +212,10 @@ router.post('/api/practice/start-session', requireAuth, async (req, res) => {
     );
 
     const result = await pool.query(`
-      INSERT INTO practice_sessions (user_id, job_description_hash, mode)
-      VALUES ($1, $2, $3)
+      INSERT INTO practice_sessions (user_id, job_description_hash, mode, skill)
+      VALUES ($1, $2, $3, $4)
       RETURNING *
-    `, [userId, jobDescriptionHash, mode || 'quiz']);
+    `, [userId, jobDescriptionHash || '', mode || 'quiz', skill || null]);
 
     res.json({
       sessionId: result.rows[0].id,
@@ -231,23 +231,32 @@ router.post('/api/practice/start-session', requireAuth, async (req, res) => {
 router.post('/api/practice/end-session', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { sessionId } = req.body;
+    const { sessionId, questionsAttempted } = req.body;
 
     if (!sessionId) {
       return res.status(400).json({ error: 'sessionId is required' });
     }
 
-    // Compute session stats from question_attempts
-    const statsResult = await pool.query(`
-      SELECT
-        COUNT(*) as questions_attempted,
-        COUNT(*) FILTER (WHERE score >= 70) as questions_correct,
-        COALESCE(AVG(score) FILTER (WHERE score IS NOT NULL), 0) as average_score
-      FROM question_attempts
-      WHERE session_id = $1 AND user_id = $2
-    `, [sessionId, userId]);
+    // If caller passes questionsAttempted directly (e.g. focus chat), use it.
+    // Otherwise compute from question_attempts table (drills/quiz mode).
+    let attempted = 0, correct = 0, avgScore = 0;
 
-    const stats = statsResult.rows[0];
+    if (questionsAttempted != null) {
+      attempted = questionsAttempted;
+    } else {
+      const statsResult = await pool.query(`
+        SELECT
+          COUNT(*) as questions_attempted,
+          COUNT(*) FILTER (WHERE score >= 70) as questions_correct,
+          COALESCE(AVG(score) FILTER (WHERE score IS NOT NULL), 0) as average_score
+        FROM question_attempts
+        WHERE session_id = $1 AND user_id = $2
+      `, [sessionId, userId]);
+      const stats = statsResult.rows[0];
+      attempted = parseInt(stats.questions_attempted);
+      correct = parseInt(stats.questions_correct);
+      avgScore = parseFloat(stats.average_score);
+    }
 
     // Update session
     await pool.query(`
@@ -260,9 +269,9 @@ router.post('/api/practice/end-session', requireAuth, async (req, res) => {
       WHERE id = $1 AND user_id = $5
     `, [
       sessionId,
-      parseInt(stats.questions_attempted),
-      parseInt(stats.questions_correct),
-      parseFloat(stats.average_score),
+      attempted,
+      correct,
+      avgScore,
       userId,
     ]);
 

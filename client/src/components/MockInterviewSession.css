@@ -1,5 +1,5 @@
 .mock-session {
-  max-width: 720px;
+  max-width: 960px;
   margin: 0 auto;
   padding: 24px 0;
   display: flex;
@@ -36,6 +36,107 @@
   background: var(--color-text-primary, #1a1a1a);
   border-radius: 2px;
   transition: width 0.4s ease;
+}
+
+/* Live Scoring Strip */
+.mock-session-scoring-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 10px;
+}
+
+.mock-session-scoring-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.mock-session-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.mock-session-stat-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.mock-session-stat-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.mock-session-stat-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--color-border, #e6e3de);
+}
+
+.mock-session-scoring-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.mock-session-scoring-dots::-webkit-scrollbar {
+  display: none;
+}
+
+.mock-session-score-dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 36px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  animation: scoreDotAppear 0.3s ease;
+}
+
+@keyframes scoreDotAppear {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.mock-session-dot-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.mock-session-dot-score {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+/* Interviewer Identity */
+.mock-session-interviewer {
+  font-size: 12px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
+  padding: 0 0 8px;
+  text-align: center;
 }
 
 /* Status Indicator */
@@ -195,7 +296,8 @@
 .mock-session-message.interviewer {
   background: var(--color-bg-card, #ffffff);
   border: 1px solid var(--color-border, #e6e3de);
-  align-self: flex-start;
+  align-self: stretch;
+  max-width: 100%;
 }
 
 .mock-session-message.user {
@@ -227,12 +329,61 @@
   color: var(--color-text-primary, #1a1a1a);
 }
 
+/* VAD Listening Indicator */
+.mock-session-vad-listening {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 14px;
+}
+
+.mock-session-vad-icon {
+  color: #22c55e;
+  animation: vadPulse 2s ease-in-out infinite;
+}
+
+@keyframes vadPulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
 /* Controls */
 .mock-session-controls {
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 12px;
   padding-top: 16px;
   border-top: 1px solid var(--color-border, #e6e3de);
+}
+
+/* Mode Toggle */
+.mock-session-mode-toggle {
+  display: flex;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.mock-session-mode-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: none;
+  border: none;
+  color: var(--color-text-secondary, #6b6b6b);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mock-session-mode-btn.active {
+  background: var(--color-text-primary, #1a1a1a);
+  color: #ffffff;
 }
 
 .mock-session-end-btn {
@@ -265,5 +416,20 @@
   .mock-session-talk-btn {
     padding: 14px 24px;
     font-size: 15px;
+  }
+
+  .mock-session-scoring-strip {
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .mock-session-scoring-stats {
+    width: 100%;
+    justify-content: space-around;
+  }
+
+  .mock-session-scoring-dots {
+    width: 100%;
   }
 }

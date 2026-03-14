@@ -1,0 +1,51 @@
+.skill-radar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.skill-radar-svg {
+  display: block;
+}
+
+.skill-radar-ring {
+  fill: none;
+  stroke: var(--color-border, #e6e3de);
+  stroke-width: 0.8;
+}
+
+.skill-radar-axis {
+  stroke: var(--color-border, #e6e3de);
+  stroke-width: 0.5;
+  stroke-dasharray: 2 3;
+}
+
+.skill-radar-data {
+  fill: rgba(37, 99, 235, 0.15);
+  stroke: #2563eb;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+.skill-radar-dot {
+  fill: #2563eb;
+  stroke: #ffffff;
+  stroke-width: 1.5;
+}
+
+.skill-radar-label {
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 11px;
+  fill: var(--color-text-secondary, #6b6b6b);
+  font-weight: 500;
+}
+
+.skill-radar-empty {
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 14px;
+  text-align: center;
+  padding: 32px 16px;
+  margin: 0;
+  font-family: 'Inter', -apple-system, sans-serif;
+}

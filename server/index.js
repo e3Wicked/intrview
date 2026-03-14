@@ -177,7 +177,7 @@ app.use(cors({
   origin: true,
   credentials: true
 }));
-app.use(express.json({ limit: '500kb' }));
+app.use(express.json({ limit: '50mb' }));
 app.use(cookieParser());
 
 // --- In-memory rate limiter ---
@@ -2370,7 +2370,8 @@ Format as JSON:
       url || 'pasted-text',
       jobDescriptionHash,
       companyInfo.name,
-      companyInfo.roleTitle
+      companyInfo.roleTitle,
+      jobDescription
     );
 
     // Index topics from the study plan for cross-job linking
@@ -2909,6 +2910,7 @@ Your approach:
 - When you identify a gap, give a brief, clear explanation (2-3 sentences) then ask a follow-up to check understanding
 - Provide concrete examples, analogies, and real-world scenarios
 - If they answer well, increase difficulty progressively
+- Signal the expected scope for each question naturally. For quick checks, say things like "In a sentence or two..." or "Briefly explain...". For deeper questions, say "Walk me through..." or "Explain in detail with tradeoffs...". Match depth to question complexity and the user's demonstrated level.
 - Be encouraging but precise — correct misconceptions immediately
 - Keep responses concise (2-3 paragraphs max)
 - Use markdown for code snippets when relevant
@@ -2955,60 +2957,7 @@ You are NOT an interviewer. You are a patient, expert tutor. Your goal is to bui
       }
     }
 
-    // After stream: evaluate user's last message and record attempt
-    let evaluation = null;
-
-    if (recentMessages.length > 0) {
-      const lastUserMsg = recentMessages.filter(m => m.role === 'user').pop();
-      if (lastUserMsg) {
-        try {
-          const evalCompletion = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: `Score this answer about ${skill} from 0-100. Return JSON only: {"score": N, "feedback": "brief feedback"}` },
-              { role: 'user', content: lastUserMsg.content }
-            ],
-            temperature: 0.3,
-            max_tokens: 150,
-          });
-
-          const evalText = evalCompletion.choices[0].message.content.trim();
-          const jsonMatch = evalText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) evaluation = JSON.parse(jsonMatch[0]);
-        } catch (e) {
-          evaluation = { score: 50, feedback: 'Practice recorded' };
-        }
-
-        try {
-          await recordAttempt(user.id, {
-            jobDescriptionHash: '',
-            sessionId: sessionId || null,
-            questionText: `[Focus] ${skill}: ${lastUserMsg.content.substring(0, 100)}`,
-            questionCategory: skill,
-            attemptType: 'quiz',
-            userAnswer: lastUserMsg.content,
-            score: evaluation?.score || 50,
-            evaluation: evaluation || { score: 50, feedback: 'Focus practice' },
-          });
-        } catch (attemptError) {
-          console.error('Focus chat attempt error (non-critical):', attemptError.message);
-        }
-
-        // Update user_topic_scores so Drills page reflects practice
-        try {
-          const drillable = !isCompanySpecificTopic(skill);
-          const topic = await getOrCreateTopic(skill, null, null, { isDrillable: drillable });
-          if (topic) {
-            const score = evaluation?.score || 50;
-            await updateUserTopicScore(user.id, topic.id, score, score >= 70);
-          }
-        } catch (topicErr) {
-          console.error('Focus chat topic score update (non-critical):', topicErr.message);
-        }
-      }
-    }
-
-    res.write(`data: ${JSON.stringify({ type: 'done', evaluation })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
     res.end();
 
   } catch (error) {
@@ -3822,7 +3771,7 @@ app.get('/api/user/analysis/:id', requireAuth, async (req, res) => {
 
     res.json({
       success: true,
-      jobDescription: '',
+      jobDescription: analysis.job_description_text || '',
       jobDescriptionHash: analysis.job_description_hash,
       companyInfo: {
         name: analysis.company_name,
@@ -4237,7 +4186,7 @@ app.get('/api/user/activity-summary', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // 7-day activity: count sessions per day
+    // 7-day activity: count sessions per day, broken down by type
     const last7DaysRes = await pool.query(`
       WITH days AS (
         SELECT generate_series(
@@ -4247,18 +4196,24 @@ app.get('/api/user/activity-summary', requireAuth, async (req, res) => {
         )::date AS day
       ),
       activity AS (
-        SELECT DATE(completed_at) AS day, COUNT(*) AS cnt
+        SELECT DATE(completed_at) AS day, 'drills' AS type
         FROM drill_sessions WHERE user_id = $1
           AND completed_at >= CURRENT_DATE - INTERVAL '6 days'
-        GROUP BY DATE(completed_at)
         UNION ALL
-        SELECT DATE(ended_at) AS day, COUNT(*) AS cnt
+        SELECT DATE(ended_at) AS day, 'chats' AS type
         FROM practice_sessions WHERE user_id = $1
           AND ended_at IS NOT NULL
           AND ended_at >= CURRENT_DATE - INTERVAL '6 days'
-        GROUP BY DATE(ended_at)
+        UNION ALL
+        SELECT DATE(completed_at) AS day, 'mocks' AS type
+        FROM mock_interview_sessions WHERE user_id = $1
+          AND completed_at IS NOT NULL
+          AND completed_at >= CURRENT_DATE - INTERVAL '6 days'
       )
-      SELECT d.day, COALESCE(SUM(a.cnt), 0)::int AS sessions
+      SELECT d.day,
+        COALESCE(SUM(CASE WHEN a.type = 'drills' THEN 1 ELSE 0 END), 0)::int AS drills,
+        COALESCE(SUM(CASE WHEN a.type = 'chats' THEN 1 ELSE 0 END), 0)::int AS chats,
+        COALESCE(SUM(CASE WHEN a.type = 'mocks' THEN 1 ELSE 0 END), 0)::int AS mocks
       FROM days d
       LEFT JOIN activity a ON a.day = d.day
       GROUP BY d.day
@@ -4272,6 +4227,9 @@ app.get('/api/user/activity-summary', requireAuth, async (req, res) => {
         UNION
         SELECT DATE(ended_at) AS practice_day FROM practice_sessions
           WHERE user_id = $1 AND ended_at IS NOT NULL
+        UNION
+        SELECT DATE(completed_at) AS practice_day FROM mock_interview_sessions
+          WHERE user_id = $1 AND completed_at IS NOT NULL
       ) sub
       WHERE practice_day IS NOT NULL
       ORDER BY practice_day DESC
@@ -4318,13 +4276,15 @@ app.get('/api/user/activity-summary', requireAuth, async (req, res) => {
       longestStreak = Math.max(longestStreak, streak);
     }
 
-    const practicedToday = last7DaysRes.rows.length > 0 &&
-      parseInt(last7DaysRes.rows[last7DaysRes.rows.length - 1].sessions) > 0;
-
     const last7Days = last7DaysRes.rows.map(r => ({
       date: r.day.toISOString().slice(0, 10),
-      sessions: parseInt(r.sessions),
+      drills: parseInt(r.drills),
+      chats: parseInt(r.chats),
+      mocks: parseInt(r.mocks),
     }));
+
+    const todayRow = last7Days[last7Days.length - 1];
+    const practicedToday = todayRow ? (todayRow.drills + todayRow.chats + todayRow.mocks) > 0 : false;
 
     res.json({ currentStreak, longestStreak, practicedToday, last7Days });
   } catch (error) {

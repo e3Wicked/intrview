@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import './MockInterviewScorecard.css'
 
 function CommunicationSkillBar({ label, score }) {
@@ -17,8 +18,9 @@ function CommunicationSkillBar({ label, score }) {
   )
 }
 
-function MockInterviewScorecard({ scorecard, onBack }) {
+function MockInterviewScorecard({ scorecard }) {
   const [expandedQuestion, setExpandedQuestion] = useState(null)
+  const navigate = useNavigate()
 
   if (!scorecard) return null
 
@@ -42,12 +44,6 @@ function MockInterviewScorecard({ scorecard, onBack }) {
 
   return (
     <div className="mock-scorecard">
-      <button className="mock-scorecard-back" onClick={onBack}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M19 12H5M12 19l-7-7 7-7"/>
-        </svg>
-        Back to Mock Interviews
-      </button>
       <div className="mock-scorecard-header">
         <h2>Interview Scorecard</h2>
       </div>
@@ -225,6 +221,21 @@ function MockInterviewScorecard({ scorecard, onBack }) {
           </div>
         </div>
       )}
+
+      {/* Next Steps */}
+      <div className="mock-scorecard-section mock-scorecard-next">
+        <h3 className="mock-scorecard-section-title">What's Next?</h3>
+        <div className="mock-scorecard-next-actions">
+          {improvements.length > 0 && (
+            <button className="mock-scorecard-next-btn primary" onClick={() => navigate(`/focus-chat?skill=${encodeURIComponent(improvements[0])}&from=/study/mock-interview`)}>
+              Practice: {improvements[0]}
+            </button>
+          )}
+          <button className="mock-scorecard-next-btn" onClick={() => navigate('/study/drills')}>
+            View All Drills
+          </button>
+        </div>
+      </div>
 
     </div>
   )
