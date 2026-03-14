@@ -9,7 +9,6 @@ function Sidebar({ user, onLogout, onUpgrade, isAdmin }) {
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem('sidebar_collapsed') === 'true'
   })
-  const [studyExpanded, setStudyExpanded] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
@@ -25,15 +24,10 @@ function Sidebar({ user, onLogout, onUpgrade, isAdmin }) {
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: 'grid' },
-  ]
-
-  const studyItems = [
     { path: '/focus-chat', label: 'Chat', icon: 'message' },
     { path: '/study/mock-interview', label: 'Mock Interview', icon: 'mic' },
     { path: '/study/drills', label: 'Drills', icon: 'zap' },
   ]
-
-  const progressItem = { path: '/progress', label: 'Progress', icon: 'bar-chart' }
 
   const renderIcon = (name) => {
     switch (name) {
@@ -59,24 +53,6 @@ function Sidebar({ user, onLogout, onUpgrade, isAdmin }) {
         return (
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-          </svg>
-        )
-      case 'bar-chart':
-        return (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>
-          </svg>
-        )
-      case 'book':
-        return (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-          </svg>
-        )
-      case 'chevron':
-        return (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points={studyExpanded ? "6 9 12 15 18 9" : "9 18 15 12 9 6"}/>
           </svg>
         )
       default:
@@ -122,47 +98,6 @@ function Sidebar({ user, onLogout, onUpgrade, isAdmin }) {
           </button>
         ))}
 
-        {/* Study With section */}
-        <div className="sidebar-section">
-          <button
-            className="sidebar-section-header"
-            onClick={() => !collapsed && setStudyExpanded(!studyExpanded)}
-            title={collapsed ? 'Study With' : undefined}
-          >
-            {renderIcon('book')}
-            {!collapsed && (
-              <>
-                <span>Study With</span>
-                <span className="sidebar-section-chevron">{renderIcon('chevron')}</span>
-              </>
-            )}
-          </button>
-          {(studyExpanded || collapsed) && (
-            <div className="sidebar-section-items">
-              {studyItems.map(item => (
-                <button
-                  key={item.path}
-                  className={`sidebar-nav-item sub-item ${isActive(item.path) ? 'active' : ''}`}
-                  onClick={() => navigate(item.path)}
-                  title={collapsed ? item.label : undefined}
-                >
-                  {renderIcon(item.icon)}
-                  {!collapsed && <span>{item.label}</span>}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Progress */}
-        <button
-          className={`sidebar-nav-item ${isActive(progressItem.path) ? 'active' : ''}`}
-          onClick={() => navigate(progressItem.path)}
-          title={collapsed ? progressItem.label : undefined}
-        >
-          {renderIcon(progressItem.icon)}
-          {!collapsed && <span>{progressItem.label}</span>}
-        </button>
       </nav>
 
       {/* Bottom section */}

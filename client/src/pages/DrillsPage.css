@@ -1,11 +1,19 @@
 .drills-page {
-  max-width: 1200px;
+  max-width: 100%;
   margin: 0 auto;
   padding: 24px;
 }
 
 .drills-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   margin-bottom: 28px;
+  gap: 16px;
+}
+
+.drills-header-left {
+  flex: 1;
 }
 
 .drills-header h1 {
@@ -20,6 +28,32 @@
   color: var(--color-text-secondary, #6b6b6b);
   font-size: 15px;
   margin: 0;
+}
+
+.drills-header-config {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.drills-config-select {
+  padding: 6px 12px;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 8px;
+  color: var(--color-text-primary, #1a1a1a);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Inter', -apple-system, sans-serif;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.drills-config-select:hover,
+.drills-config-select:focus {
+  border-color: var(--color-accent, #47aafd);
 }
 
 .drills-loading {
@@ -172,9 +206,9 @@
 }
 
 .drills-filter.active {
-  background: var(--color-accent, #2563eb);
+  background: var(--color-text-primary, #1a1a1a);
   color: #fff;
-  border-color: var(--color-accent, #2563eb);
+  border-color: var(--color-text-primary, #1a1a1a);
 }
 
 .drills-filter-divider {
@@ -239,8 +273,8 @@
 }
 
 .drills-list-row.has-session {
-  background: rgba(37, 99, 235, 0.03);
-  border-left: 3px solid var(--color-accent, #2563eb);
+  background: rgba(71, 170, 253, 0.03);
+  border-left: 3px solid var(--color-accent, #47aafd);
 }
 
 .drills-col-name {
@@ -261,7 +295,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--color-accent, #2563eb);
+  background: var(--color-accent, #47aafd);
   flex-shrink: 0;
   animation: drills-pulse 2s ease-in-out infinite;
 }
@@ -288,7 +322,7 @@
 
 .drills-session-info {
   font-size: 11px;
-  color: var(--color-accent, #2563eb);
+  color: var(--color-accent, #47aafd);
   font-family: 'Inter', -apple-system, sans-serif;
 }
 
@@ -299,8 +333,8 @@
 .drills-row-active-tag {
   font-size: 11px;
   font-weight: 600;
-  color: var(--color-accent, #2563eb);
-  background: rgba(37, 99, 235, 0.08);
+  color: var(--color-accent, #47aafd);
+  background: rgba(71, 170, 253, 0.08);
   padding: 2px 8px;
   border-radius: 10px;
   font-family: 'Inter', -apple-system, sans-serif;
@@ -412,13 +446,13 @@
 }
 
 .drills-expand-btn:hover {
-  border-color: var(--color-accent, #2563eb);
-  color: var(--color-accent, #2563eb);
+  border-color: var(--color-accent, #47aafd);
+  color: var(--color-accent, #47aafd);
 }
 
 .drills-practice-btn {
   padding: 6px 14px;
-  background: var(--color-accent, #2563eb);
+  background: var(--color-accent, #47aafd);
   color: #fff;
   border: none;
   border-radius: 6px;
@@ -431,28 +465,28 @@
 }
 
 .drills-practice-btn:hover {
-  background: #1d4ed8;
+  background: var(--color-accent-hover, #2d96f0);
 }
 
 .drills-practice-btn.continue {
   background: transparent;
-  color: var(--color-accent, #2563eb);
-  border: 1px solid var(--color-accent, #2563eb);
+  color: var(--color-accent, #47aafd);
+  border: 1px solid var(--color-accent, #47aafd);
 }
 
 .drills-practice-btn.continue:hover {
-  background: var(--color-accent, #2563eb);
+  background: var(--color-accent, #47aafd);
   color: #fff;
 }
 
 .drills-practice-btn.resume {
-  background: var(--color-accent, #2563eb);
+  background: var(--color-accent, #47aafd);
   color: #fff;
   border: none;
 }
 
 .drills-practice-btn.resume:hover {
-  background: #1d4ed8;
+  background: var(--color-accent-hover, #2d96f0);
 }
 
 /* ========== Expandable Detail Panel ========== */
@@ -545,7 +579,7 @@
 .drills-history-xp {
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-accent, #2563eb);
+  color: var(--color-accent, #47aafd);
 }
 
 .drills-history-bars {
@@ -578,6 +612,270 @@
   padding: 40px 20px;
   color: var(--color-text-secondary, #6b6b6b);
   font-size: 14px;
+}
+
+/* ========== Tabs ========== */
+.drills-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--color-border, #e6e3de);
+  margin-bottom: 20px;
+}
+
+.drills-tab {
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b6b6b);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, sans-serif;
+  transition: color 0.15s;
+  margin-bottom: -1px;
+}
+
+.drills-tab:hover {
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.drills-tab.active {
+  color: var(--color-text-primary, #1a1a1a);
+  border-bottom-color: var(--color-text-primary, #1a1a1a);
+  font-weight: 600;
+}
+
+/* ========== Filter Groups (Practice tab) ========== */
+.drills-filter-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.drills-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.drills-filter-group-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: 'Inter', -apple-system, sans-serif;
+  min-width: 70px;
+}
+
+/* ========== History Tab ========== */
+.drills-history-header {
+  display: grid;
+  grid-template-columns: 100px 1fr 80px 80px;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--color-bg-secondary, #f4f2ee);
+  border-bottom: 1px solid var(--color-border, #e6e3de);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b6b6b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.drills-history-row-item {
+  display: grid;
+  grid-template-columns: 100px 1fr 80px 80px;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--color-border-subtle, #f0eeea);
+  align-items: center;
+}
+
+.drills-history-row-item:last-child { border-bottom: none; }
+
+.drills-history-date-cell {
+  font-size: 12px;
+  color: var(--color-text-tertiary, #999);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.drills-history-topic {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.drills-history-answers-cell {
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b6b6b);
+  text-align: center;
+}
+
+.drills-history-score-cell {
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+.drills-history-score-cell.high { color: #22c55e; }
+.drills-history-score-cell.mid { color: #f59e0b; }
+.drills-history-score-cell.low { color: #ef4444; }
+
+.drills-load-more {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  margin-top: 12px;
+  background: none;
+  border: 1px dashed var(--color-border, #e6e3de);
+  border-radius: 8px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.drills-load-more:hover {
+  border-color: var(--color-accent, #47aafd);
+  color: var(--color-accent, #47aafd);
+}
+
+.drills-tab-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 14px;
+}
+
+/* ========== Progress Tab ========== */
+.drills-progress-tab .drills-summary {
+  margin-bottom: 20px;
+}
+
+.drills-progress-section {
+  margin-bottom: 24px;
+}
+
+.drills-progress-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  margin: 0 0 12px;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.drills-progress-categories {
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.drills-progress-category-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--color-border-subtle, #f0eeea);
+}
+
+.drills-progress-category-row:last-child { border-bottom: none; }
+
+.drills-progress-category-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.drills-progress-category-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  text-transform: capitalize;
+}
+
+.drills-progress-category-meta {
+  font-size: 11px;
+  color: var(--color-text-secondary, #6b6b6b);
+}
+
+.drills-progress-category-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 180px;
+}
+
+/* Weak spots */
+.drills-progress-weak-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 10px;
+  margin-bottom: 6px;
+}
+
+.drills-progress-weak-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Topic list for Progress tab */
+.drills-progress-topics {
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.drills-progress-topic-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--color-border-subtle, #f0eeea);
+}
+
+.drills-progress-topic-row:last-child { border-bottom: none; }
+
+.drills-progress-topic-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drills-progress-topic-category {
+  font-size: 11px;
+  color: var(--color-text-secondary, #6b6b6b);
+  text-transform: capitalize;
+  min-width: 80px;
+}
+
+.drills-progress-topic-drills {
+  font-size: 12px;
+  color: var(--color-text-secondary, #6b6b6b);
+  min-width: 50px;
+  text-align: right;
 }
 
 /* ========== Responsive ========== */
@@ -643,5 +941,31 @@
 
   .drills-history-bars {
     display: none;
+  }
+
+  .drills-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .drills-tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .drills-filter-group {
+    flex-wrap: wrap;
+  }
+  .drills-history-header {
+    display: none;
+  }
+  .drills-history-row-item {
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+  }
+  .drills-history-date-cell,
+  .drills-history-answers-cell {
+    display: none;
+  }
+  .drills-progress-category-bar-wrap {
+    min-width: 120px;
   }
 }

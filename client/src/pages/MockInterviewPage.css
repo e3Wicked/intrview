@@ -1,60 +1,132 @@
 .mock-interview-page {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 24px 32px;
   min-height: calc(100vh - 200px);
-  padding: 40px 20px;
 }
 
-.mock-interview-card {
-  max-width: 480px;
+.mock-interview-loading {
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 14px;
   text-align: center;
-  padding: 48px 40px;
-  background: var(--color-bg-card, #ffffff);
-  border: 1px solid var(--color-border, #e6e3de);
-  border-radius: 16px;
-  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02));
+  padding: 60px 0;
 }
 
-.mock-interview-icon {
-  color: var(--color-accent, #2563eb);
+/* Header - matches dashboard */
+.mock-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   margin-bottom: 24px;
+  gap: 16px;
 }
 
-.mock-interview-card h1 {
-  font-size: 24px;
+.mock-page-header-text {
+  flex: 1;
+}
+
+.mock-page-title {
+  font-size: 32px;
   font-weight: 700;
   color: var(--color-text-primary, #1a1a1a);
-  margin: 0 0 12px;
+  margin: 0 0 4px;
   font-family: 'Inter', -apple-system, sans-serif;
 }
 
-.mock-interview-desc {
+.mock-page-subtitle {
+  font-size: 14px;
   color: var(--color-text-secondary, #6b6b6b);
-  font-size: 15px;
-  line-height: 1.6;
-  margin: 0 0 24px;
-}
-
-.mock-interview-badge {
-  display: inline-block;
-  padding: 6px 16px;
-  background: rgba(37, 99, 235, 0.08);
-  border: 1px solid rgba(37, 99, 235, 0.2);
-  color: var(--color-accent, #2563eb);
-  font-size: 13px;
-  font-weight: 600;
-  border-radius: 20px;
-  margin-bottom: 20px;
-}
-
-.mock-interview-sub {
-  color: var(--color-text-secondary, #6b6b6b);
-  font-size: 13px;
-  line-height: 1.6;
   margin: 0;
 }
 
-.mock-interview-sub strong {
+/* Tabs */
+.mock-page-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--color-border, #e6e3de);
+  margin-bottom: 24px;
+}
+
+.mock-page-tab {
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b6b6b);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, sans-serif;
+  transition: color 0.15s ease;
+  margin-bottom: -1px;
+}
+
+.mock-page-tab:hover {
   color: var(--color-text-primary, #1a1a1a);
+}
+
+.mock-page-tab.active {
+  color: var(--color-text-primary, #1a1a1a);
+  border-bottom-color: var(--color-text-primary, #1a1a1a);
+  font-weight: 600;
+}
+
+/* Generating State */
+.mock-page-generating {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  text-align: center;
+}
+
+.mock-page-generating-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--color-border, #e6e3de);
+  border-top-color: var(--color-text-primary, #1a1a1a);
+  border-radius: 50%;
+  animation: mock-page-spin 0.8s linear infinite;
+  margin-bottom: 24px;
+}
+
+@keyframes mock-page-spin {
+  to { transform: rotate(360deg); }
+}
+
+.mock-page-generating h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text-primary, #1a1a1a);
+  margin: 0 0 8px;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.mock-page-generating p {
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 15px;
+  margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .mock-interview-page {
+    padding: 16px;
+  }
+
+  .mock-page-title {
+    font-size: 24px;
+  }
+
+  .mock-page-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mock-page-tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
 }

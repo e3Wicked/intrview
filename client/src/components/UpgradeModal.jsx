@@ -10,13 +10,12 @@ const PLAN_INFO = {
   elite:   { name: 'Elite',   price: 39, jobAnalyses: 'Unlimited',   trainingCredits: '800 / mo' },
 }
 
-function UpgradeModal({ isOpen, onClose, user, onLoginRequired, onUserUpdate, onUpgradeSuccess }) {
-  const [loading, setLoading] = useState(null)
-  const [confirmingPlan, setConfirmingPlan] = useState(null)
-  const [confirmingDowngrade, setConfirmingDowngrade] = useState(null)
+  const handleSelectPlan = async ({ plan: planKey, interval }) => {
+    if (planKey === currentPlan) {
+      onClose()
+      return
+    }
 
-  const handleSelectPlan = async (planKey, interval) => {
-    // Check if user needs to login first
     try {
       const meResponse = await axios.get('/api/auth/me')
       if (!meResponse.data.user) {

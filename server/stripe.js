@@ -87,55 +87,25 @@ export async function createStripeProducts() {
   return products;
 }
 
-// Resolve the Stripe price ID for a plan (from env or auto-create)
-export async function getPriceIdForPlan(planKey, interval = 'month') {
+const INTERVAL_CONFIG = {
+  monthly:   { interval: 'month', interval_count: 1 },
+  quarterly: { interval: 'month', interval_count: 3 },
+  annual:    { interval: 'year',  interval_count: 1 },
+};
+
+// Create checkout session
+export async function createCheckoutSession(userId, planKey, successUrl, cancelUrl, interval = 'monthly') {
   const plan = PLANS[planKey];
   if (!plan || !plan.price) {
     throw new Error('Invalid plan');
   }
 
-  const envSuffix = interval === 'year' ? `_ANNUAL` : '';
-  let priceId = process.env[`STRIPE_PRICE_ID_${planKey.toUpperCase()}${envSuffix}`];
-
-  if (!priceId) {
-    const label = interval === 'year' ? 'annual' : 'monthly';
-    console.log(`Creating Stripe product and ${label} price for ${planKey}...`);
-    try {
-      const product = await stripe.products.create({
-        name: `${plan.name} Plan`,
-        description: `intrview.io ${plan.name} subscription`
-      });
-
-      const unitAmount = interval === 'year'
-        ? Math.round(plan.price * 12 * 0.8 * 100)
-        : plan.price * 100;
-
-      const price = await stripe.prices.create({
-        product: product.id,
-        unit_amount: unitAmount,
-        currency: 'usd',
-        recurring: { interval }
-      });
-
-      priceId = price.id;
-      const envKey = `STRIPE_PRICE_ID_${planKey.toUpperCase()}${envSuffix}`;
-      console.log(`Created Stripe ${label} price for ${planKey}: ${priceId}`);
-      console.log(`Add this to your .env: ${envKey}=${priceId}`);
-    } catch (error) {
-      console.error('Error creating Stripe product/price:', error);
-      throw new Error(`Failed to create Stripe price: ${error.message}`);
-    }
+  const intervalCfg = INTERVAL_CONFIG[interval];
+  if (!intervalCfg) {
+    throw new Error('Invalid billing interval');
   }
 
-  return priceId;
-}
-
-// Create checkout session (for free → paid transitions)
-export async function createCheckoutSession(userId, planKey, successUrl, cancelUrl, interval = 'month') {
-  const plan = PLANS[planKey];
-  if (!plan || !plan.price) {
-    throw new Error('Invalid plan');
-  }
+  const priceAmount = plan.pricing?.[interval] ?? plan.price;
 
   // Get or create Stripe customer
   const userResult = await pool.query(
@@ -165,7 +135,37 @@ export async function createCheckoutSession(userId, planKey, successUrl, cancelU
     );
   }
 
-  const priceId = await getPriceIdForPlan(planKey, interval);
+  const envKey = `STRIPE_PRICE_ID_${planKey.toUpperCase()}_${interval.toUpperCase()}`;
+  let priceId = process.env[envKey];
+
+  if (!priceId) {
+    console.log(`Creating Stripe product and price for ${planKey} (${interval})...`);
+    try {
+      const product = await stripe.products.create({
+        name: `${plan.name} Plan`,
+        description: `intrview.io ${plan.name} subscription`
+      });
+
+      const recurring = { interval: intervalCfg.interval };
+      if (intervalCfg.interval_count > 1) {
+        recurring.interval_count = intervalCfg.interval_count;
+      }
+
+      const price = await stripe.prices.create({
+        product: product.id,
+        unit_amount: priceAmount * 100,
+        currency: 'usd',
+        recurring
+      });
+
+      priceId = price.id;
+      console.log(`Created Stripe price for ${planKey} (${interval}): ${priceId}`);
+      console.log(`Add this to your .env: ${envKey}=${priceId}`);
+    } catch (error) {
+      console.error('Error creating Stripe product/price:', error);
+      throw new Error(`Failed to create Stripe price: ${error.message}`);
+    }
+  }
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,

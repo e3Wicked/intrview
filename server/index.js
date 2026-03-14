@@ -70,17 +70,11 @@ import {
 import { sendVerificationCode } from './email.js';
 import Stripe from 'stripe';
 import practiceRouter, { recordAttempt } from './routes/practice.js';
-import {
-  createCheckoutSession,
-  upgradeSubscription,
-  handleWebhook,
-  createPortalSession,
-  activateSubscription,
-  getAdvertiserPriceId,
-  scheduleDowngrade,
-  cancelScheduledDowngrade,
-  scheduleCancellation,
-  undoCancellation
+import mockInterviewRouter from './routes/mock-interview.js';
+import { 
+  createCheckoutSession, 
+  handleWebhook, 
+  createPortalSession 
 } from './stripe.js';
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
@@ -120,6 +114,45 @@ function isCompanySpecificTopic(topicName, companyName = null) {
     if (new RegExp(`(culture|values|mission|principles|fit).*\\b${comp}\\b`, 'i').test(lower)) return true
   }
   return false
+}
+
+// Parse seniority level from role title and job description
+function parseSeniority(roleTitle, jobDescription = '') {
+  const title = (roleTitle || '').toLowerCase();
+  const desc = (jobDescription || '').toLowerCase();
+
+  // Check role title for level indicators
+  let level = 'mid';
+  if (/\b(intern|internship)\b/.test(title)) level = 'intern';
+  else if (/\b(junior|jr\.?|entry[- ]level|associate)\b/.test(title)) level = 'junior';
+  else if (/\b(staff|principal)\b/.test(title)) level = 'staff';
+  else if (/\b(lead|architect|head|director|vp|vice president)\b/.test(title)) level = 'lead';
+  else if (/\b(senior|sr\.?)\b/.test(title)) level = 'senior';
+  else if (/\b(mid[- ]?level|mid[- ]?senior)\b/.test(title)) level = 'mid';
+
+  // Parse years of experience from job description
+  let yearsHint = null;
+  const yearsMatch = desc.match(/(\d+)\+?\s*(?:years?|yrs?)\s*(?:of\s+)?(?:experience|exp)/i);
+  if (yearsMatch) {
+    yearsHint = parseInt(yearsMatch[1], 10);
+    // If title didn't give a clear signal, infer from years
+    if (level === 'mid') {
+      if (yearsHint >= 10) level = 'staff';
+      else if (yearsHint >= 6) level = 'senior';
+      else if (yearsHint <= 2) level = 'junior';
+    }
+  }
+
+  const labels = {
+    intern: 'Intern-level',
+    junior: 'Junior-level',
+    mid: 'Mid-level',
+    senior: 'Senior-level',
+    staff: 'Staff/Principal-level',
+    lead: 'Lead/Director-level',
+  };
+
+  return { level, yearsHint, label: labels[level] || 'Mid-level' };
 }
 
 const app = express();
@@ -1528,7 +1561,29 @@ ${topicNames.map(n => `- "${n}"`).join('\n')}
     const MAX_JD_FOR_PROMPT = 15_000;
     const truncatedJD = jobDescription.length > MAX_JD_FOR_PROMPT ? jobDescription.substring(0, MAX_JD_FOR_PROMPT) : jobDescription;
 
+    // Parse seniority and build difficulty guidance
+    const seniority = parseSeniority(roleTitle, jobDescription);
+    let seniorityGuidance = '';
+    switch (seniority.level) {
+      case 'intern':
+      case 'junior':
+        seniorityGuidance = `This is a ${seniority.label} position${seniority.yearsHint ? ` (${seniority.yearsHint}+ years experience)` : ''}. Focus on fundamentals, practical coding patterns, and clear step-by-step explanations. Ask about basic implementations, common patterns, and foundational concepts. Avoid advanced architecture or leadership questions.`;
+        break;
+      case 'mid':
+        seniorityGuidance = `This is a ${seniority.label} position${seniority.yearsHint ? ` (${seniority.yearsHint}+ years experience)` : ''}. Balance fundamentals with intermediate concepts. Include practical problem-solving, design discussions, and collaboration scenarios.`;
+        break;
+      case 'senior':
+        seniorityGuidance = `This is a ${seniority.label} position${seniority.yearsHint ? ` (${seniority.yearsHint}+ years experience)` : ''}. Focus on deep technical discussions, design patterns, performance optimization, trade-off analysis, and technical leadership. Avoid basic syntax or introductory-level questions.`;
+        break;
+      case 'staff':
+      case 'lead':
+        seniorityGuidance = `This is a ${seniority.label} position${seniority.yearsHint ? ` (${seniority.yearsHint}+ years experience)` : ''}. Focus on system design trade-offs, architecture decisions, cross-team technical leadership, mentoring, and strategic thinking. Questions should test depth of understanding, not breadth of syntax. Avoid basic or introductory questions entirely.`;
+        break;
+    }
+
     const prompt = `You are an expert career coach and technical interviewer specializing in ${fieldContext}. Based on the following job description for ${companyName}, create a comprehensive study plan and a LARGE set of interview questions.
+
+${seniorityGuidance}
 
 IMPORTANT: Generate questions that are SPECIFIC to ${companyName} and their tech stack. Include:
 1. Company-specific culture and values questions about ${companyName}
@@ -2341,7 +2396,7 @@ Format as JSON:
 
     // Track this job analysis
     const jobDescriptionHash = hashJobDescription(jobDescription);
-    await trackJobAnalysis(
+    const analysisDbId = await trackJobAnalysis(
       user.id,
       url || 'pasted-text',
       jobDescriptionHash,
@@ -2398,12 +2453,17 @@ Format as JSON:
     console.log('companyInfo.fundingRounds:', companyInfo?.fundingRounds?.length || 0);
     console.log('Full companyInfo:', JSON.stringify(companyInfo, null, 2));
 
+    // Include seniority in the response for frontend use
+    const seniorityData = parseSeniority(companyInfo?.roleTitle, jobDescription);
+
     const response = {
       success: true,
+      id: analysisDbId, // DB id for reliable navigation
       jobDescription: jobDescription,
       jobDescriptionHash: jobDescriptionHash, // Add hash for generate more questions feature
       companyInfo: companyInfo,
       companyResearch: companyResearch || null,
+      seniority: seniorityData,
       studyPlan,
       url: url || null, // Include URL for reference
       user: {
@@ -2832,7 +2892,7 @@ app.post('/api/chat/focus', requireAuth, async (req, res) => {
       return res.status(429).json({ error: 'Too many requests. Please slow down.', retryAfter: focusRl.retryAfter });
     }
 
-    const { skill, messages, sessionId } = req.body;
+    const { skill, messages, sessionId, seniorityLevel } = req.body;
 
     if (!skill) {
       return res.status(400).json({ error: 'Skill is required' });
@@ -2857,8 +2917,23 @@ app.post('/api/chat/focus', requireAuth, async (req, res) => {
 
     const openai = getOpenAIClient();
 
-    const systemPrompt = `You are a focused skill coach helping a software engineer improve their understanding of: ${skill}.
+    // Build seniority context for coaching
+    const levelLabels = { intern: 'intern', junior: 'junior', mid: 'mid-level', senior: 'senior', staff: 'staff/principal', lead: 'lead/director' };
+    const levelLabel = levelLabels[seniorityLevel] || 'mid-level';
+    const seniorityContext = seniorityLevel && seniorityLevel !== 'mid'
+      ? `\nThe user is preparing for a ${levelLabel} position. Calibrate question depth and complexity accordingly — ${
+          ['staff', 'lead'].includes(seniorityLevel)
+            ? 'focus on architecture trade-offs, system design, and leadership. Avoid basic syntax questions.'
+            : seniorityLevel === 'senior'
+            ? 'focus on deep technical discussions and trade-offs. Avoid introductory questions.'
+            : ['junior', 'intern'].includes(seniorityLevel)
+            ? 'focus on fundamentals and practical patterns. Build up gradually from basics.'
+            : ''
+        }`
+      : '';
 
+    const systemPrompt = `You are a focused skill coach helping a software engineer improve their understanding of: ${skill}.
+${seniorityContext}
 Your approach:
 - Start by asking a diagnostic question to gauge their current level
 - Use Socratic questioning — guide them to discover answers rather than lecturing
@@ -3290,29 +3365,21 @@ Format as JSON:
 // Create checkout session
 app.post('/api/stripe/create-checkout', requireAuth, async (req, res) => {
   try {
-    const { plan, interval = 'month' } = req.body;
+    const { plan, interval = 'monthly' } = req.body;
 
     if (!PLANS[plan] || !PLANS[plan].price) {
       return res.status(400).json({ error: 'Invalid plan' });
     }
 
-    if (!['month', 'year'].includes(interval)) {
-      return res.status(400).json({ error: 'Invalid billing interval' });
+    if (!['monthly', 'quarterly', 'annual'].includes(interval)) {
+      return res.status(400).json({ error: 'Invalid interval' });
     }
 
-    if (req.user.plan === plan && req.user.subscriptionStatus === 'active') {
-      return res.status(400).json({ error: 'You are already on this plan' });
-    }
-
-    if (req.user.subscriptionStatus === 'active' && req.user.stripeSubscriptionId) {
-      return res.status(400).json({ error: 'Use the upgrade endpoint to change plans' });
-    }
-
-    const successUrl = `${req.headers.origin || 'http://localhost:5173'}/dashboard?upgraded=true`;
-    const cancelUrl = `${req.headers.origin || 'http://localhost:5173'}/dashboard`;
+    const successUrl = `${req.headers.origin || 'http://localhost:5000'}/billing/success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${req.headers.origin || 'http://localhost:5000'}/billing/cancel`;
 
     const session = await createCheckoutSession(req.user.id, plan, successUrl, cancelUrl, interval);
-
+    
     res.json({ sessionId: session.id, url: session.url });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -4053,7 +4120,11 @@ app.get('/api/user/analysis/:id', requireAuth, async (req, res) => {
     // Fetch full company data (founders, funding, research)
     let companyData = null;
     if (analysis.company_name) {
-      companyData = await getCompanyFullData(analysis.company_name);
+      try {
+        companyData = await getCompanyFullData(analysis.company_name);
+      } catch (e) {
+        console.error('Error loading company data:', e.message);
+      }
     }
 
     res.json({
@@ -4091,6 +4162,39 @@ app.delete('/api/user/analyses', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Error deleting user analyses:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/user/analysis/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const result = await pool.query(
+      'SELECT job_description_hash FROM job_analyses WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Analysis not found' });
+    }
+
+    const hash = result.rows[0].job_description_hash;
+
+    await pool.query('DELETE FROM job_analyses WHERE id = $1 AND user_id = $2', [id, userId]);
+
+    const otherUses = await pool.query(
+      'SELECT id FROM job_analyses WHERE job_description_hash = $1 AND id != $2',
+      [hash, id]
+    );
+    if (otherUses.rows.length === 0) {
+      await pool.query('DELETE FROM job_topics WHERE job_description_hash = $1', [hash]);
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting analysis:', error);
+    res.status(500).json({ error: 'Failed to delete analysis' });
   }
 });
 
@@ -4290,6 +4394,7 @@ app.get('/api/advertisers', async (req, res) => {
 
 // Mount practice/progress routes
 app.use(practiceRouter);
+app.use('/api/mock-interview', mockInterviewRouter);
 
 // Topic API endpoints
 app.get('/api/user/topic-scores', requireAuth, async (req, res) => {

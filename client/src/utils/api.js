@@ -48,11 +48,11 @@ export const api = {
     deleteAllAnalyses: () => axios.delete('/api/user/analyses'),
     updateProfile: (data) => axios.put('/api/user/profile', data),
   },
-  subscription: {
-    cancel: (data) => axios.post('/api/stripe/cancel-subscription', data),
-    undoCancel: () => axios.post('/api/stripe/undo-cancellation'),
-  },
-  admin: {
-    getAnalytics: () => axios.get('/api/admin/analytics'),
+  mockInterview: {
+    start: (data) => axios.post('/api/mock-interview/start', data),
+    respond: (data) => axios.post('/api/mock-interview/respond', data, { timeout: 60000 }),
+    end: (data) => axios.post('/api/mock-interview/end', data, { timeout: 60000 }),
+    history: () => axios.get('/api/mock-interview/history'),
+    session: (id) => axios.get(`/api/mock-interview/session/${id}`),
   },
 }

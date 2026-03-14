@@ -20,6 +20,8 @@ function Practice({ questions, jobDescription, companyName, roleTitle, techStack
   const [focusCategories, setFocusCategories] = useState(initialFocusCategories || [])
   const [autoGenerateAttempted, setAutoGenerateAttempted] = useState(false)
   const [questionsExhausted, setQuestionsExhausted] = useState(false)
+  const [questionTarget, setQuestionTarget] = useState(10)
+  const [autoStopTriggered, setAutoStopTriggered] = useState(false)
   const sessionIdRef = useRef(null)
 
   // Map initialMode to the correct internal mode
@@ -99,6 +101,38 @@ function Practice({ questions, jobDescription, companyName, roleTitle, techStack
       questionsAnswered: prev.questionsAnswered + 1,
     }))
   }, [])
+
+  // Auto-stop when question target reached
+  useEffect(() => {
+    if (
+      questionTarget > 0 &&
+      sessionStats.questionsAnswered > 0 &&
+      sessionStats.questionsAnswered >= questionTarget &&
+      !autoStopTriggered &&
+      !showSummary
+    ) {
+      setAutoStopTriggered(true)
+      handleEndSession()
+    }
+  }, [sessionStats.questionsAnswered, questionTarget, autoStopTriggered, showSummary])
+
+  const handleContinueMore = async () => {
+    setAutoStopTriggered(false)
+    setQuestionTarget(prev => prev + 5)
+    setShowSummary(false)
+    setSummaryData(null)
+    // Don't reset stats — keep cumulative count but start new server session
+    try {
+      const res = await api.practice.startSession({
+        jobDescriptionHash,
+        mode: practiceMode,
+      })
+      setSessionId(res.data.sessionId)
+      sessionIdRef.current = res.data.sessionId
+    } catch (err) {
+      console.error('Failed to restart session:', err)
+    }
+  }
 
   const handleEndSession = async () => {
     if (!sessionId) {
@@ -190,15 +224,31 @@ function Practice({ questions, jobDescription, companyName, roleTitle, techStack
       {showSummary && summaryData && (
         <div className="practice-summary-overlay">
           <div className="practice-summary-card">
-            <h3>Session Complete</h3>
+            <h3>{autoStopTriggered ? `${questionTarget} Questions Done!` : 'Session Complete'}</h3>
             <div className="practice-summary-stats">
-              <div><strong>{summaryData.questionsAttempted}</strong> questions</div>
-              <div><strong>{summaryData.questionsCorrect}</strong> correct</div>
-              {summaryData.averageScore > 0 && <div>Avg score: <strong>{Math.round(summaryData.averageScore)}%</strong></div>}
+              <div className="practice-summary-stat">
+                <span className="practice-summary-stat-value">{summaryData.questionsAttempted}</span>
+                <span className="practice-summary-stat-label">Questions</span>
+              </div>
+              <div className="practice-summary-stat">
+                <span className="practice-summary-stat-value">{summaryData.questionsCorrect}</span>
+                <span className="practice-summary-stat-label">Correct</span>
+              </div>
+              {summaryData.averageScore > 0 && (
+                <div className="practice-summary-stat">
+                  <span className="practice-summary-stat-value">{Math.round(summaryData.averageScore)}%</span>
+                  <span className="practice-summary-stat-label">Avg Score</span>
+                </div>
+              )}
             </div>
             <div className="practice-summary-actions">
-              <button className="mode-btn" onClick={handleContinuePractice}>Continue Practice</button>
-              <button className="mode-btn" onClick={() => setShowSummary(false)} style={{ borderColor: '#555', color: '#aaa' }}>Close</button>
+              {autoStopTriggered && (
+                <button className="practice-continue-btn" onClick={handleContinueMore}>
+                  Continue +5 more
+                </button>
+              )}
+              <button className="practice-restart-btn" onClick={handleContinuePractice}>New Session</button>
+              <button className="practice-close-btn" onClick={() => setShowSummary(false)}>Close</button>
             </div>
           </div>
         </div>
@@ -214,15 +264,30 @@ function Practice({ questions, jobDescription, companyName, roleTitle, techStack
             })()}
             {generating && <span className="practice-loading-hint"> &middot; Loading more...</span>}
             {sessionStats.questionsAnswered > 0 && (
-              <span> &middot; {sessionStats.questionsAnswered} answered</span>
+              <span> &middot; {sessionStats.questionsAnswered}/{questionTarget} answered</span>
             )}
           </p>
         </div>
         <div className="practice-header-right">
+          <div className="practice-target-selector">
+            <label className="practice-target-label">Goal:</label>
+            <select
+              className="practice-target-select"
+              value={questionTarget}
+              onChange={(e) => {
+                setQuestionTarget(Number(e.target.value))
+                setAutoStopTriggered(false)
+              }}
+            >
+              <option value={5}>5 questions</option>
+              <option value={10}>10 questions</option>
+              <option value={15}>15 questions</option>
+              <option value={20}>20 questions</option>
+            </select>
+          </div>
           <button
-            className="mode-btn"
+            className="practice-end-btn"
             onClick={handleEndSession}
-            style={{ fontSize: '12px', padding: '8px 14px', borderColor: '#f59e0b33', color: '#f59e0b' }}
           >
             End Session
           </button>

@@ -36,7 +36,16 @@ function saveCompletedSession(skill, { exchangeCount, scores }) {
   }).catch(err => console.error('[Drill] Failed to save session to DB:', err))
 }
 
-function FocusChat({ skill, user }) {
+const SENIORITY_OPTIONS = [
+  { value: 'intern', label: 'Intern' },
+  { value: 'junior', label: 'Junior' },
+  { value: 'mid', label: 'Mid' },
+  { value: 'senior', label: 'Senior' },
+  { value: 'staff', label: 'Staff' },
+  { value: 'lead', label: 'Lead+' },
+]
+
+function FocusChat({ skill, user, seniorityLevel = 'mid', onSeniorityChange, questionGoal = 10 }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const returnTo = searchParams.get('from') || '/dashboard'
@@ -51,6 +60,8 @@ function FocusChat({ skill, user }) {
   const [sessionId, setSessionId] = useState(saved.current?.sessionId || null)
   const [showEndSummary, setShowEndSummary] = useState(false)
   const [error, setError] = useState(null)
+  const [questionTarget, setQuestionTarget] = useState(saved.current?.questionTarget || questionGoal)
+  const [autoStopTriggered, setAutoStopTriggered] = useState(false)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const abortRef = useRef(null)
@@ -87,26 +98,42 @@ function FocusChat({ skill, user }) {
         exchangeCount,
         scores,
         sessionId: sessionIdRef.current,
+        questionTarget,
       })
     }
-  }, [messages, exchangeCount, scores, skill, showEndSummary])
+  }, [messages, exchangeCount, scores, skill, showEndSummary, questionTarget])
 
-  // Start session and first message on mount (only if no saved session)
+  // Auto-stop when question target reached
+  useEffect(() => {
+    if (
+      questionTarget > 0 &&
+      exchangeCount > 0 &&
+      exchangeCount >= questionTarget &&
+      !autoStopTriggered &&
+      !showEndSummary &&
+      !streaming
+    ) {
+      setAutoStopTriggered(true)
+      handleEndChat()
+    }
+  }, [exchangeCount, questionTarget, autoStopTriggered, showEndSummary, streaming])
+
+  const initSession = async () => {
+    try {
+      const res = await api.practice.startSession({ jobDescriptionHash: '', mode: 'focus' })
+      setSessionId(res.data.sessionId)
+      sessionIdRef.current = res.data.sessionId
+    } catch (e) {
+      // Non-critical
+    }
+    doSendMessage(null)
+  }
+
+  // Start session and first message on mount
   useEffect(() => {
     if (!skill || startedRef.current) return
     startedRef.current = true
-
-    const init = async () => {
-      try {
-        const res = await api.practice.startSession({ jobDescriptionHash: '', mode: 'focus' })
-        setSessionId(res.data.sessionId)
-        sessionIdRef.current = res.data.sessionId
-      } catch (e) {
-        // Non-critical
-      }
-      doSendMessage(null)
-    }
-    init()
+    initSession()
   }, [skill])
 
   // On unmount: DON'T end the session — we're saving state for resume.
@@ -147,6 +174,7 @@ function FocusChat({ skill, user }) {
           skill,
           messages: updatedMessages.map(m => ({ role: m.role, content: m.content })),
           sessionId: sessionIdRef.current,
+          seniorityLevel,
         }),
         signal: controller.signal,
       })
@@ -267,6 +295,18 @@ function FocusChat({ skill, user }) {
     setShowEndSummary(true)
   }
 
+  const handleContinueMore = async () => {
+    setAutoStopTriggered(false)
+    setQuestionTarget(prev => prev + 5)
+    setShowEndSummary(false)
+    // Start a new server session but keep messages/scores
+    try {
+      const res = await api.practice.startSession({ jobDescriptionHash: '', mode: 'focus' })
+      setSessionId(res.data.sessionId)
+      sessionIdRef.current = res.data.sessionId
+    } catch (e) { /* non-critical */ }
+  }
+
   const goBack = () => {
     // Save is automatic via the useEffect — just navigate away
     if (abortRef.current) abortRef.current.abort()
@@ -281,7 +321,7 @@ function FocusChat({ skill, user }) {
     return (
       <div className="focus-chat-summary">
         <div className="focus-summary-header">
-          <h3>Session Complete</h3>
+          <h3>{autoStopTriggered ? `${questionTarget} Questions Done!` : 'Session Complete'}</h3>
           <p>{skill}</p>
         </div>
         <div className="focus-summary-stats">
@@ -318,6 +358,11 @@ function FocusChat({ skill, user }) {
           </div>
         )}
         <div className="focus-summary-actions">
+          {autoStopTriggered && (
+            <button className="focus-continue-btn" onClick={handleContinueMore}>
+              Continue +5 more
+            </button>
+          )}
           <button className="focus-back-btn" onClick={() => navigate(returnTo)}>
             Back to {returnTo === '/study/drills' ? 'Drills' : 'Dashboard'}
           </button>
@@ -325,9 +370,13 @@ function FocusChat({ skill, user }) {
             setMessages([])
             messagesRef.current = []
             setExchangeCount(0)
+            exchangeCountRef.current = 0
             setScores([])
+            scoresRef.current = []
             setShowEndSummary(false)
-            startedRef.current = false
+            setAutoStopTriggered(false)
+            setQuestionTarget(questionGoal)
+            initSession()
           }}>
             Practice Again
           </button>
@@ -337,6 +386,7 @@ function FocusChat({ skill, user }) {
   }
 
   const isResumed = saved.current && messages.length > 0
+  const seniorityLabel = SENIORITY_OPTIONS.find(o => o.value === seniorityLevel)?.label || 'Mid'
 
   return (
     <div className="focus-chat-container">
@@ -349,8 +399,9 @@ function FocusChat({ skill, user }) {
             </svg>
           </button>
           <span className="focus-skill-badge">{skill}</span>
+          <span className="focus-header-tag">{seniorityLabel}</span>
           <span className="focus-exchange-count">
-            {exchangeCount} {exchangeCount === 1 ? 'answer' : 'answers'}
+            {exchangeCount}/{questionTarget}
             {avgScore !== null && <> &middot; avg {avgScore}%</>}
           </span>
         </div>

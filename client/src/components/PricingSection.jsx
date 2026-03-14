@@ -1,16 +1,19 @@
 import { useState } from 'react'
 import './PricingSection.css'
 
-function PricingSection({ onSelectPlan, currentPlan, onManageBilling, onDowngrade, scheduledDowngradePlan }) {
-  const [billingInterval, setBillingInterval] = useState('month')
-  const planOrder = ['free', 'starter', 'pro', 'elite']
-  const currentIndex = planOrder.indexOf(currentPlan || 'free')
+const PRICING = {
+  starter:  { monthly: 9,  quarterly: 24,  annual: 86 },
+  pro:      { monthly: 19, quarterly: 51,  annual: 182 },
+  elite:    { monthly: 39, quarterly: 105, annual: 374 },
+}
+
+function PricingSection({ onSelectPlan }) {
+  const [interval, setInterval] = useState('monthly')
 
   const plans = [
     {
       key: 'starter',
       name: 'Starter',
-      price: 9,
       jobAnalyses: '10',
       trainingCredits: '150',
       features: [
@@ -20,13 +23,12 @@ function PricingSection({ onSelectPlan, currentPlan, onManageBilling, onDowngrad
         'Company research',
         'Progress tracking'
       ],
-      cta: 'Start Starter',
+      cta: 'Get Started',
       popular: false
     },
     {
       key: 'pro',
       name: 'Pro',
-      price: 19,
       jobAnalyses: '30',
       trainingCredits: '400',
       features: [
@@ -35,13 +37,12 @@ function PricingSection({ onSelectPlan, currentPlan, onManageBilling, onDowngrad
         'PDF export of study plans',
         'Priority AI speed'
       ],
-      cta: 'Go Pro',
+      cta: 'Get Started',
       popular: true
     },
     {
       key: 'elite',
       name: 'Elite',
-      price: 39,
       jobAnalyses: 'Unlimited',
       trainingCredits: '800',
       features: [
@@ -51,11 +52,17 @@ function PricingSection({ onSelectPlan, currentPlan, onManageBilling, onDowngrad
         'Custom interview simulation (coming soon)',
         'Early access to new features'
       ],
-      cta: 'Join Elite',
+      cta: 'Get Started',
       popular: false,
       badge: 'Includes upcoming premium features'
     }
   ]
+
+  const getPeriodLabel = () => {
+    if (interval === 'monthly') return '/month'
+    if (interval === 'quarterly') return '/quarter'
+    return '/year'
+  }
 
   return (
     <div className="pricing-section">
@@ -64,19 +71,18 @@ function PricingSection({ onSelectPlan, currentPlan, onManageBilling, onDowngrad
         <p>Choose a plan that fits your interview journey.</p>
       </div>
 
-      <div className="pricing-toggle">
-        <span className={`pricing-toggle-label ${billingInterval === 'month' ? 'active' : ''}`}>Monthly</span>
-        <button
-          className={`pricing-toggle-switch ${billingInterval === 'year' ? 'active' : ''}`}
-          onClick={() => setBillingInterval(prev => prev === 'month' ? 'year' : 'month')}
-          aria-label="Toggle billing interval"
-        >
-          <span className="pricing-toggle-knob" />
-        </button>
-        <span className={`pricing-toggle-label ${billingInterval === 'year' ? 'active' : ''}`}>
-          Annual
-          <span className="pricing-save-badge">Save 20%</span>
-        </span>
+      <div className="pricing-interval-toggle">
+        {['monthly', 'quarterly', 'annual'].map((opt) => (
+          <button
+            key={opt}
+            className={`pricing-interval-option ${interval === opt ? 'active' : ''}`}
+            onClick={() => setInterval(opt)}
+          >
+            {opt.charAt(0).toUpperCase() + opt.slice(1)}
+            {opt === 'quarterly' && <span className="pricing-save-badge">Save 10%</span>}
+            {opt === 'annual' && <span className="pricing-save-badge">Save 20%</span>}
+          </button>
+        ))}
       </div>
 
       <div className="pricing-cards">
@@ -85,17 +91,13 @@ function PricingSection({ onSelectPlan, currentPlan, onManageBilling, onDowngrad
           const isCurrent = plan.key === currentPlan
           const isDowngrade = planIndex < currentIndex && planIndex > 0
 
-          return (
-            <div
-              key={plan.key}
-              className={`pricing-card ${plan.popular ? 'popular' : ''} ${isCurrent ? 'current' : ''}`}
-            >
-              {isCurrent && (
-                <div className="pricing-badge current-badge">Current Plan</div>
-              )}
-              {!isCurrent && plan.popular && (
-                <div className="pricing-badge">Most Popular</div>
-              )}
+            <div className="pricing-card-header">
+              <h3>{plan.name}</h3>
+              <div className="pricing-price">
+                <span className="pricing-amount">${PRICING[plan.key][interval]}</span>
+                <span className="pricing-period">{getPeriodLabel()}</span>
+              </div>
+            </div>
 
               <div className="pricing-card-header">
                 <h3>{plan.name}</h3>
@@ -140,34 +142,14 @@ function PricingSection({ onSelectPlan, currentPlan, onManageBilling, onDowngrad
                 <div className="pricing-badge-small">{plan.badge}</div>
               )}
 
-              {isCurrent ? (
-                <button className="pricing-cta current" disabled>
-                  Current Plan
-                </button>
-              ) : isDowngrade ? (
-                scheduledDowngradePlan === plan.key ? (
-                  <button className="pricing-cta downgrade-scheduled" disabled>
-                    Downgrade Scheduled
-                  </button>
-                ) : (
-                  <button
-                    className="pricing-cta downgrade"
-                    onClick={() => onDowngrade?.(plan.key, billingInterval)}
-                  >
-                    Downgrade to {plan.name}
-                  </button>
-                )
-              ) : (
-                <button
-                  className="pricing-cta"
-                  onClick={() => onSelectPlan(plan.key, billingInterval)}
-                >
-                  {plan.cta}
-                </button>
-              )}
-            </div>
-          )
-        })}
+            <button
+              className="pricing-cta"
+              onClick={() => onSelectPlan({ plan: plan.key, interval })}
+            >
+              {plan.cta}
+            </button>
+          </div>
+        ))}
       </div>
 
       <p className="pricing-footer">

@@ -28,6 +28,7 @@ export const PLANS = {
     monthlyJobAnalyses: 10,
     monthlyTrainingCredits: 150,
     price: 9,
+    pricing: { monthly: 9, quarterly: 24, annual: 86 },
     features: {
       studyPlan: true,
       questions: true,
@@ -45,6 +46,7 @@ export const PLANS = {
     monthlyJobAnalyses: 30,
     monthlyTrainingCredits: 400,
     price: 19,
+    pricing: { monthly: 19, quarterly: 51, annual: 182 },
     features: {
       studyPlan: true,
       questions: true,
@@ -62,6 +64,7 @@ export const PLANS = {
     monthlyJobAnalyses: -1, // unlimited
     monthlyTrainingCredits: 800,
     price: 39,
+    pricing: { monthly: 39, quarterly: 105, annual: 374 },
     features: {
       studyPlan: true,
       questions: true,
@@ -87,6 +90,7 @@ export const TRAINING_CREDIT_COSTS = {
   voiceEvaluation: 2,
   companyResearch: 3,
   studyPlan: 5,
+  mockInterview: 20,
 };
 
 // Generate 6-digit verification code
@@ -421,6 +425,59 @@ export function isAdminUser(email) {
   return ADMIN_EMAILS.includes(email?.toLowerCase());
 }
 
+// Check if user has enough credits
+export async function checkCredits(userId, actionCost) {
+  // Get user email to check if admin
+  const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+  if (userResult.rows.length > 0 && isAdminUser(userResult.rows[0].email)) {
+    return { hasCredits: true, remaining: 999999 }; // Admin users have unlimited credits
+  }
+
+  // Reset credits if 30+ days have elapsed (covers annual billing plans)
+  await maybeResetCredits(userId);
+
+  const result = await pool.query(
+    'SELECT credits_remaining FROM subscriptions WHERE user_id = $1',
+    [userId]
+  );
+
+  if (result.rows.length === 0) {
+    return { hasCredits: false, remaining: 0 };
+  }
+
+  const remaining = result.rows[0].credits_remaining || 0;
+  return {
+    hasCredits: remaining >= actionCost,
+    remaining
+  };
+}
+
+// Deduct credits
+export async function deductCredits(userId, amount) {
+  // Get user email to check if admin
+  const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+  if (userResult.rows.length > 0 && isAdminUser(userResult.rows[0].email)) {
+    // Admin users don't have credits deducted
+    const adminSub = await pool.query('SELECT credits_remaining FROM subscriptions WHERE user_id = $1', [userId]);
+    return adminSub.rows[0]?.credits_remaining || 999999;
+  }
+  
+  const result = await pool.query(
+    `UPDATE subscriptions 
+     SET credits_remaining = credits_remaining - $2,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE user_id = $1 AND credits_remaining >= $2
+     RETURNING credits_remaining`,
+    [userId, amount]
+  );
+  
+  if (result.rows.length === 0) {
+    throw new Error('Failed to deduct credits - user subscription not found or insufficient credits');
+  }
+  
+  return result.rows[0].credits_remaining;
+}
+
 // Check feature access
 export function hasFeatureAccess(userPlan, feature, userEmail = null) {
   // Admin users have access to all features
@@ -468,6 +525,48 @@ export function requireAdmin(req, res, next) {
   }).catch(() => {
     res.status(500).json({ error: 'Authentication error' });
   });
+}
+
+// Middleware to require credits (legacy — kept for any routes not yet migrated)
+export function requireCredits(actionCost) {
+  return async (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { hasCredits, remaining } = await checkCredits(req.user.id, actionCost);
+
+    if (!hasCredits) {
+      return res.status(402).json({
+        error: 'Insufficient credits',
+        remaining,
+        required: actionCost,
+        upgradeRequired: true
+      });
+    }
+
+    req.creditCost = actionCost;
+    next();
+  };
+}
+
+// ==================== ANNUAL BILLING CREDIT RESET ====================
+
+// For annual plans, credits still reset monthly. Stripe webhooks handle monthly
+// billing cycles, but annual plans have no monthly invoice event. This helper
+// checks on each request whether 30+ days have elapsed since the last reset
+// and, if so, resets both buckets to their monthly allowance.
+async function maybeResetCredits(userId) {
+  const result = await pool.query(
+    `UPDATE subscriptions
+     SET training_credits_remaining = training_credits_monthly_allowance,
+         job_analyses_remaining = CASE WHEN job_analyses_monthly_allowance = -1 THEN 999999 ELSE job_analyses_monthly_allowance END,
+         credits_reset_at = NOW()
+     WHERE user_id = $1 AND credits_reset_at < NOW() - INTERVAL '30 days'
+     RETURNING *`,
+    [userId]
+  );
+  return result.rows.length > 0; // true if a reset occurred
 }
 
 // ==================== TWO-BUCKET CREDIT SYSTEM ====================
@@ -519,6 +618,9 @@ export async function checkJobAnalyses(userId) {
     return { hasAnalyses: true, remaining: 999999 };
   }
 
+  // Reset credits if 30+ days have elapsed (covers annual billing plans)
+  await maybeResetCredits(userId);
+
   const result = await pool.query(
     'SELECT job_analyses_remaining, job_analyses_monthly_allowance FROM subscriptions WHERE user_id = $1',
     [userId]
@@ -562,6 +664,9 @@ export async function checkTrainingCredits(userId, cost) {
   if (userResult.rows.length > 0 && isAdminUser(userResult.rows[0].email)) {
     return { hasCredits: true, remaining: 999999 };
   }
+
+  // Reset credits if 30+ days have elapsed (covers annual billing plans)
+  await maybeResetCredits(userId);
 
   const result = await pool.query(
     'SELECT training_credits_remaining FROM subscriptions WHERE user_id = $1',

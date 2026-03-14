@@ -4,7 +4,7 @@ import MissionDashboard from '../components/MissionDashboard'
 import InlineLoadingTerminal from '../components/InlineLoadingTerminal'
 import './DashboardPage.css'
 
-function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSelectPlan, setResult, setSelectedJdId, jdHistory, setJdHistory }) {
+function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSelectPlan, setResult, setSelectedJdId, jdHistory, setJdHistory, onDeleteJob }) {
   const navigate = useNavigate()
   const [localUrl, setLocalUrl] = useState('')
   const [localLoading, setLocalLoading] = useState(false)
@@ -29,7 +29,7 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
 
     if (analysisResult && analysisResult.companyInfo) {
       const jdEntry = {
-        id: Date.now().toString(),
+        id: (analysisResult.id || Date.now()).toString(),
         url: localUrl || 'pasted-text',
         companyName: analysisResult.companyInfo?.name || 'Unknown Company',
         roleTitle: analysisResult.companyInfo?.roleTitle || analysisResult.roleTitle || 'Unknown Role',
@@ -320,6 +320,7 @@ function DashboardPage({ user, setUser, url, setUrl, handleSubmit, loading, onSe
       {/* Mission Control Dashboard */}
       <MissionDashboard
         user={user}
+        onDeleteJob={onDeleteJob}
         onAnalyzeClick={() => {
           if (user && user.jobAnalysesRemaining === 0 && user.jobAnalysesMonthlyAllowance !== -1) {
             setCreditGate({
