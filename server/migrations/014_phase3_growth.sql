@@ -1,0 +1,3 @@
+ALTER TABLE subscriptions
+  ADD COLUMN IF NOT EXISTS billing_interval VARCHAR(10) DEFAULT 'month',
+  ADD COLUMN IF NOT EXISTS paused_at TIMESTAMP;

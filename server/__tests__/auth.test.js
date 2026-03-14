@@ -18,12 +18,13 @@ vi.mock('bcrypt', () => ({
 const { pool } = await import('../db.js');
 const {
   PLANS,
-  CREDIT_COSTS,
+  TRAINING_CREDIT_COSTS,
   isAdminUser,
   hasFeatureAccess,
   generateVerificationCode,
-  checkCredits,
-  deductCredits,
+  checkAndEnforceGracePeriod,
+  requireJobAnalysis,
+  requireTrainingCredits,
 } = await import('../auth.js');
 
 describe('PLANS configuration', () => {
@@ -31,22 +32,21 @@ describe('PLANS configuration', () => {
     expect(Object.keys(PLANS)).toEqual(['free', 'starter', 'pro', 'elite']);
   });
 
-  it('should give free plan 15 monthly credits', () => {
-    expect(PLANS.free.monthlyCredits).toBe(15);
+  it('should give free plan 15 lifetime training credits', () => {
+    expect(PLANS.free.lifetimeTrainingCredits).toBe(15);
   });
 
-  it('should give free plan 1 monthly job analysis', () => {
-    expect(PLANS.free.monthlyJobAnalyses).toBe(1);
+  it('should give free plan 3 lifetime job analyses', () => {
+    expect(PLANS.free.lifetimeJobAnalyses).toBe(3);
   });
 
-  it('should give pro plan unlimited job analyses (-1)', () => {
-    expect(PLANS.pro.monthlyJobAnalyses).toBe(-1);
+  it('should give elite plan unlimited job analyses (-1)', () => {
+    expect(PLANS.elite.monthlyJobAnalyses).toBe(-1);
   });
 
-  it('should increase credits with each tier', () => {
-    expect(PLANS.starter.monthlyCredits).toBeGreaterThan(PLANS.free.monthlyCredits);
-    expect(PLANS.pro.monthlyCredits).toBeGreaterThan(PLANS.starter.monthlyCredits);
-    expect(PLANS.elite.monthlyCredits).toBeGreaterThan(PLANS.pro.monthlyCredits);
+  it('should increase training credits with each paid tier', () => {
+    expect(PLANS.pro.monthlyTrainingCredits).toBeGreaterThan(PLANS.starter.monthlyTrainingCredits);
+    expect(PLANS.elite.monthlyTrainingCredits).toBeGreaterThan(PLANS.pro.monthlyTrainingCredits);
   });
 
   it('should not give free plan voice practice access', () => {
@@ -70,24 +70,23 @@ describe('PLANS configuration', () => {
   });
 });
 
-describe('CREDIT_COSTS', () => {
+describe('TRAINING_CREDIT_COSTS', () => {
   it('should define costs for all expected actions', () => {
-    expect(CREDIT_COSTS).toHaveProperty('companyInfo');
-    expect(CREDIT_COSTS).toHaveProperty('studyPlan');
-    expect(CREDIT_COSTS).toHaveProperty('companyResearch');
-    expect(CREDIT_COSTS).toHaveProperty('quizEvaluation');
-    expect(CREDIT_COSTS).toHaveProperty('voiceEvaluation');
-    expect(CREDIT_COSTS).toHaveProperty('chatPractice');
-    expect(CREDIT_COSTS).toHaveProperty('focusChat');
+    expect(TRAINING_CREDIT_COSTS).toHaveProperty('studyPlan');
+    expect(TRAINING_CREDIT_COSTS).toHaveProperty('companyResearch');
+    expect(TRAINING_CREDIT_COSTS).toHaveProperty('quizEvaluation');
+    expect(TRAINING_CREDIT_COSTS).toHaveProperty('voiceEvaluation');
+    expect(TRAINING_CREDIT_COSTS).toHaveProperty('chatPractice');
+    expect(TRAINING_CREDIT_COSTS).toHaveProperty('focusChat');
   });
 
   it('should have studyPlan as the most expensive action', () => {
-    const maxCost = Math.max(...Object.values(CREDIT_COSTS));
-    expect(CREDIT_COSTS.studyPlan).toBe(maxCost);
+    const maxCost = Math.max(...Object.values(TRAINING_CREDIT_COSTS));
+    expect(TRAINING_CREDIT_COSTS.studyPlan).toBe(maxCost);
   });
 
   it('should have all positive integer costs', () => {
-    for (const [action, cost] of Object.entries(CREDIT_COSTS)) {
+    for (const [action, cost] of Object.entries(TRAINING_CREDIT_COSTS)) {
       expect(cost).toBeGreaterThan(0);
       expect(Number.isInteger(cost)).toBe(true);
     }
@@ -163,82 +162,229 @@ describe('generateVerificationCode', () => {
   });
 });
 
-describe('checkCredits', () => {
+describe('checkAndEnforceGracePeriod', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should return unlimited credits for admin users', async () => {
+  it('should return not downgraded when no subscription exists', async () => {
+    pool.query.mockResolvedValueOnce({ rows: [] });
+
+    const result = await checkAndEnforceGracePeriod(1);
+    expect(result.downgraded).toBe(false);
+  });
+
+  it('should return not downgraded when status is active', async () => {
     pool.query.mockResolvedValueOnce({
-      rows: [{ email: 'admin@intrview.io' }],
+      rows: [{ status: 'active', grace_period_end: null, plan: 'pro' }],
     });
 
-    const result = await checkCredits(1, 5);
-    expect(result.hasCredits).toBe(true);
-    expect(result.remaining).toBe(999999);
+    const result = await checkAndEnforceGracePeriod(1);
+    expect(result.downgraded).toBe(false);
   });
 
-  it('should return true when user has enough credits', async () => {
-    pool.query
-      .mockResolvedValueOnce({ rows: [{ email: 'user@example.com' }] })
-      .mockResolvedValueOnce({ rows: [{ credits_remaining: 50 }] });
+  it('should return not downgraded when grace period has not expired', async () => {
+    const futureDate = new Date(Date.now() + 3 * 86400000).toISOString();
+    pool.query.mockResolvedValueOnce({
+      rows: [{ status: 'past_due', grace_period_end: futureDate, plan: 'pro' }],
+    });
 
-    const result = await checkCredits(1, 5);
-    expect(result.hasCredits).toBe(true);
-    expect(result.remaining).toBe(50);
+    const result = await checkAndEnforceGracePeriod(1);
+    expect(result.downgraded).toBe(false);
   });
 
-  it('should return false when user lacks credits', async () => {
+  it('should downgrade to free when grace period has expired', async () => {
+    const pastDate = new Date(Date.now() - 86400000).toISOString();
     pool.query
-      .mockResolvedValueOnce({ rows: [{ email: 'user@example.com' }] })
-      .mockResolvedValueOnce({ rows: [{ credits_remaining: 3 }] });
+      .mockResolvedValueOnce({
+        rows: [{ status: 'past_due', grace_period_end: pastDate, plan: 'pro' }],
+      })
+      .mockResolvedValueOnce({ rows: [] }); // UPDATE result
 
-    const result = await checkCredits(1, 5);
-    expect(result.hasCredits).toBe(false);
-    expect(result.remaining).toBe(3);
-  });
-
-  it('should return false when user has no subscription', async () => {
-    pool.query
-      .mockResolvedValueOnce({ rows: [{ email: 'user@example.com' }] })
-      .mockResolvedValueOnce({ rows: [] });
-
-    const result = await checkCredits(1, 5);
-    expect(result.hasCredits).toBe(false);
-    expect(result.remaining).toBe(0);
+    const result = await checkAndEnforceGracePeriod(1);
+    expect(result.downgraded).toBe(true);
+    expect(pool.query).toHaveBeenCalledTimes(2);
   });
 });
 
-describe('deductCredits', () => {
+// Helper: create a minimal Express-like req/res/next triple
+function makeReqResNext(userOverrides = {}) {
+  const req = {
+    user: {
+      id: 42,
+      email: 'user@example.com',
+      subscriptionStatus: 'active',
+      ...userOverrides,
+    },
+  };
+  const res = {
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn().mockReturnThis(),
+  };
+  const next = vi.fn();
+  return { req, res, next };
+}
+
+describe('requireJobAnalysis middleware', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should not deduct credits for admin users', async () => {
-    pool.query
-      .mockResolvedValueOnce({ rows: [{ email: 'admin@intrview.io' }] })
-      .mockResolvedValueOnce({ rows: [{ credits_remaining: 999999 }] });
+  it('should return 401 when req.user is missing', async () => {
+    const req = {};
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+    const next = vi.fn();
 
-    const remaining = await deductCredits(1, 5);
-    expect(remaining).toBe(999999);
-    // Should not have called the UPDATE query
-    expect(pool.query).toHaveBeenCalledTimes(2);
+    await requireJobAnalysis()(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
   });
 
-  it('should deduct credits for regular users', async () => {
-    pool.query
-      .mockResolvedValueOnce({ rows: [{ email: 'user@example.com' }] })
-      .mockResolvedValueOnce({ rows: [{ credits_remaining: 45 }] });
+  it('should return 402 with downgraded:true when grace period has expired', async () => {
+    const { req, res, next } = makeReqResNext({ subscriptionStatus: 'past_due' });
+    const pastDate = new Date(Date.now() - 86400000).toISOString();
 
-    const remaining = await deductCredits(1, 5);
-    expect(remaining).toBe(45);
+    // checkAndEnforceGracePeriod: SELECT returns expired grace period
+    pool.query
+      .mockResolvedValueOnce({
+        rows: [{ status: 'past_due', grace_period_end: pastDate, plan: 'pro' }],
+      })
+      .mockResolvedValueOnce({ rows: [] }); // UPDATE to free
+
+    await requireJobAnalysis()(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(402);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ downgraded: true, upgradeRequired: true })
+    );
+    expect(next).not.toHaveBeenCalled();
   });
 
-  it('should throw when deduction fails (insufficient credits)', async () => {
-    pool.query
-      .mockResolvedValueOnce({ rows: [{ email: 'user@example.com' }] })
-      .mockResolvedValueOnce({ rows: [] });
+  it('should return 402 with upgradeRequired when no job analyses remain', async () => {
+    const { req, res, next } = makeReqResNext();
 
-    await expect(deductCredits(1, 5)).rejects.toThrow('Failed to deduct credits');
+    // checkAndEnforceGracePeriod: active, no issue
+    pool.query.mockResolvedValueOnce({ rows: [{ status: 'active', grace_period_end: null }] });
+    // checkJobAnalyses: user not admin (email query)
+    pool.query.mockResolvedValueOnce({ rows: [{ email: 'user@example.com' }] });
+    // checkJobAnalyses: subscription query returns 0 remaining
+    pool.query.mockResolvedValueOnce({
+      rows: [{ job_analyses_remaining: 0, job_analyses_monthly_allowance: 10 }],
+    });
+
+    await requireJobAnalysis()(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(402);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ resourceType: 'jobAnalyses', upgradeRequired: true })
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('should call next() when subscription is active and analyses remain', async () => {
+    const { req, res, next } = makeReqResNext();
+
+    // checkAndEnforceGracePeriod: active
+    pool.query.mockResolvedValueOnce({ rows: [{ status: 'active', grace_period_end: null }] });
+    // checkJobAnalyses: email check (non-admin)
+    pool.query.mockResolvedValueOnce({ rows: [{ email: 'user@example.com' }] });
+    // checkJobAnalyses: 5 remaining
+    pool.query.mockResolvedValueOnce({
+      rows: [{ job_analyses_remaining: 5, job_analyses_monthly_allowance: 10 }],
+    });
+
+    await requireJobAnalysis()(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+});
+
+describe('requireTrainingCredits middleware', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return 401 when req.user is missing', async () => {
+    const req = {};
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+    const next = vi.fn();
+
+    await requireTrainingCredits('chatPractice')(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('should return 500 for unknown action name', async () => {
+    const { req, res, next } = makeReqResNext();
+
+    // checkAndEnforceGracePeriod: no issue
+    pool.query.mockResolvedValueOnce({ rows: [{ status: 'active', grace_period_end: null }] });
+
+    await requireTrainingCredits('unknownAction')(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('should return 402 with downgraded:true when grace period has expired', async () => {
+    const { req, res, next } = makeReqResNext({ subscriptionStatus: 'past_due' });
+    const pastDate = new Date(Date.now() - 86400000).toISOString();
+
+    pool.query
+      .mockResolvedValueOnce({
+        rows: [{ status: 'past_due', grace_period_end: pastDate, plan: 'pro' }],
+      })
+      .mockResolvedValueOnce({ rows: [] }); // UPDATE to free
+
+    await requireTrainingCredits('studyPlan')(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(402);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ downgraded: true })
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('should return 402 when training credits are insufficient', async () => {
+    const { req, res, next } = makeReqResNext();
+
+    // checkAndEnforceGracePeriod: no issue
+    pool.query.mockResolvedValueOnce({ rows: [{ status: 'active', grace_period_end: null }] });
+    // checkTrainingCredits: email (non-admin)
+    pool.query.mockResolvedValueOnce({ rows: [{ email: 'user@example.com' }] });
+    // checkTrainingCredits: 1 credit remaining, studyPlan costs 5
+    pool.query.mockResolvedValueOnce({ rows: [{ training_credits_remaining: 1 }] });
+
+    await requireTrainingCredits('studyPlan')(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(402);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resourceType: 'trainingCredits',
+        required: TRAINING_CREDIT_COSTS.studyPlan,
+        upgradeRequired: true,
+      })
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('should call next() and set req.trainingCreditCost when credits are sufficient', async () => {
+    const { req, res, next } = makeReqResNext();
+
+    // checkAndEnforceGracePeriod: no issue
+    pool.query.mockResolvedValueOnce({ rows: [{ status: 'active', grace_period_end: null }] });
+    // checkTrainingCredits: email (non-admin)
+    pool.query.mockResolvedValueOnce({ rows: [{ email: 'user@example.com' }] });
+    // checkTrainingCredits: 10 credits remaining, chatPractice costs 1
+    pool.query.mockResolvedValueOnce({ rows: [{ training_credits_remaining: 10 }] });
+
+    await requireTrainingCredits('chatPractice')(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.trainingCreditCost).toBe(TRAINING_CREDIT_COSTS.chatPractice);
+    expect(res.status).not.toHaveBeenCalled();
   });
 });

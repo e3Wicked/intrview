@@ -226,7 +226,7 @@
   transition: opacity 0.2s;
 }
 
-.pricing-cta:hover {
+.pricing-cta:hover:not(:disabled) {
   opacity: 0.9;
 }
 

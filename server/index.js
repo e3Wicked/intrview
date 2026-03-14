@@ -40,7 +40,8 @@ import {
   normalizeTopicName,
   saveDrillSession,
   getDrillSessions,
-  getAllDrillSessions
+  getAllDrillSessions,
+  getAdvertiserSubByStripeId
 } from './db.js';
 import {
   createUser,
@@ -48,14 +49,10 @@ import {
   createOrGetUser,
   createSession,
   getUserFromSession,
-  checkCredits,
-  deductCredits,
   hasFeatureAccess,
   requireAuth,
   requireAdmin,
-  requireCredits,
   isAdminUser,
-  CREDIT_COSTS,
   PLANS,
   generateVerificationCode,
   createUserWithoutPassword,
@@ -177,6 +174,40 @@ app.use(cors({
   origin: true,
   credentials: true
 }));
+
+// Stripe webhook must be registered BEFORE express.json() because Stripe
+// signature verification requires the raw request body. express.json()
+// parses the body into an object, which breaks constructEvent().
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripe) {
+    return res.status(500).json({ error: 'Stripe not configured' });
+  }
+
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    return res.status(500).json({ error: 'Webhook secret not configured' });
+  }
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
+    await handleWebhook(event);
+    res.json({ received: true });
+  } catch (error) {
+    console.error('Webhook handler error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.use(express.json({ limit: '500kb' }));
 app.use(cookieParser());
 
@@ -3355,33 +3386,121 @@ app.post('/api/stripe/create-checkout', requireAuth, async (req, res) => {
   }
 });
 
-// Stripe webhook
-app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  if (!stripe) {
-    return res.status(500).json({ error: 'Stripe not configured' });
-  }
-  
-  const sig = req.headers['stripe-signature'];
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  
-  if (!webhookSecret) {
-    return res.status(500).json({ error: 'Webhook secret not configured' });
-  }
-  
-  let event;
-  
+// Upgrade existing subscription (paid → paid)
+app.post('/api/stripe/upgrade-subscription', requireAuth, async (req, res) => {
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-  } catch (err) {
-    console.error('Webhook signature verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-  
-  try {
-    await handleWebhook(event);
-    res.json({ received: true });
+    const { plan, interval = 'month' } = req.body;
+
+    if (!PLANS[plan] || !PLANS[plan].price) {
+      return res.status(400).json({ error: 'Invalid plan' });
+    }
+
+    if (!['month', 'year'].includes(interval)) {
+      return res.status(400).json({ error: 'Invalid billing interval' });
+    }
+
+    if (req.user.plan === plan) {
+      return res.status(400).json({ error: 'You are already on this plan' });
+    }
+
+    if (!req.user.stripeSubscriptionId || req.user.subscriptionStatus !== 'active') {
+      return res.status(400).json({ error: 'No active subscription. Use checkout for initial subscription.' });
+    }
+
+    const planOrder = ['free', 'starter', 'pro', 'elite'];
+    const currentIndex = planOrder.indexOf(req.user.plan);
+    const newIndex = planOrder.indexOf(plan);
+
+    if (newIndex <= currentIndex) {
+      return res.status(400).json({ error: 'Use the downgrade endpoint to downgrade your plan' });
+    }
+
+    // Cancel any pending downgrade before upgrading
+    if (req.user.scheduledDowngradePlan) {
+      await cancelScheduledDowngrade(req.user.id);
+    }
+
+    const updatedSub = await upgradeSubscription(req.user.id, plan, interval);
+    res.json({ success: true, plan, subscriptionId: updatedSub.id });
   } catch (error) {
-    console.error('Webhook handler error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Schedule a subscription downgrade (paid → lower paid)
+app.post('/api/stripe/downgrade-subscription', requireAuth, async (req, res) => {
+  try {
+    const { plan, interval = 'month' } = req.body;
+
+    if (!PLANS[plan] || !PLANS[plan].price) {
+      return res.status(400).json({ error: 'Invalid plan' });
+    }
+
+    if (!['month', 'year'].includes(interval)) {
+      return res.status(400).json({ error: 'Invalid billing interval' });
+    }
+
+    if (plan === 'free') {
+      return res.status(400).json({ error: 'Use the billing portal to cancel your subscription' });
+    }
+
+    if (!req.user.stripeSubscriptionId || req.user.subscriptionStatus !== 'active') {
+      return res.status(400).json({ error: 'No active subscription' });
+    }
+
+    const planOrder = ['free', 'starter', 'pro', 'elite'];
+    const currentIndex = planOrder.indexOf(req.user.plan);
+    const newIndex = planOrder.indexOf(plan);
+
+    if (newIndex >= currentIndex) {
+      return res.status(400).json({ error: 'New plan must be a lower tier. Use upgrade for higher tiers.' });
+    }
+
+    const result = await scheduleDowngrade(req.user.id, plan, interval);
+    res.json({ success: true, scheduledPlan: result.scheduledPlan, effectiveDate: result.effectiveDate });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cancel a scheduled downgrade
+app.post('/api/stripe/cancel-downgrade', requireAuth, async (req, res) => {
+  try {
+    await cancelScheduledDowngrade(req.user.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cancel subscription (schedule cancellation at period end)
+const VALID_CANCELLATION_REASONS = ['too_expensive', 'not_using_enough', 'missing_features', 'switching_competitor', 'temporary_break', 'other'];
+
+app.post('/api/stripe/cancel-subscription', requireAuth, async (req, res) => {
+  try {
+    const { reason, comment } = req.body;
+    if (!reason || !VALID_CANCELLATION_REASONS.includes(reason)) {
+      return res.status(400).json({ error: 'Invalid cancellation reason' });
+    }
+    if (!req.user.stripeSubscriptionId || req.user.plan === 'free') {
+      return res.status(400).json({ error: 'No active subscription to cancel' });
+    }
+    const result = await scheduleCancellation(req.user.id, reason, comment);
+    res.json({ success: true, effectiveDate: result.effectiveDate });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Undo a pending cancellation
+app.post('/api/stripe/undo-cancellation', requireAuth, async (req, res) => {
+  try {
+    if (!req.user.cancelAtPeriodEnd) {
+      return res.status(400).json({ error: 'No pending cancellation' });
+    }
+    await undoCancellation(req.user.id);
+    res.json({ success: true });
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
@@ -3392,12 +3511,68 @@ app.post('/api/stripe/create-portal', requireAuth, async (req, res) => {
     if (!req.user.stripeCustomerId) {
       return res.status(400).json({ error: 'No active subscription' });
     }
-    
-    const returnUrl = `${req.headers.origin || 'http://localhost:5000'}/billing`;
+
+    const returnUrl = `${req.headers.origin || 'http://localhost:5173'}/settings`;
     const session = await createPortalSession(req.user.stripeCustomerId, returnUrl);
-    
+
     res.json({ url: session.url });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Verify checkout — fallback for when webhook hasn't fired yet
+app.get('/api/stripe/verify-checkout', requireAuth, async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).json({ error: 'Stripe not configured' });
+    }
+
+    const subResult = await pool.query(
+      'SELECT plan, stripe_customer_id FROM subscriptions WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    const sub = subResult.rows[0];
+    if (!sub || !sub.stripe_customer_id) {
+      return res.json({ plan: sub?.plan || 'free', updated: false });
+    }
+
+    // Already on a paid plan — no need to check Stripe
+    if (sub.plan !== 'free') {
+      return res.json({ plan: sub.plan, updated: false });
+    }
+
+    // Check Stripe for active subscriptions
+    const subscriptions = await stripe.subscriptions.list({
+      customer: sub.stripe_customer_id,
+      status: 'active',
+      limit: 1
+    });
+
+    if (subscriptions.data.length === 0) {
+      return res.json({ plan: 'free', updated: false });
+    }
+
+    const stripeSub = subscriptions.data[0];
+    // Find plan from the checkout session metadata or price lookup
+    const sessions = await stripe.checkout.sessions.list({
+      subscription: stripeSub.id,
+      limit: 1
+    });
+
+    const planKey = sessions.data[0]?.metadata?.plan;
+    if (!planKey || !PLANS[planKey]) {
+      return res.json({ plan: 'free', updated: false });
+    }
+
+    // Webhook hasn't fired yet — update DB directly
+    await activateSubscription(req.user.id, planKey, stripeSub.id,
+      stripeSub.current_period_start, stripeSub.current_period_end);
+
+    res.json({ plan: planKey, updated: true });
+  } catch (error) {
+    console.error('Verify checkout error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -3409,34 +3584,52 @@ app.post('/api/stripe/create-advertiser-checkout', async (req, res) => {
       return res.status(500).json({ error: 'Stripe not configured' });
     }
 
-    const { companyName, email } = req.body;
-    
+    const { companyName, email, domain, description, websiteUrl } = req.body;
+    if (!companyName || !email) {
+      return res.status(400).json({ error: 'companyName and email are required' });
+    }
+
+    // Get or create the advertiser in DB
+    const advertiser = await getOrCreateAdvertiser(
+      companyName,
+      domain || companyName.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com',
+      description || null,
+      websiteUrl || null
+    );
+
+    // Get or create Stripe customer for this advertiser
+    let customerId;
+    const existingResult = await pool.query(
+      'SELECT stripe_customer_id FROM advertiser_subscriptions WHERE advertiser_id = $1 AND stripe_customer_id IS NOT NULL ORDER BY created_at DESC LIMIT 1',
+      [advertiser.id]
+    );
+    if (existingResult.rows.length > 0 && existingResult.rows[0].stripe_customer_id) {
+      customerId = existingResult.rows[0].stripe_customer_id;
+    } else {
+      const customer = await stripe.customers.create({
+        email,
+        name: companyName,
+        metadata: { advertiserId: advertiser.id.toString(), type: 'advertiser' }
+      });
+      customerId = customer.id;
+    }
+
+    const priceId = await getAdvertiserPriceId();
+
     const session = await stripe.checkout.sessions.create({
+      customer: customerId,
       payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: 'intrview.io Advertiser Spot',
-            description: 'Monthly advertising spot - Next month reservation' + (companyName ? ` (${companyName})` : '')
-          },
-          recurring: {
-            interval: 'month'
-          },
-          unit_amount: 99900 // $999 in cents
-        },
-        quantity: 1
-      }],
+      line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: `${req.headers.origin || 'http://localhost:5000'}/advertiser-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.origin || 'http://localhost:5000'}/advertiser-cancel`,
-      customer_email: email,
+      success_url: `${req.headers.origin || 'http://localhost:5173'}/advertiser-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${req.headers.origin || 'http://localhost:5173'}/advertiser-cancel`,
       metadata: {
         type: 'advertiser',
-        company: companyName || 'Unknown'
+        advertiserId: advertiser.id.toString(),
+        company: companyName
       }
     });
-    
+
     res.json({ url: session.url, sessionId: session.id });
   } catch (error) {
     console.error('Error creating advertiser checkout:', error);
@@ -3665,6 +3858,120 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
     res.json({ users, total: users.length });
   } catch (error) {
     console.error('Admin users error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: subscription analytics
+app.get('/api/admin/analytics', requireAdmin, async (req, res) => {
+  try {
+    const [subscriberCounts, mrrData, advertiserStats, growth, churn, recentEvents] = await Promise.all([
+      // 1. Subscriber counts by plan and status
+      pool.query(`
+        SELECT plan, status, COUNT(*) as count
+        FROM subscriptions
+        WHERE plan != 'free'
+        GROUP BY plan, status
+      `),
+      // 2. MRR calculation
+      pool.query(`
+        SELECT
+          plan,
+          billing_interval,
+          COUNT(*) as count,
+          SUM(CASE
+            WHEN billing_interval = 'year' THEN
+              CASE plan
+                WHEN 'starter' THEN 86.0 / 12
+                WHEN 'pro' THEN 182.0 / 12
+                WHEN 'elite' THEN 374.0 / 12
+                ELSE 0
+              END
+            ELSE
+              CASE plan
+                WHEN 'starter' THEN 9
+                WHEN 'pro' THEN 19
+                WHEN 'elite' THEN 39
+                ELSE 0
+              END
+          END) as mrr
+        FROM subscriptions
+        WHERE status = 'active' AND plan != 'free'
+        GROUP BY plan, billing_interval
+      `),
+      // 3. Advertiser stats
+      pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE status = 'active') as active_count,
+          COUNT(*) as total_count,
+          COUNT(*) FILTER (WHERE status = 'active') * 999 as monthly_revenue
+        FROM advertiser_subscriptions
+      `),
+      // 4. Growth - new signups by month (last 6 months)
+      pool.query(`
+        SELECT
+          DATE_TRUNC('month', created_at) as month,
+          COUNT(*) as signups
+        FROM users
+        WHERE created_at >= NOW() - INTERVAL '6 months'
+        GROUP BY DATE_TRUNC('month', created_at)
+        ORDER BY month
+      `),
+      // 5. Churn - cancellations in last 30 days
+      pool.query(`
+        SELECT COUNT(*) as churned
+        FROM subscriptions
+        WHERE status = 'canceled' AND updated_at >= NOW() - INTERVAL '30 days' AND plan != 'free'
+      `),
+      // 6. Recent webhook events
+      pool.query(`
+        SELECT event_id, event_type, created_at
+        FROM webhook_events
+        ORDER BY created_at DESC
+        LIMIT 50
+      `)
+    ]);
+
+    // Calculate total MRR
+    const userMrr = mrrData.rows.reduce((sum, r) => sum + parseFloat(r.mrr || 0), 0);
+    const advStats = advertiserStats.rows[0] || { active_count: 0, total_count: 0, monthly_revenue: 0 };
+    const totalMrr = userMrr + parseFloat(advStats.monthly_revenue || 0);
+
+    // Build subscriber breakdown
+    const subscribers = {};
+    for (const row of subscriberCounts.rows) {
+      if (!subscribers[row.plan]) subscribers[row.plan] = { active: 0, past_due: 0, canceled: 0 };
+      subscribers[row.plan][row.status] = parseInt(row.count);
+    }
+
+    // Build MRR breakdown
+    const mrrBreakdown = {};
+    for (const row of mrrData.rows) {
+      if (!mrrBreakdown[row.plan]) mrrBreakdown[row.plan] = 0;
+      mrrBreakdown[row.plan] += parseFloat(row.mrr || 0);
+    }
+
+    res.json({
+      mrr: {
+        total: Math.round(totalMrr * 100) / 100,
+        user: Math.round(userMrr * 100) / 100,
+        advertiser: parseFloat(advStats.monthly_revenue || 0),
+        breakdown: mrrBreakdown
+      },
+      subscribers,
+      advertisers: {
+        active: parseInt(advStats.active_count || 0),
+        total: parseInt(advStats.total_count || 0)
+      },
+      growth: growth.rows.map(r => ({
+        month: r.month,
+        signups: parseInt(r.signups)
+      })),
+      churn: parseInt(churn.rows[0]?.churned || 0),
+      recentEvents: recentEvents.rows
+    });
+  } catch (error) {
+    console.error('Analytics error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -4379,9 +4686,11 @@ app.listen(PORT, () => {
   console.log('✅ POST /api/voice/evaluate');
   console.log('✅ POST /api/company/research');
   console.log('✅ POST /api/stripe/create-checkout');
+  console.log('✅ POST /api/stripe/upgrade-subscription');
   console.log('✅ POST /api/stripe/create-advertiser-checkout');
   console.log('✅ POST /api/stripe/webhook');
   console.log('✅ POST /api/stripe/create-portal');
+  console.log('✅ GET  /api/stripe/verify-checkout');
   console.log('✅ POST /api/questions/generate-more');
   console.log('✅ GET  /api/test');
   console.log('=============================\n');

@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { api } from '../utils/api'
 import axios from 'axios'
+import CancelSubscriptionModal from '../components/CancelSubscriptionModal'
 import './SettingsPage.css'
 
 function SettingsPage({ user, setUser, onUpgrade, onLogout }) {
   const [name, setName] = useState(user.name || '')
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [undoingCancel, setUndoingCancel] = useState(false)
 
   const handleSaveName = async () => {
     setSaving(true)
@@ -23,6 +26,8 @@ function SettingsPage({ user, setUser, onUpgrade, onLogout }) {
     }
   }
 
+  const [cancellingDowngrade, setCancellingDowngrade] = useState(false)
+
   const handleManageBilling = async () => {
     try {
       const res = await axios.post('/api/stripe/create-portal')
@@ -32,7 +37,44 @@ function SettingsPage({ user, setUser, onUpgrade, onLogout }) {
     }
   }
 
+  const handleCancelDowngrade = async () => {
+    setCancellingDowngrade(true)
+    try {
+      await axios.post('/api/stripe/cancel-downgrade')
+      const meRes = await axios.get('/api/auth/me')
+      if (meRes.data.user) {
+        setUser(meRes.data.user)
+      }
+    } catch (err) {
+      console.error('Cancel downgrade error:', err)
+      alert('Failed to cancel downgrade. Please try again.')
+    } finally {
+      setCancellingDowngrade(false)
+    }
+  }
+
+  const handleUndoCancellation = async () => {
+    setUndoingCancel(true)
+    try {
+      await api.subscription.undoCancel()
+      const meRes = await axios.get('/api/auth/me')
+      if (meRes.data.user) {
+        setUser(meRes.data.user)
+      }
+    } catch (err) {
+      console.error('Undo cancellation error:', err)
+      alert('Failed to undo cancellation. Please try again.')
+    } finally {
+      setUndoingCancel(false)
+    }
+  }
+
   const planLabel = (user.plan || 'free').charAt(0).toUpperCase() + (user.plan || 'free').slice(1)
+
+  const formatDate = (date) => {
+    if (!date) return ''
+    return new Date(date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  }
 
   return (
     <div className="settings-page">
@@ -65,6 +107,11 @@ function SettingsPage({ user, setUser, onUpgrade, onLogout }) {
         <h2 className="settings-section-title">Subscription</h2>
         <div className="settings-plan-row">
           <span className="settings-plan-badge">{planLabel}</span>
+          {user.billingInterval && user.plan !== 'free' && (
+            <span className="settings-billing-interval">
+              Billed {user.billingInterval === 'year' ? 'annually' : 'monthly'}
+            </span>
+          )}
         </div>
         <div className="settings-usage">
           <div className="settings-usage-row">
@@ -82,10 +129,41 @@ function SettingsPage({ user, setUser, onUpgrade, onLogout }) {
             </span>
           </div>
         </div>
+        {user.cancelAtPeriodEnd && (
+          <div className="settings-cancel-notice">
+            <p>Your subscription will end on <strong>{formatDate(user.currentPeriodEnd)}</strong>. You'll keep all features until then.</p>
+            <button
+              className="settings-btn"
+              onClick={handleUndoCancellation}
+              disabled={undoingCancel}
+            >
+              {undoingCancel ? 'Restoring...' : 'Keep My Plan'}
+            </button>
+          </div>
+        )}
+        {user.scheduledDowngradePlan && !user.cancelAtPeriodEnd && (
+          <div className="settings-downgrade-notice">
+            <p>Downgrade to <strong>{user.scheduledDowngradePlan.charAt(0).toUpperCase() + user.scheduledDowngradePlan.slice(1)}</strong> scheduled. Your current plan features remain active until your next billing date.</p>
+            <button
+              className="settings-btn secondary"
+              onClick={handleCancelDowngrade}
+              disabled={cancellingDowngrade}
+            >
+              {cancellingDowngrade ? 'Cancelling...' : 'Cancel Downgrade'}
+            </button>
+          </div>
+        )}
         <div className="settings-plan-actions">
-          <button className="settings-btn" onClick={onUpgrade}>Upgrade Plan</button>
+          {user.plan !== 'elite' && (
+            <button className="settings-btn" onClick={onUpgrade}>Upgrade Plan</button>
+          )}
           {user.stripeCustomerId && (
             <button className="settings-btn secondary" onClick={handleManageBilling}>Manage Billing</button>
+          )}
+          {user.plan !== 'free' && user.stripeSubscriptionId && !user.cancelAtPeriodEnd && (
+            <button className="settings-btn danger" onClick={() => setShowCancelModal(true)}>
+              Cancel Subscription
+            </button>
           )}
         </div>
       </div>
@@ -94,6 +172,14 @@ function SettingsPage({ user, setUser, onUpgrade, onLogout }) {
         <h2 className="settings-section-title">Account</h2>
         <button className="settings-btn danger" onClick={onLogout}>Sign Out</button>
       </div>
+
+      <CancelSubscriptionModal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        user={user}
+        onUserUpdate={setUser}
+        onUpgrade={onUpgrade}
+      />
     </div>
   )
 }

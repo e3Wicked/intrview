@@ -206,3 +206,35 @@
 .admin-error {
   color: #dc2626;
 }
+
+/* -- Tabs -- */
+.admin-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--color-border, #e6e3de);
+  padding-bottom: 0;
+}
+
+.admin-tab {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b6b6b);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.2s, border-color 0.2s;
+  font-family: inherit;
+}
+
+.admin-tab:hover {
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.admin-tab--active {
+  color: var(--color-accent, #2563eb);
+  border-bottom-color: var(--color-accent, #2563eb);
+}

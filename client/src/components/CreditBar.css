@@ -90,3 +90,10 @@
   border: 6px solid transparent;
   border-right-color: #1a1a1a;
 }
+
+.credit-reset-info {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 10px;
+  text-align: center;
+  padding-top: 4px;
+}

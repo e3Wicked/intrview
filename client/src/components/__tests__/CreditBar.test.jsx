@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CreditBar from '../CreditBar.jsx';
 
@@ -8,74 +8,112 @@ describe('CreditBar', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('should display credits remaining and total', () => {
-    const user = { creditsRemaining: 10, creditsMonthlyAllowance: 15 };
+  it('should display analyses remaining with monthly allowance', () => {
+    const user = {
+      jobAnalysesRemaining: 8,
+      jobAnalysesMonthlyAllowance: 10,
+      trainingCreditsRemaining: 100,
+      trainingCreditsMonthlyAllowance: 150,
+      isLifetimePlan: false,
+    };
     render(<CreditBar user={user} />);
-    expect(screen.getByText('10 / 15')).toBeInTheDocument();
+    expect(screen.getByText('Analyses')).toBeInTheDocument();
+    expect(screen.getByText('8 / 10')).toBeInTheDocument();
   });
 
-  it('should display only remaining credits when allowance is 0', () => {
-    const user = { creditsRemaining: 10, creditsMonthlyAllowance: 0 };
+  it('should display unlimited analyses for unlimited allowance', () => {
+    const user = {
+      jobAnalysesRemaining: 5,
+      jobAnalysesMonthlyAllowance: -1,
+      trainingCreditsRemaining: 100,
+      trainingCreditsMonthlyAllowance: 800,
+      isLifetimePlan: false,
+    };
     render(<CreditBar user={user} />);
+    // Unlimited analyses show infinity symbol
+    expect(screen.getByText('\u221E')).toBeInTheDocument();
+  });
+
+  it('should display training credits remaining', () => {
+    const user = {
+      jobAnalysesRemaining: 3,
+      jobAnalysesMonthlyAllowance: 10,
+      trainingCreditsRemaining: 120,
+      trainingCreditsMonthlyAllowance: 150,
+      isLifetimePlan: false,
+    };
+    render(<CreditBar user={user} />);
+    expect(screen.getByText('Training')).toBeInTheDocument();
+    expect(screen.getByText('120 / 150')).toBeInTheDocument();
+  });
+
+  it('should display lifetime credits without monthly allowance format', () => {
+    const user = {
+      jobAnalysesRemaining: 2,
+      jobAnalysesMonthlyAllowance: 0,
+      trainingCreditsRemaining: 10,
+      trainingCreditsMonthlyAllowance: 0,
+      isLifetimePlan: true,
+      planDetails: { lifetimeJobAnalyses: 3, lifetimeTrainingCredits: 15 },
+    };
+    render(<CreditBar user={user} />);
+    // Lifetime plans show just the remaining count without "/ allowance"
     expect(screen.getByText('10')).toBeInTheDocument();
   });
 
-  it('should not render progress bar when allowance is 0', () => {
-    const user = { creditsRemaining: 10, creditsMonthlyAllowance: 0 };
+  it('should render segment meters for non-zero allowances', () => {
+    const user = {
+      jobAnalysesRemaining: 5,
+      jobAnalysesMonthlyAllowance: 10,
+      trainingCreditsRemaining: 80,
+      trainingCreditsMonthlyAllowance: 150,
+      isLifetimePlan: false,
+    };
     const { container } = render(<CreditBar user={user} />);
-    expect(container.querySelector('.credit-progress')).toBeNull();
+    const segments = container.querySelectorAll('.credit-segments');
+    expect(segments.length).toBe(2); // One for analyses, one for training
   });
 
-  it('should render progress bar when allowance is positive', () => {
-    const user = { creditsRemaining: 10, creditsMonthlyAllowance: 15 };
-    const { container } = render(<CreditBar user={user} />);
-    expect(container.querySelector('.credit-progress')).not.toBeNull();
-  });
-
-  it('should show upgrade button when credits are 0', () => {
-    const onUpgrade = vi.fn();
-    const user = { creditsRemaining: 0, creditsMonthlyAllowance: 15 };
-    render(<CreditBar user={user} onUpgrade={onUpgrade} />);
-    const btn = screen.getByText('Upgrade');
-    expect(btn).toBeInTheDocument();
-    fireEvent.click(btn);
-    expect(onUpgrade).toHaveBeenCalledTimes(1);
-  });
-
-  it('should not show upgrade button when credits remain', () => {
-    const user = { creditsRemaining: 5, creditsMonthlyAllowance: 15 };
+  it('should show reset date for non-lifetime plans', () => {
+    const resetDate = new Date('2026-04-01T00:00:00Z');
+    const user = {
+      jobAnalysesRemaining: 5,
+      jobAnalysesMonthlyAllowance: 10,
+      trainingCreditsRemaining: 80,
+      trainingCreditsMonthlyAllowance: 150,
+      isLifetimePlan: false,
+      creditsResetAt: resetDate.toISOString(),
+    };
     render(<CreditBar user={user} />);
-    expect(screen.queryByText('Upgrade')).toBeNull();
+    expect(screen.getByText(/Resets/)).toBeInTheDocument();
   });
 
-  it('should apply amber color when credits > 50%', () => {
-    const user = { creditsRemaining: 10, creditsMonthlyAllowance: 15 };
-    const { container } = render(<CreditBar user={user} />);
-    const fill = container.querySelector('.credit-progress-fill');
-    expect(fill.style.backgroundColor).toBe('rgb(245, 158, 11)'); // #f59e0b
-  });
-
-  it('should apply yellow color when credits 20-50%', () => {
-    const user = { creditsRemaining: 5, creditsMonthlyAllowance: 15 };
-    const { container } = render(<CreditBar user={user} />);
-    const fill = container.querySelector('.credit-progress-fill');
-    expect(fill.style.backgroundColor).toBe('rgb(251, 191, 36)'); // #fbbf24
-  });
-
-  it('should apply red color when credits <= 20%', () => {
-    const user = { creditsRemaining: 1, creditsMonthlyAllowance: 15 };
-    const { container } = render(<CreditBar user={user} />);
-    const fill = container.querySelector('.credit-progress-fill');
-    expect(fill.style.backgroundColor).toBe('rgb(239, 68, 68)'); // #ef4444
+  it('should not show reset date for lifetime plans', () => {
+    const user = {
+      jobAnalysesRemaining: 2,
+      jobAnalysesMonthlyAllowance: 0,
+      trainingCreditsRemaining: 10,
+      trainingCreditsMonthlyAllowance: 0,
+      isLifetimePlan: true,
+      creditsResetAt: '2026-04-01T00:00:00Z',
+    };
+    render(<CreditBar user={user} />);
+    expect(screen.queryByText(/Resets/)).toBeNull();
   });
 
   it('should show tooltip on hover', () => {
-    const user = { creditsRemaining: 10, creditsMonthlyAllowance: 15 };
+    const user = {
+      jobAnalysesRemaining: 5,
+      jobAnalysesMonthlyAllowance: 10,
+      trainingCreditsRemaining: 80,
+      trainingCreditsMonthlyAllowance: 150,
+      isLifetimePlan: false,
+    };
     const { container } = render(<CreditBar user={user} />);
-    const info = container.querySelector('.credit-info');
-    fireEvent.mouseEnter(info);
-    expect(screen.getByText(/Prep credits power/)).toBeInTheDocument();
-    fireEvent.mouseLeave(info);
-    expect(screen.queryByText(/Prep credits power/)).toBeNull();
+    const bar = container.querySelector('.credit-bar');
+    fireEvent.mouseEnter(bar);
+    expect(screen.getByText(/Analyses are used for job postings/)).toBeInTheDocument();
+    fireEvent.mouseLeave(bar);
+    expect(screen.queryByText(/Analyses are used for job postings/)).toBeNull();
   });
 });

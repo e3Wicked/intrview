@@ -49,3 +49,7 @@ Full-stack: React (Vite) frontend + Express backend + PostgreSQL via Docker.
 **Client routing:** All routes defined in `client/src/App.jsx`. Key routes: `/` (homepage/landing), `/dashboard`, `/job/:jobId` (job analysis view), `/company/:companyName`, `/progress`, `/focus-chat`, `/study/drills`, `/study/mock-interview`, `/admin` (admin-only). App.jsx owns global state (`user`, `result`, `jdHistory`) and passes it down. Job analysis results are temporarily cached in `sessionStorage` keyed by job ID, with the DB as the primary source of truth.
 
 **Dev email:** Without SMTP configured, OTP codes are printed to the server console instead of being emailed. Check server logs to get the code during local development.
+
+## Verifying your work
+
+**Unit tests:** ALWAYS write unit tests and update existing ones to verify your work does not break other functionalities. Fix your changes if unit tests fail.

@@ -1,5 +1,16 @@
 import axios from 'axios'
 
+// Global 402 interceptor — dispatches a custom event so App.jsx can show the upgrade modal
+axios.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response?.status === 402) {
+      window.dispatchEvent(new CustomEvent('subscription-error', { detail: error.response.data || {} }));
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const api = {
   progress: {
     get: (jobHash) => axios.get(`/api/progress/${jobHash}`),

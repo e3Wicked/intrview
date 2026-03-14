@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import SubscriptionAnalytics from '../components/SubscriptionAnalytics'
 import './AdminPage.css'
 
 const PLAN_LABELS = {
@@ -24,6 +25,7 @@ export default function AdminPage({ user }) {
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
   const [search, setSearch]   = useState('')
+  const [activeTab, setActiveTab] = useState('users')
 
   useEffect(() => {
     axios.get('/api/admin/users')
@@ -54,6 +56,23 @@ export default function AdminPage({ user }) {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="admin-tabs">
+        <button
+          className={`admin-tab ${activeTab === 'users' ? 'admin-tab--active' : ''}`}
+          onClick={() => setActiveTab('users')}
+        >
+          Users
+        </button>
+        <button
+          className={`admin-tab ${activeTab === 'analytics' ? 'admin-tab--active' : ''}`}
+          onClick={() => setActiveTab('analytics')}
+        >
+          Analytics
+        </button>
+      </div>
+
+      {activeTab === 'users' && (<>
       {/* Stats row */}
       <div className="admin-stats">
         <div className="admin-stat">
@@ -125,6 +144,9 @@ export default function AdminPage({ user }) {
           </table>
         </div>
       )}
+      </>)}
+
+      {activeTab === 'analytics' && <SubscriptionAnalytics />}
     </div>
   )
 }

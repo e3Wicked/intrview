@@ -86,14 +86,10 @@ function PricingSection({ onSelectPlan }) {
       </div>
 
       <div className="pricing-cards">
-        {plans.map((plan) => (
-          <div
-            key={plan.key}
-            className={`pricing-card ${plan.popular ? 'popular' : ''}`}
-          >
-            {plan.popular && (
-              <div className="pricing-badge">Most Popular</div>
-            )}
+        {plans.map((plan) => {
+          const planIndex = planOrder.indexOf(plan.key)
+          const isCurrent = plan.key === currentPlan
+          const isDowngrade = planIndex < currentIndex && planIndex > 0
 
             <div className="pricing-card-header">
               <h3>{plan.name}</h3>
@@ -103,30 +99,48 @@ function PricingSection({ onSelectPlan }) {
               </div>
             </div>
 
-            <div className="pricing-details">
-              <div className="pricing-analyses">
-                <strong>{plan.jobAnalyses}</strong> job analyses / month
+              <div className="pricing-card-header">
+                <h3>{plan.name}</h3>
+                {billingInterval === 'month' ? (
+                  <div className="pricing-price">
+                    <span className="pricing-amount">${plan.price}</span>
+                    <span className="pricing-period">/month</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="pricing-price">
+                      <span className="pricing-amount">${Math.round(plan.price * 12 * 0.8 / 12)}</span>
+                      <span className="pricing-period">/mo</span>
+                    </div>
+                    <div className="pricing-annual-total">${Math.round(plan.price * 12 * 0.8)}/year</div>
+                  </>
+                )}
               </div>
-              <div className="pricing-credits">
-                <strong>{plan.trainingCredits}</strong> training credits / month
-                <span className="pricing-tooltip" title="Training credits power AI chat, quizzes, voice practice, and company research.">
-                  ?
-                </span>
+
+              <div className="pricing-details">
+                <div className="pricing-analyses">
+                  <strong>{plan.jobAnalyses}</strong> job analyses / month
+                </div>
+                <div className="pricing-credits">
+                  <strong>{plan.trainingCredits}</strong> training credits / month
+                  <span className="pricing-tooltip" title="Training credits power AI chat, quizzes, voice practice, and company research.">
+                    ?
+                  </span>
+                </div>
               </div>
-            </div>
 
-            <ul className="pricing-features">
-              {plan.features.map((feature, idx) => (
-                <li key={idx}>
-                  <span className="feature-check">&#10003;</span>
-                  {feature}
-                </li>
-              ))}
-            </ul>
+              <ul className="pricing-features">
+                {plan.features.map((feature, idx) => (
+                  <li key={idx}>
+                    <span className="feature-check">&#10003;</span>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
 
-            {plan.badge && (
-              <div className="pricing-badge-small">{plan.badge}</div>
-            )}
+              {plan.badge && (
+                <div className="pricing-badge-small">{plan.badge}</div>
+              )}
 
             <button
               className="pricing-cta"
