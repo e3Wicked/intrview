@@ -1,11 +1,19 @@
+import { useState } from 'react'
 import './PricingSection.css'
 
+const PRICING = {
+  starter:  { monthly: 9,  quarterly: 24,  annual: 86 },
+  pro:      { monthly: 19, quarterly: 51,  annual: 182 },
+  elite:    { monthly: 39, quarterly: 105, annual: 374 },
+}
+
 function PricingSection({ onSelectPlan }) {
+  const [interval, setInterval] = useState('monthly')
+
   const plans = [
     {
       key: 'starter',
       name: 'Starter',
-      price: 9,
       jobAnalyses: '10',
       trainingCredits: '150',
       features: [
@@ -15,13 +23,12 @@ function PricingSection({ onSelectPlan }) {
         'Company research',
         'Progress tracking'
       ],
-      cta: 'Start Starter',
+      cta: 'Get Started',
       popular: false
     },
     {
       key: 'pro',
       name: 'Pro',
-      price: 19,
       jobAnalyses: '30',
       trainingCredits: '400',
       features: [
@@ -30,13 +37,12 @@ function PricingSection({ onSelectPlan }) {
         'PDF export of study plans',
         'Priority AI speed'
       ],
-      cta: 'Go Pro',
+      cta: 'Get Started',
       popular: true
     },
     {
       key: 'elite',
       name: 'Elite',
-      price: 39,
       jobAnalyses: 'Unlimited',
       trainingCredits: '800',
       features: [
@@ -46,17 +52,37 @@ function PricingSection({ onSelectPlan }) {
         'Custom interview simulation (coming soon)',
         'Early access to new features'
       ],
-      cta: 'Join Elite',
+      cta: 'Get Started',
       popular: false,
       badge: 'Includes upcoming premium features'
     }
   ]
+
+  const getPeriodLabel = () => {
+    if (interval === 'monthly') return '/month'
+    if (interval === 'quarterly') return '/quarter'
+    return '/year'
+  }
 
   return (
     <div className="pricing-section">
       <div className="pricing-header">
         <h2>Simple, transparent pricing</h2>
         <p>Choose a plan that fits your interview journey.</p>
+      </div>
+
+      <div className="pricing-interval-toggle">
+        {['monthly', 'quarterly', 'annual'].map((opt) => (
+          <button
+            key={opt}
+            className={`pricing-interval-option ${interval === opt ? 'active' : ''}`}
+            onClick={() => setInterval(opt)}
+          >
+            {opt.charAt(0).toUpperCase() + opt.slice(1)}
+            {opt === 'quarterly' && <span className="pricing-save-badge">Save 10%</span>}
+            {opt === 'annual' && <span className="pricing-save-badge">Save 20%</span>}
+          </button>
+        ))}
       </div>
 
       <div className="pricing-cards">
@@ -72,8 +98,8 @@ function PricingSection({ onSelectPlan }) {
             <div className="pricing-card-header">
               <h3>{plan.name}</h3>
               <div className="pricing-price">
-                <span className="pricing-amount">${plan.price}</span>
-                <span className="pricing-period">/month</span>
+                <span className="pricing-amount">${PRICING[plan.key][interval]}</span>
+                <span className="pricing-period">{getPeriodLabel()}</span>
               </div>
             </div>
 
@@ -104,7 +130,7 @@ function PricingSection({ onSelectPlan }) {
 
             <button
               className="pricing-cta"
-              onClick={() => onSelectPlan(plan.key)}
+              onClick={() => onSelectPlan({ plan: plan.key, interval })}
             >
               {plan.cta}
             </button>

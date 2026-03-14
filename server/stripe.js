@@ -39,25 +39,38 @@ export async function createStripeProducts() {
   return products;
 }
 
+const INTERVAL_CONFIG = {
+  monthly:   { interval: 'month', interval_count: 1 },
+  quarterly: { interval: 'month', interval_count: 3 },
+  annual:    { interval: 'year',  interval_count: 1 },
+};
+
 // Create checkout session
-export async function createCheckoutSession(userId, planKey, successUrl, cancelUrl) {
+export async function createCheckoutSession(userId, planKey, successUrl, cancelUrl, interval = 'monthly') {
   const plan = PLANS[planKey];
   if (!plan || !plan.price) {
     throw new Error('Invalid plan');
   }
+
+  const intervalCfg = INTERVAL_CONFIG[interval];
+  if (!intervalCfg) {
+    throw new Error('Invalid billing interval');
+  }
+
+  const priceAmount = plan.pricing?.[interval] ?? plan.price;
 
   // Get or create Stripe customer
   const userResult = await pool.query(
     'SELECT stripe_customer_id FROM subscriptions WHERE user_id = $1',
     [userId]
   );
-  
+
   let customerId = userResult.rows[0]?.stripe_customer_id;
-  
+
   if (!customerId) {
     const userResult = await pool.query('SELECT email, name FROM users WHERE id = $1', [userId]);
     const user = userResult.rows[0];
-    
+
     const customer = await stripe.customers.create({
       email: user.email,
       name: user.name,
@@ -65,40 +78,41 @@ export async function createCheckoutSession(userId, planKey, successUrl, cancelU
         userId: userId.toString()
       }
     });
-    
+
     customerId = customer.id;
-    
+
     await pool.query(
       'UPDATE subscriptions SET stripe_customer_id = $1 WHERE user_id = $2',
       [customerId, userId]
     );
   }
 
-  // Get price ID from environment or create it
-  // In production, store these in your database
-  let priceId = process.env[`STRIPE_PRICE_ID_${planKey.toUpperCase()}`];
-  
+  const envKey = `STRIPE_PRICE_ID_${planKey.toUpperCase()}_${interval.toUpperCase()}`;
+  let priceId = process.env[envKey];
+
   if (!priceId) {
-    // Auto-create product and price if not exists
-    console.log(`Creating Stripe product and price for ${planKey}...`);
+    console.log(`Creating Stripe product and price for ${planKey} (${interval})...`);
     try {
       const product = await stripe.products.create({
         name: `${plan.name} Plan`,
         description: `intrview.io ${plan.name} subscription`
       });
-      
+
+      const recurring = { interval: intervalCfg.interval };
+      if (intervalCfg.interval_count > 1) {
+        recurring.interval_count = intervalCfg.interval_count;
+      }
+
       const price = await stripe.prices.create({
         product: product.id,
-        unit_amount: plan.price * 100, // Convert to cents
+        unit_amount: priceAmount * 100,
         currency: 'usd',
-        recurring: {
-          interval: 'month'
-        }
+        recurring
       });
-      
+
       priceId = price.id;
-      console.log(`✅ Created Stripe price for ${planKey}: ${priceId}`);
-      console.log(`💡 Add this to your .env: STRIPE_PRICE_ID_${planKey.toUpperCase()}=${priceId}`);
+      console.log(`Created Stripe price for ${planKey} (${interval}): ${priceId}`);
+      console.log(`Add this to your .env: ${envKey}=${priceId}`);
     } catch (error) {
       console.error('Error creating Stripe product/price:', error);
       throw new Error(`Failed to create Stripe price: ${error.message}`);

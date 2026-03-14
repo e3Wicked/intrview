@@ -1,3 +1,16 @@
+/* Header tag (static label) */
+.focus-header-tag {
+  padding: 3px 10px;
+  background: var(--color-bg-surface, #f8f7f5);
+  border: 1px solid var(--color-border, #e6e3de);
+  border-radius: 12px;
+  color: var(--color-text-secondary, #6b6b6b);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Inter', -apple-system, sans-serif;
+  text-transform: capitalize;
+}
+
 /* Focus Chat Container */
 .focus-chat-container {
   background: var(--color-bg-card, #ffffff);
@@ -477,6 +490,23 @@
 .focus-back-btn:hover {
   border-color: #d0cdc7;
   color: var(--color-text-primary, #1a1a1a);
+}
+
+.focus-continue-btn {
+  padding: 12px 32px;
+  background: #22c55e;
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.focus-continue-btn:hover {
+  background: #16a34a;
 }
 
 .focus-restart-btn {

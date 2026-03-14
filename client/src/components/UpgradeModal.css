@@ -1,7 +1,7 @@
 .upgrade-modal-overlay {
   position: fixed;
   top: 0;
-  left: 0;
+  left: var(--sidebar-width, 220px);
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.3);
@@ -78,8 +78,19 @@
 
 .upgrade-loading {
   text-align: center;
-  color: var(--color-accent, #2563eb);
+  color: var(--color-accent, #47aafd);
   font-size: 14px;
   margin-top: 24px;
   font-family: 'Inter', -apple-system, sans-serif;
+}
+
+@media (max-width: 768px) {
+  .upgrade-modal-overlay {
+    left: 0;
+    padding: 16px;
+  }
+
+  .upgrade-modal {
+    padding: 24px 16px;
+  }
 }

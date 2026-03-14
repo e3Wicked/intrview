@@ -4,9 +4,37 @@ import { api } from '../utils/api'
 import FocusChat from '../components/FocusChat'
 import './FocusChatPage.css'
 
+// Lightweight seniority detection from role title
+const SENIORITY_RANK = { intern: 0, junior: 1, mid: 2, senior: 3, staff: 4, lead: 5 }
+
+function detectSeniority(roleTitle) {
+  const t = (roleTitle || '').toLowerCase()
+  if (/\b(intern|internship)\b/.test(t)) return 'intern'
+  if (/\b(junior|jr\.?|entry[- ]level|associate)\b/.test(t)) return 'junior'
+  if (/\b(staff|principal)\b/.test(t)) return 'staff'
+  if (/\b(lead|architect|head|director|vp|vice president)\b/.test(t)) return 'lead'
+  if (/\b(senior|sr\.?)\b/.test(t)) return 'senior'
+  return 'mid'
+}
+
+// Derive seniority from multiple role titles — take the highest level
+function deriveSeniorityFromRoles(roleTitles) {
+  if (!roleTitles || roleTitles.length === 0) return 'mid'
+  let highest = 'mid'
+  for (const title of roleTitles) {
+    const level = detectSeniority(title)
+    if ((SENIORITY_RANK[level] || 0) > (SENIORITY_RANK[highest] || 0)) {
+      highest = level
+    }
+  }
+  return highest
+}
+
 function FocusChatPage({ user }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const skill = searchParams.get('skill') || ''
+  const [seniorityLevel, setSeniorityLevel] = useState(searchParams.get('seniority') || 'mid')
+  const [questionGoal, setQuestionGoal] = useState(parseInt(searchParams.get('goal')) || 10)
   const [topics, setTopics] = useState([])
   const [jobs, setJobs] = useState([])
   const [allJobTopics, setAllJobTopics] = useState([])
@@ -24,9 +52,15 @@ function FocusChatPage({ user }) {
           api.user.getAnalyses().catch(() => ({ data: [] })),
           api.topics.getAllTopics().catch(() => ({ data: [] })),
         ])
+        const jobsList = jobsRes.data || []
         setTopics(topicsRes.data || [])
-        setJobs(jobsRes.data || [])
+        setJobs(jobsList)
         setAllJobTopics(allJobTopicsRes.data || [])
+        // Auto-detect seniority from most recent job
+        if (jobsList.length > 0 && !searchParams.get('seniority')) {
+          const detected = detectSeniority(jobsList[0].role_title)
+          setSeniorityLevel(detected)
+        }
       } catch (err) {
         console.error('Error loading chat topics:', err)
       } finally {
@@ -58,11 +92,26 @@ function FocusChatPage({ user }) {
   }
 
   if (skill) {
-    return <FocusChat skill={skill} user={user} />
+    const goalParam = parseInt(searchParams.get('goal')) || 10
+    const seniorityParam = searchParams.get('seniority') || seniorityLevel
+    return <FocusChat skill={skill} user={user} seniorityLevel={seniorityParam} onSeniorityChange={setSeniorityLevel} questionGoal={goalParam} />
   }
 
-  const startChat = (topicName) => {
-    setSearchParams({ skill: topicName })
+  const startChat = (topicName, jobRoleTitle) => {
+    let level = seniorityLevel
+    if (jobRoleTitle) {
+      level = detectSeniority(jobRoleTitle)
+      setSeniorityLevel(level)
+    } else {
+      const topicData = allJobTopics.find(t =>
+        (t.topic_name || t.name) === topicName
+      )
+      if (topicData?.role_titles?.length > 0) {
+        level = deriveSeniorityFromRoles(topicData.role_titles)
+        setSeniorityLevel(level)
+      }
+    }
+    setSearchParams({ skill: topicName, seniority: level, goal: questionGoal.toString() })
   }
 
   return (
@@ -75,6 +124,29 @@ function FocusChatPage({ user }) {
           <div className="focus-chat-loading">Loading topics...</div>
         ) : (
           <>
+            <div className="focus-chat-config">
+              <div className="focus-chat-config-item">
+                <label>Level</label>
+                <select value={seniorityLevel} onChange={(e) => setSeniorityLevel(e.target.value)}>
+                  <option value="intern">Intern</option>
+                  <option value="junior">Junior</option>
+                  <option value="mid">Mid</option>
+                  <option value="senior">Senior</option>
+                  <option value="staff">Staff</option>
+                  <option value="lead">Lead+</option>
+                </select>
+              </div>
+              <div className="focus-chat-config-item">
+                <label>Goal</label>
+                <select value={questionGoal} onChange={(e) => setQuestionGoal(Number(e.target.value))}>
+                  <option value={5}>5 Qs</option>
+                  <option value={10}>10 Qs</option>
+                  <option value={15}>15 Qs</option>
+                  <option value={20}>20 Qs</option>
+                </select>
+              </div>
+            </div>
+
             {topics.length > 0 && (
               <div className="focus-chat-section">
                 <h2>Your Topics</h2>
@@ -157,7 +229,7 @@ function FocusChatPage({ user }) {
                                   <button
                                     key={t.id || idx}
                                     className="focus-chat-pill"
-                                    onClick={() => startChat(t.topic_name || t.name)}
+                                    onClick={() => startChat(t.topic_name || t.name, job.role_title)}
                                   >
                                     {t.topic_name || t.name}
                                   </button>

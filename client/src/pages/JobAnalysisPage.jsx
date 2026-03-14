@@ -12,7 +12,6 @@ function JobAnalysisPage({ result, companyName, progress, user }) {
   const [research, setResearch] = useState(null)
   const [researchLoading, setResearchLoading] = useState(false)
   const [serverProgress, setServerProgress] = useState(null)
-  const [lastSession, setLastSession] = useState(null)
 
   // Load company research (use result.companyResearch first, fetch as fallback)
   useEffect(() => {
@@ -45,17 +44,6 @@ function JobAnalysisPage({ result, companyName, progress, user }) {
       .catch(() => {})
   }, [result?.jobDescriptionHash])
 
-  // Load last session for resume CTA
-  useEffect(() => {
-    api.practice.getHistory({ limit: 5 })
-      .then(res => {
-        const sessions = res.data.sessions || []
-        const hash = result?.jobDescriptionHash
-        const session = sessions.find(s => s.job_description_hash === hash)
-        if (session) setLastSession(session)
-      })
-      .catch(() => {})
-  }, [result?.jobDescriptionHash])
 
   // Normalize study plan
   const studyPlanData = useMemo(() => {
@@ -340,10 +328,10 @@ function JobAnalysisPage({ result, companyName, progress, user }) {
                 </div>
               )}
 
-              {/* Empty state */}
+              {/* Empty state / error fallback */}
               {!research && !researchLoading && (
                 <div className="jb-card jb-card-full">
-                  <p className="jb-empty-text">No company research available yet.</p>
+                  <p className="jb-empty-text">Company intel unavailable — try refreshing or check back later.</p>
                 </div>
               )}
             </div>

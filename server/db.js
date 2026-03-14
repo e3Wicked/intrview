@@ -659,10 +659,12 @@ async function trackJobAnalysis(userId, url, jobDescriptionHash, companyName, ro
       [userId, url, jobDescriptionHash, companyName || null, roleTitle || null]
     );
     console.log(`✅ Tracked job analysis: ${companyName || 'Unknown'} - ${roleTitle || 'No role'} (ID: ${result.rows[0]?.id})`);
+    return result.rows[0]?.id || null;
   } catch (error) {
     console.error('❌ Error tracking job analysis:', error.message);
     console.error('Error details:', error);
     // Don't throw - tracking failure shouldn't break the app
+    return null;
   }
 }
 
@@ -888,7 +890,8 @@ async function getAllUserTopics(userId) {
               COALESCE(uts.attempts, 0) as attempts,
               COALESCE(uts.correct_count, 0) as correct_count,
               uts.last_practiced_at,
-              COUNT(DISTINCT jt.job_description_hash) as job_count
+              COUNT(DISTINCT jt.job_description_hash) as job_count,
+              array_agg(DISTINCT ja.role_title) FILTER (WHERE ja.role_title IS NOT NULL) as role_titles
        FROM topics t
        JOIN job_topics jt ON jt.topic_id = t.id
        JOIN job_analyses ja ON ja.job_description_hash = jt.job_description_hash

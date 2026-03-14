@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom'
 import axios from 'axios'
 import './App.css'
 import HomePage from './pages/HomePage'
@@ -12,8 +12,6 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const JobAnalysisPage = lazy(() => import('./pages/JobAnalysisPage'))
 const CompanyPage = lazy(() => import('./pages/CompanyPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
-const TrainingPage = lazy(() => import('./pages/TrainingPage'))
-const ProgressPage = lazy(() => import('./pages/ProgressPage'))
 const FocusChatPage = lazy(() => import('./pages/FocusChatPage'))
 const MockInterviewPage = lazy(() => import('./pages/MockInterviewPage'))
 const DrillsPage = lazy(() => import('./pages/DrillsPage'))
@@ -82,6 +80,8 @@ function App() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [jdHistory, setJdHistory] = useState([])
   const [selectedJdId, setSelectedJdId] = useState(null)
+  const [jobLoading, setJobLoading] = useState(false)
+  const [jobLoadError, setJobLoadError] = useState(null)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -245,6 +245,11 @@ function App() {
     }
   }
 
+  const handleDeleteJob = (id) => {
+    setJdHistory(prev => prev.filter(j => j.id !== id))
+    sessionStorage.removeItem(`job_analysis_${id}`)
+  }
+
   const handleSelectAnalysis = (analysisResult) => {
     setResult(analysisResult)
     setUrl(analysisResult.url || '')
@@ -265,7 +270,9 @@ function App() {
     if (location.pathname.startsWith('/job/')) {
       const jobId = location.pathname.split('/job/')[1]
       if (jobId) {
-        // Try sessionStorage first (temporary cache from recent navigation)
+        setJobLoadError(null)
+
+        // Try sessionStorage for instant render
         const sessionData = sessionStorage.getItem(`job_analysis_${jobId}`)
         if (sessionData) {
           try {
@@ -273,15 +280,15 @@ function App() {
             setResult(analysisResult)
             setUrl(analysisResult.url || '')
             setSelectedJdId(jobId)
-            return
           } catch (e) {
             console.error('Error parsing sessionStorage data:', e)
           }
         }
 
-        // Fetch from server (primary source of truth)
+        // Always fetch from server for full data
         const token = localStorage.getItem('session_token')
         if (token && /^\d+$/.test(jobId)) {
+          setJobLoading(!sessionData)
           axios.get(`/api/user/analysis/${jobId}`)
             .then(res => {
               const analysisResult = res.data
@@ -292,7 +299,13 @@ function App() {
             })
             .catch(err => {
               console.error('Error loading analysis from server:', err)
+              if (!sessionData) {
+                setJobLoadError('Could not load this job analysis.')
+              }
             })
+            .finally(() => setJobLoading(false))
+        } else if (!sessionData) {
+          setJobLoadError('Could not load this job analysis.')
         }
       }
     }
@@ -353,6 +366,7 @@ function App() {
                 setSelectedJdId={setSelectedJdId}
                 jdHistory={jdHistory}
                 setJdHistory={setJdHistory}
+                onDeleteJob={handleDeleteJob}
               />
             ) : (
               <SignInPrompt 
@@ -401,7 +415,6 @@ function App() {
             )
           }
         />
-        {/* /job/:jobId/train removed — training now via sidebar (Chat, Drills) */}
         <Route
           path="/job/:jobId"
           element={
@@ -412,32 +425,24 @@ function App() {
                 progress={progress}
                 user={user}
               />
-            ) : (
+            ) : jobLoading ? (
               <div style={{ padding: '64px', textAlign: 'center', color: '#6b6b6b' }}>
                 <p>Loading job analysis...</p>
+              </div>
+            ) : (
+              <div style={{ padding: '64px', textAlign: 'center', color: '#6b6b6b' }}>
+                <p>{jobLoadError || 'Job analysis not found.'}</p>
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  style={{ marginTop: '16px', padding: '10px 24px', background: 'transparent', border: '1px solid #e6e3de', borderRadius: '8px', color: '#6b6b6b', cursor: 'pointer', fontFamily: "'Inter', sans-serif", fontSize: '14px' }}
+                >
+                  Back to Dashboard
+                </button>
               </div>
             )
           }
         />
-        <Route
-          path="/progress"
-          element={
-            user ? (
-              <ProgressPage user={user} />
-            ) : (
-              <SignInPrompt
-                onSignIn={() => {
-                  setLoginModalMode('signin')
-                  setShowLoginModal(true)
-                }}
-                onSignUp={() => {
-                  setLoginModalMode('signup')
-                  setShowLoginModal(true)
-                }}
-              />
-            )
-          }
-        />
+        <Route path="/progress" element={<Navigate to="/study/drills" replace />} />
         <Route
           path="/study/mock-interview"
           element={

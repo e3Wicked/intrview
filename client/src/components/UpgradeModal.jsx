@@ -6,17 +6,15 @@ import './UpgradeModal.css'
 function UpgradeModal({ isOpen, onClose, currentPlan, onLoginRequired }) {
   const [loading, setLoading] = useState(null)
 
-  const handleSelectPlan = async (planKey) => {
+  const handleSelectPlan = async ({ plan: planKey, interval }) => {
     if (planKey === currentPlan) {
       onClose()
       return
     }
 
-    // Check if user needs to login first
     try {
       const meResponse = await axios.get('/api/auth/me')
       if (!meResponse.data.user) {
-        // User not logged in, show login modal
         onClose()
         if (onLoginRequired) {
           onLoginRequired()
@@ -24,7 +22,6 @@ function UpgradeModal({ isOpen, onClose, currentPlan, onLoginRequired }) {
         return
       }
     } catch (error) {
-      // If auth check fails, assume not logged in
       onClose()
       if (onLoginRequired) {
         onLoginRequired()
@@ -35,14 +32,13 @@ function UpgradeModal({ isOpen, onClose, currentPlan, onLoginRequired }) {
     setLoading(planKey)
 
     try {
-      const response = await axios.post('/api/stripe/create-checkout', { plan: planKey })
+      const response = await axios.post('/api/stripe/create-checkout', { plan: planKey, interval })
       if (response.data.url) {
         window.location.href = response.data.url
       }
     } catch (error) {
       console.error('Error creating checkout:', error)
       if (error.response?.status === 401) {
-        // Not authenticated, show login
         onClose()
         if (onLoginRequired) {
           onLoginRequired()

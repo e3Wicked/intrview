@@ -1,6 +1,6 @@
 .focus-chat-page {
   padding: 32px;
-  max-width: 800px;
+  max-width: 100%;
   margin: 0 auto;
 }
 
@@ -15,6 +15,46 @@
   color: #6b6b6b;
   font-size: 15px;
   margin: 0 0 32px;
+}
+
+/* --- Session config bar --- */
+.focus-chat-config {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.focus-chat-config-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.focus-chat-config-item label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b6b6b;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.focus-chat-config-item select {
+  padding: 5px 10px;
+  background: #f8f7f5;
+  border: 1px solid #e6e3de;
+  border-radius: 6px;
+  color: #1a1a1a;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Inter', -apple-system, sans-serif;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.focus-chat-config-item select:hover,
+.focus-chat-config-item select:focus {
+  border-color: #2563eb;
 }
 
 .focus-chat-loading {

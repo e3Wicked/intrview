@@ -113,82 +113,47 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
-.sidebar-nav-item.sub-item {
-  padding-left: 24px;
-  font-size: 13px;
-}
 
 .sidebar.collapsed .sidebar-nav-item {
   justify-content: center;
   padding: 10px;
 }
 
-.sidebar.collapsed .sidebar-nav-item.sub-item {
-  padding-left: 10px;
-}
-
 .sidebar.collapsed .sidebar-nav-item span {
   display: none;
 }
 
-/* ------------------------------------------------
-   Section header (Study With)
-   ------------------------------------------------ */
-
-.sidebar-section {
-  margin-top: 12px;
+/* Tooltip for collapsed sidebar items */
+.sidebar.collapsed .sidebar-nav-item[title],
+.sidebar.collapsed .sidebar-user-trigger[title] {
+  position: relative;
 }
 
-.sidebar-section-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  background: none;
-  border: none;
-  border-radius: 10px;
-  color: rgba(255, 255, 255, 0.3);
+.sidebar.collapsed .sidebar-nav-item[title]::after,
+.sidebar.collapsed .sidebar-user-trigger[title]::after {
+  content: attr(title);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 6px 12px;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
   font-family: 'Inter', -apple-system, sans-serif;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  width: 100%;
-  text-align: left;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
-.sidebar-section-header:hover {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.sidebar-section-chevron {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
-}
-
-.sidebar-section-header:hover .sidebar-section-chevron {
+.sidebar.collapsed .sidebar-nav-item[title]:hover::after,
+.sidebar.collapsed .sidebar-user-trigger[title]:hover::after {
   opacity: 1;
-}
-
-.sidebar.collapsed .sidebar-section-header {
-  justify-content: center;
-  padding: 10px;
-}
-
-.sidebar.collapsed .sidebar-section-header span {
-  display: none;
-}
-
-.sidebar-section-items {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 2px;
 }
 
 /* ------------------------------------------------
@@ -312,12 +277,12 @@
 }
 
 .sidebar-action-btn.upgrade {
-  color: rgba(37, 99, 235, 0.85);
+  color: rgba(71, 170, 253, 0.85);
 }
 
 .sidebar-action-btn.upgrade:hover {
-  color: rgba(37, 99, 235, 1);
-  background: rgba(37, 99, 235, 0.08);
+  color: rgba(71, 170, 253, 1);
+  background: rgba(71, 170, 253, 0.08);
 }
 
 .sidebar-action-btn.upgrade svg {

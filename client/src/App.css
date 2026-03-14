@@ -25,13 +25,13 @@
   --color-border-subtle: #f0eeea;
 
   /* Accent */
-  --color-accent: #2563eb;
-  --color-accent-hover: #1d4ed8;
-  --color-accent-light: #eff6ff;
+  --color-accent: #47aafd;
+  --color-accent-hover: #2d96f0;
+  --color-accent-light: #eef7ff;
 
   /* Status */
-  --color-success: #22c55e;
-  --color-warning: #eab308;
+  --color-success: #34d399;
+  --color-warning: #f59e0b;
   --color-danger: #ef4444;
 
   /* Shadows */

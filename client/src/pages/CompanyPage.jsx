@@ -28,12 +28,6 @@ function CompanyPage({ user }) {
       )
       setAnalyses(companyAnalyses)
 
-      // Single role: redirect directly to job brief
-      if (companyAnalyses.length === 1) {
-        navigate(`/job/${companyAnalyses[0].id}`, { replace: true })
-        return
-      }
-
       // Load study plans and progress for multi-role view
       const plans = {}
       const progress = {}
